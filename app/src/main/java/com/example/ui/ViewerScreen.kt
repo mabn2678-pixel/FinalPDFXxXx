@@ -435,6 +435,20 @@ fun ViewerScreen(
         }
     }
 
+    // Toggle System Status Bar based on isBarsVisible (Fullscreen mode when toolbars hide)
+    LaunchedEffect(isBarsVisible) {
+        activity?.window?.let { window ->
+            val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+            if (isBarsVisible) {
+                insetsController.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+                insetsController.isAppearanceLightStatusBars = true
+            } else {
+                insetsController.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+                insetsController.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        }
+    }
+
     // Auto-hide control bars after 5 seconds of inactivity
     LaunchedEffect(isBarsVisible, state.autoHideToolbar) {
         if (state.autoHideToolbar && isBarsVisible) {
@@ -687,16 +701,16 @@ fun ViewerScreen(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
                     .widthIn(max = 480.dp)
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 54.dp, max = 72.dp)
+                        .heightIn(min = 40.dp, max = 48.dp)
                         .clip(RoundedCornerShape(percent = 50))
-                        .background(Color(0xF2ECE6F8))
-                        .border(BorderStroke(1.dp, Color(0x407C5CFF)), RoundedCornerShape(percent = 50)),
+                        .background(Color(0xFFEDE7F6))
+                        .border(BorderStroke(1.2.dp, Color(0xFFC4B5FD)), RoundedCornerShape(percent = 50)),
                     contentAlignment = Alignment.Center
                 ) {
                     Box(
@@ -769,9 +783,10 @@ fun ViewerScreen(
                         } else {
                             val fileName = state.currentPdfName ?: "عرض ملف PDF"
                             val fileNameFontSize = when {
-                                fileName.length > 30 -> 12.sp
-                                fileName.length > 18 -> 13.sp
-                                else -> 14.sp
+                                fileName.length > 35 -> 10.sp
+                                fileName.length > 20 -> 11.sp
+                                fileName.length > 12 -> 12.sp
+                                else -> 13.sp
                             }
 
                             Row(
@@ -812,17 +827,17 @@ fun ViewerScreen(
                                     )
                                 }
 
-                                // Centered Title text - Full filename with up to 4 lines
+                                // Centered Title text - Single line compact filename with auto-scaling font
                                 Text(
                                     text = fileName,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = fileNameFontSize,
-                                    maxLines = 4,
+                                    maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
-                                    lineHeight = (fileNameFontSize.value + 2).sp,
+                                    lineHeight = (fileNameFontSize.value + 1).sp,
                                     modifier = Modifier
                                         .weight(1f)
-                                        .padding(horizontal = 8.dp),
+                                        .padding(horizontal = 4.dp),
                                     color = Color(0xFF1C182B),
                                     textAlign = TextAlign.Center
                                 )
@@ -892,8 +907,8 @@ fun ViewerScreen(
                                 .fillMaxWidth()
                                 .testTag("native_bottom_bar")
                                 .clip(RoundedCornerShape(28.dp))
-                                .background(Color(0xF2ECE6F8))
-                                .border(BorderStroke(1.dp, Color(0x407C5CFF)), RoundedCornerShape(28.dp))
+                                .background(Color(0xFFEDE7F6))
+                                .border(BorderStroke(1.2.dp, Color(0xFFC4B5FD)), RoundedCornerShape(28.dp))
                         ) {
                             Row(
                                 modifier = Modifier
@@ -1534,14 +1549,22 @@ fun PdfWebView(
                                             PDFViewerApplication.eventBus.on('pagesinit', (e) => {
                                                 reportPageStatus();
                                                 try {
-                                                    PDFViewerApplication.pdfViewer.scrollMode = ${if (state.snapToPage) 3 else if (state.scrollMode == "horizontal") 1 else 0};
+                                                    if (PDFViewerApplication.pdfViewer) {
+                                                        PDFViewerApplication.pdfViewer.removePageBorders = true;
+                                                        PDFViewerApplication.pdfViewer.scrollMode = ${if (state.snapToPage) 3 else if (state.scrollMode == "horizontal") 1 else 0};
+                                                        PDFViewerApplication.pdfViewer.currentScaleValue = 'page-width';
+                                                    }
                                                 } catch (err) {}
                                             });
 
                                             PDFViewerApplication.eventBus.on('pagesloaded', (e) => {
                                                 reportPageStatus();
                                                 try {
-                                                    PDFViewerApplication.pdfViewer.scrollMode = ${if (state.snapToPage) 3 else if (state.scrollMode == "horizontal") 1 else 0};
+                                                    if (PDFViewerApplication.pdfViewer) {
+                                                        PDFViewerApplication.pdfViewer.removePageBorders = true;
+                                                        PDFViewerApplication.pdfViewer.scrollMode = ${if (state.snapToPage) 3 else if (state.scrollMode == "horizontal") 1 else 0};
+                                                        PDFViewerApplication.pdfViewer.currentScaleValue = 'page-width';
+                                                    }
                                                 } catch (err) {}
                                             });
 
@@ -1599,12 +1622,19 @@ fun PdfWebView(
                                                 reportSearchMatches(e);
                                             });
 
-                                            // 3. Complete hide/vanish of PDF.js official viewer toolbar elements
+                                            // 3. Complete hide/vanish of PDF.js official viewer toolbar elements and gapless page layout
                                             var style = document.createElement('style');
                                             style.type = 'text/css';
                                             style.innerHTML = `
-                                                #toolbarContainer, .toolbar, #sidebarContainer, .findbar, #secondaryToolbar { 
+                                                :root {
+                                                    --page-margin: 0px auto 0px !important;
+                                                    --page-border: 0px solid transparent !important;
+                                                }
+                                                #toolbarContainer, .toolbar, #sidebarContainer, .findbar, #secondaryToolbar, #loadingBar { 
                                                     display: none !important; 
+                                                    visibility: hidden !important;
+                                                    height: 0 !important;
+                                                    min-height: 0 !important;
                                                 } 
                                                 #outerContainer {
                                                     position: fixed !important;
@@ -1618,7 +1648,7 @@ fun PdfWebView(
                                                     overscroll-behavior: none !important;
                                                     overscroll-behavior-y: none !important;
                                                 }
-                                                #viewerContainer { 
+                                                #viewerContainer, #viewer, .pdfViewer { 
                                                     position: absolute !important;
                                                     top: 0 !important; 
                                                     left: 0 !important;
@@ -1631,6 +1661,21 @@ fun PdfWebView(
                                                     overscroll-behavior: none !important;
                                                     overscroll-behavior-y: none !important;
                                                     -webkit-overflow-scrolling: touch !important;
+                                                    padding: 0 !important;
+                                                    margin: 0 !important;
+                                                }
+                                                .pdfViewer .page, .spread .page, .page {
+                                                    margin: 0 auto 0px !important;
+                                                    border: none !important;
+                                                    border-image: none !important;
+                                                    box-shadow: none !important;
+                                                    outline: none !important;
+                                                    background-clip: border-box !important;
+                                                }
+                                                .pdfViewer.removePageBorders .page {
+                                                    margin: 0 auto 0px !important;
+                                                    border: none !important;
+                                                    box-shadow: none !important;
                                                 }
                                                 html, body {
                                                     position: fixed !important;
@@ -1819,19 +1864,31 @@ fun PdfWebView(
 
                                             var initialTouchDist = 0;
                                             var initialScale = 1.0;
+                                            var pinchAnchorPage = 1;
+                                            var pinchAnchorRatio = 0;
 
                                             document.addEventListener('touchstart', function(e) {
                                                 if (e.touches.length === 2) {
                                                     var t1 = e.touches[0];
                                                     var t2 = e.touches[1];
                                                     initialTouchDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-                                                    initialScale = PDFViewerApplication.pdfViewer.currentScale || 1.0;
+                                                    initialScale = (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentScale) ? PDFViewerApplication.pdfViewer.currentScale : 1.0;
+                                                    
+                                                    // Pin the currently active page number & relative offset ratio
+                                                    pinchAnchorPage = (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentPageNumber) ? PDFViewerApplication.pdfViewer.currentPageNumber : 1;
+                                                    var pageEl = document.querySelector('.page[data-page-number="' + pinchAnchorPage + '"]');
+                                                    var container = document.getElementById('viewerContainer');
+                                                    if (pageEl && container && pageEl.clientHeight > 0) {
+                                                        pinchAnchorRatio = (container.scrollTop - pageEl.offsetTop) / pageEl.clientHeight;
+                                                    } else {
+                                                        pinchAnchorRatio = 0;
+                                                    }
                                                 }
                                             }, { passive: true });
 
                                             document.addEventListener('touchmove', function(e) {
                                                 if (e.touches.length === 2 && initialTouchDist > 0) {
-                                                    e.preventDefault();
+                                                    if (e.cancelable) e.preventDefault();
                                                     var t1 = e.touches[0];
                                                     var t2 = e.touches[1];
                                                     var dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
@@ -1842,14 +1899,35 @@ fun PdfWebView(
                                                     }
                                                     var minScale = window.defaultScale || 1.0;
                                                     newScale = Math.min(Math.max(newScale, minScale), 4.0);
+                                                    
                                                     window.setScale(newScale);
-                                                    AndroidBridge.onScaleChanged(newScale);
+
+                                                    // Re-align scroll position so the anchor page stays fixed
+                                                    var container = document.getElementById('viewerContainer');
+                                                    var pageEl = document.querySelector('.page[data-page-number="' + pinchAnchorPage + '"]');
+                                                    if (pageEl && container && pageEl.clientHeight > 0) {
+                                                        container.scrollTop = pageEl.offsetTop + (pinchAnchorRatio * pageEl.clientHeight);
+                                                    }
+
+                                                    if (window.AndroidBridge && window.AndroidBridge.onScaleChanged) {
+                                                        window.AndroidBridge.onScaleChanged(newScale);
+                                                    }
                                                 }
                                             }, { passive: false });
 
                                             document.addEventListener('touchend', function(e) {
                                                 if (e.touches.length < 2) {
-                                                    initialTouchDist = 0;
+                                                    if (initialTouchDist > 0) {
+                                                        initialTouchDist = 0;
+                                                        var curScale = (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentScale) ? PDFViewerApplication.pdfViewer.currentScale : 1.0;
+                                                        var minScale = window.defaultScale || 1.0;
+                                                        // When scale reaches back near minimum scale, snap back cleanly to anchor page
+                                                        if (Math.abs(curScale - minScale) < 0.05) {
+                                                            if (pinchAnchorPage > 0 && typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
+                                                                PDFViewerApplication.pdfViewer.scrollPageIntoView({ pageNumber: pinchAnchorPage });
+                                                            }
+                                                        }
+                                                    }
                                                 }
                                             }, { passive: true });
 
@@ -1891,8 +1969,25 @@ fun PdfWebView(
                                                     var curScale = (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentScale) ? PDFViewerApplication.pdfViewer.currentScale : baseScale;
 
                                                     var targetScale = (curScale < baseScale * 1.3) ? (baseScale * 2.0) : baseScale;
+                                                    var anchorPage = (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentPageNumber) ? PDFViewerApplication.pdfViewer.currentPageNumber : 1;
+                                                    var pageEl = document.querySelector('.page[data-page-number="' + anchorPage + '"]');
+                                                    var container = document.getElementById('viewerContainer');
+                                                    var ratio = 0;
+                                                    if (pageEl && container && pageEl.clientHeight > 0) {
+                                                        ratio = (container.scrollTop - pageEl.offsetTop) / pageEl.clientHeight;
+                                                    }
 
                                                     window.setScale(targetScale);
+
+                                                    var newPageEl = document.querySelector('.page[data-page-number="' + anchorPage + '"]');
+                                                    if (newPageEl && container && newPageEl.clientHeight > 0) {
+                                                        container.scrollTop = newPageEl.offsetTop + (ratio * newPageEl.clientHeight);
+                                                    }
+
+                                                    if (Math.abs(targetScale - baseScale) < 0.05 && anchorPage > 0 && typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
+                                                        PDFViewerApplication.pdfViewer.scrollPageIntoView({ pageNumber: anchorPage });
+                                                    }
+
                                                     if (window.AndroidBridge && window.AndroidBridge.onScaleChanged) {
                                                         window.AndroidBridge.onScaleChanged(targetScale);
                                                     }

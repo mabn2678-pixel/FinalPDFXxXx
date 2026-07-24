@@ -1101,45 +1101,43 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
     fun mergePdfs(context: Context, filePaths: List<String>, targetName: String, onSuccess: (String) -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                val pdfDocument = PdfDocument()
-                var pageIndex = 0
+                if (filePaths.size < 2) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        onError("الرجاء اختيار ملفين على الأقل للدمج")
+                    }
+                    return@launch
+                }
+                val merger = com.tom_roush.pdfbox.multipdf.PDFMergerUtility()
+                var addedAny = false
                 for (path in filePaths) {
                     val file = File(path)
-                    if (!file.exists()) continue
-                    val fileDescriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-                    val renderer = PdfRenderer(fileDescriptor)
-                    for (i in 0 until renderer.pageCount) {
-                        val page = renderer.openPage(i)
-                        val width = page.width
-                        val height = page.height
-                        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                        page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                        
-                        val pageInfo = PdfDocument.PageInfo.Builder(width, height, pageIndex++).create()
-                        val pdfPage = pdfDocument.startPage(pageInfo)
-                        pdfPage.canvas.drawBitmap(bitmap, 0f, 0f, null)
-                        pdfDocument.finishPage(pdfPage)
-                        page.close()
-                        bitmap.recycle()
+                    if (file.exists() && file.length() > 0) {
+                        merger.addSource(file)
+                        addedAny = true
                     }
-                    renderer.close()
-                    fileDescriptor.close()
                 }
-                
+                if (!addedAny) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        onError("لم يتم العثور على ملفات صالحة للدمج")
+                    }
+                    return@launch
+                }
                 val finalName = if (targetName.lowercase().endsWith(".pdf")) targetName else "$targetName.pdf"
                 val outputDir = File(context.cacheDir, "processed_pdfs")
                 if (!outputDir.exists()) outputDir.mkdirs()
                 val outputFile = File(outputDir, finalName)
-                outputFile.outputStream().use { out ->
-                    pdfDocument.writeTo(out)
-                }
-                pdfDocument.close()
+                merger.destinationFileName = outputFile.absolutePath
+                merger.mergeDocuments(null)
                 
                 scanFiles(context)
-                onSuccess(outputFile.absolutePath)
-            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onSuccess(outputFile.absolutePath)
+                }
+            } catch (e: Throwable) {
                 e.printStackTrace()
-                onError(e.message ?: "حدث خطأ غير معروف أثناء دمج الملفات")
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onError(e.message ?: "حدث خطأ غير معروف أثناء دمج الملفات")
+                }
             }
         }
     }
@@ -1149,49 +1147,37 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
             try {
                 val file = File(filePath)
                 if (!file.exists()) {
-                    onError("الملف غير موجود")
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onError("الملف غير موجود") }
                     return@launch
                 }
-                val fileDescriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-                val renderer = PdfRenderer(fileDescriptor)
+                val sourceDoc = com.tom_roush.pdfbox.pdmodel.PDDocument.load(file)
+                val total = sourceDoc.numberOfPages
+                val start = (fromPage - 1).coerceIn(0, total - 1)
+                val end = (toPage - 1).coerceIn(start, total - 1)
                 
-                val total = renderer.pageCount
-                val start = fromPage.coerceIn(1, total)
-                val end = toPage.coerceIn(start, total)
-                
-                val pdfDocument = PdfDocument()
-                var pageIndex = 0
-                for (i in (start - 1)..(end - 1)) {
-                    val page = renderer.openPage(i)
-                    val width = page.width
-                    val height = page.height
-                    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                    
-                    val pageInfo = PdfDocument.PageInfo.Builder(width, height, pageIndex++).create()
-                    val pdfPage = pdfDocument.startPage(pageInfo)
-                    pdfPage.canvas.drawBitmap(bitmap, 0f, 0f, null)
-                    pdfDocument.finishPage(pdfPage)
-                    page.close()
-                    bitmap.recycle()
+                val newDoc = com.tom_roush.pdfbox.pdmodel.PDDocument()
+                for (i in start..end) {
+                    newDoc.addPage(sourceDoc.getPage(i))
                 }
-                renderer.close()
-                fileDescriptor.close()
                 
                 val finalName = if (targetName.lowercase().endsWith(".pdf")) targetName else "$targetName.pdf"
                 val outputDir = File(context.cacheDir, "processed_pdfs")
                 if (!outputDir.exists()) outputDir.mkdirs()
                 val outputFile = File(outputDir, finalName)
-                outputFile.outputStream().use { out ->
-                    pdfDocument.writeTo(out)
-                }
-                pdfDocument.close()
+                
+                newDoc.save(outputFile)
+                newDoc.close()
+                sourceDoc.close()
                 
                 scanFiles(context)
-                onSuccess(outputFile.absolutePath)
-            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onSuccess(outputFile.absolutePath)
+                }
+            } catch (e: Throwable) {
                 e.printStackTrace()
-                onError(e.message ?: "حدث خطأ أثناء تقسيم الملف")
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onError(e.message ?: "حدث خطأ أثناء تقسيم الملف")
+                }
             }
         }
     }
@@ -1201,7 +1187,7 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
             try {
                 val file = File(filePath)
                 if (!file.exists()) {
-                    onError("الملف غير موجود")
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onError("الملف غير موجود") }
                     return@launch
                 }
                 val fileDescriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
@@ -1260,10 +1246,14 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 pdfDocument.close()
                 
                 scanFiles(context)
-                onSuccess(outputFile.absolutePath)
-            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onSuccess(outputFile.absolutePath)
+                }
+            } catch (e: Throwable) {
                 e.printStackTrace()
-                onError(e.message ?: "حدث خطأ أثناء ضغط الملف")
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onError(e.message ?: "حدث خطأ أثناء ضغط الملف")
+                }
             }
         }
     }
@@ -1273,67 +1263,39 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
             try {
                 val file = File(filePath)
                 if (!file.exists()) {
-                    onError("الملف غير موجود")
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onError("الملف غير موجود") }
                     return@launch
                 }
-                val fileDescriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-                val renderer = PdfRenderer(fileDescriptor)
-                
-                val pdfDocument = PdfDocument()
-                for (i in 0 until renderer.pageCount) {
-                    val page = renderer.openPage(i)
-                    val width = page.width
-                    val height = page.height
-                    
-                    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                    
-                    val shouldRotate = (targetPage == -1) || (targetPage == (i + 1))
-                    
-                    val (finalWidth, finalHeight) = if (shouldRotate && (degrees == 90 || degrees == 270)) {
-                        Pair(height, width)
-                    } else {
-                        Pair(width, height)
-                    }
-                    
-                    val pageInfo = PdfDocument.PageInfo.Builder(finalWidth, finalHeight, i).create()
-                    val pdfPage = pdfDocument.startPage(pageInfo)
-                    
+                val document = com.tom_roush.pdfbox.pdmodel.PDDocument.load(file)
+                val total = document.numberOfPages
+
+                for (i in 0 until total) {
+                    val pageNumOneBased = i + 1
+                    val shouldRotate = (targetPage == -1) || (targetPage == pageNumOneBased)
                     if (shouldRotate) {
-                        val matrix = Matrix()
-                        matrix.postRotate(degrees.toFloat())
-                        
-                        when (degrees) {
-                            90 -> matrix.postTranslate(finalWidth.toFloat(), 0f)
-                            180 -> matrix.postTranslate(finalWidth.toFloat(), finalHeight.toFloat())
-                            270 -> matrix.postTranslate(0f, finalHeight.toFloat())
-                        }
-                        pdfPage.canvas.drawBitmap(bitmap, matrix, null)
-                    } else {
-                        pdfPage.canvas.drawBitmap(bitmap, 0f, 0f, null)
+                        val page = document.getPage(i)
+                        val currentRotation = page.rotation
+                        page.rotation = (currentRotation + degrees) % 360
                     }
-                    
-                    pdfDocument.finishPage(pdfPage)
-                    page.close()
-                    bitmap.recycle()
                 }
-                renderer.close()
-                fileDescriptor.close()
-                
+
                 val finalName = if (targetName.lowercase().endsWith(".pdf")) targetName else "$targetName.pdf"
                 val outputDir = File(context.cacheDir, "processed_pdfs")
                 if (!outputDir.exists()) outputDir.mkdirs()
                 val outputFile = File(outputDir, finalName)
-                outputFile.outputStream().use { out ->
-                    pdfDocument.writeTo(out)
-                }
-                pdfDocument.close()
-                
+
+                document.save(outputFile)
+                document.close()
+
                 scanFiles(context)
-                onSuccess(outputFile.absolutePath)
-            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onSuccess(outputFile.absolutePath)
+                }
+            } catch (e: Throwable) {
                 e.printStackTrace()
-                onError(e.message ?: "حدث خطأ أثناء تدوير صفحات الملف")
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onError(e.message ?: "حدث خطأ أثناء تدوير صفحات الملف")
+                }
             }
         }
     }
@@ -1343,48 +1305,38 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
             try {
                 val file = File(filePath)
                 if (!file.exists()) {
-                    onError("الملف غير موجود")
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onError("الملف غير موجود") }
                     return@launch
                 }
-                val fileDescriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-                val renderer = PdfRenderer(fileDescriptor)
-                
-                val pdfDocument = PdfDocument()
-                var pageIndex = 0
-                for (pageOneBased in pageOrderList) {
-                    val i = pageOneBased - 1
-                    if (i < 0 || i >= renderer.pageCount) continue
-                    
-                    val page = renderer.openPage(i)
-                    val width = page.width
-                    val height = page.height
-                    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                    
-                    val pageInfo = PdfDocument.PageInfo.Builder(width, height, pageIndex++).create()
-                    val pdfPage = pdfDocument.startPage(pageInfo)
-                    pdfPage.canvas.drawBitmap(bitmap, 0f, 0f, null)
-                    pdfDocument.finishPage(pdfPage)
-                    page.close()
-                    bitmap.recycle()
+                val sourceDoc = com.tom_roush.pdfbox.pdmodel.PDDocument.load(file)
+                val total = sourceDoc.numberOfPages
+                val newDoc = com.tom_roush.pdfbox.pdmodel.PDDocument()
+
+                for (p in pageOrderList) {
+                    val idx = p - 1
+                    if (idx in 0 until total) {
+                        newDoc.addPage(sourceDoc.getPage(idx))
+                    }
                 }
-                renderer.close()
-                fileDescriptor.close()
-                
+
                 val finalName = if (targetName.lowercase().endsWith(".pdf")) targetName else "$targetName.pdf"
                 val outputDir = File(context.cacheDir, "processed_pdfs")
                 if (!outputDir.exists()) outputDir.mkdirs()
                 val outputFile = File(outputDir, finalName)
-                outputFile.outputStream().use { out ->
-                    pdfDocument.writeTo(out)
-                }
-                pdfDocument.close()
-                
+
+                newDoc.save(outputFile)
+                newDoc.close()
+                sourceDoc.close()
+
                 scanFiles(context)
-                onSuccess(outputFile.absolutePath)
-            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onSuccess(outputFile.absolutePath)
+                }
+            } catch (e: Throwable) {
                 e.printStackTrace()
-                onError(e.message ?: "حدث خطأ أثناء إعادة ترتيب الصفحات")
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onError(e.message ?: "حدث خطأ أثناء إعادة ترتيب الصفحات")
+                }
             }
         }
     }
@@ -1394,56 +1346,46 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
             try {
                 val file = File(filePath)
                 if (!file.exists()) {
-                    onError("الملف غير موجود")
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onError("الملف غير موجود") }
                     return@launch
                 }
-                val fileDescriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-                val renderer = PdfRenderer(fileDescriptor)
+                val sourceDoc = com.tom_roush.pdfbox.pdmodel.PDDocument.load(file)
+                val total = sourceDoc.numberOfPages
+                val validPagesToDelete = pagesToDelete.filter { it in 1..total }.toSet()
                 
-                val pdfDocument = PdfDocument()
-                var pageIndex = 0
-                var addedAny = false
-                for (i in 0 until renderer.pageCount) {
-                    val pageNumOneBased = i + 1
-                    if (pagesToDelete.contains(pageNumOneBased)) continue
-                    
-                    val page = renderer.openPage(i)
-                    val width = page.width
-                    val height = page.height
-                    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                    
-                    val pageInfo = PdfDocument.PageInfo.Builder(width, height, pageIndex++).create()
-                    val pdfPage = pdfDocument.startPage(pageInfo)
-                    pdfPage.canvas.drawBitmap(bitmap, 0f, 0f, null)
-                    pdfDocument.finishPage(pdfPage)
-                    page.close()
-                    bitmap.recycle()
-                    addedAny = true
-                }
-                renderer.close()
-                fileDescriptor.close()
-                
-                if (!addedAny) {
-                    onError("لا يمكن حذف جميع الصفحات! يجب إبقاء صفحة واحدة على الأقل.")
-                    pdfDocument.close()
+                if (validPagesToDelete.size >= total) {
+                    sourceDoc.close()
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        onError("لا يمكن حذف جميع الصفحات! يجب إبقاء صفحة واحدة على الأقل.")
+                    }
                     return@launch
                 }
-                
+
+                val newDoc = com.tom_roush.pdfbox.pdmodel.PDDocument()
+                for (i in 0 until total) {
+                    if (!validPagesToDelete.contains(i + 1)) {
+                        newDoc.addPage(sourceDoc.getPage(i))
+                    }
+                }
+
                 val finalName = if (targetName.lowercase().endsWith(".pdf")) targetName else "$targetName.pdf"
                 val outputDir = File(context.cacheDir, "processed_pdfs")
                 if (!outputDir.exists()) outputDir.mkdirs()
                 val outputFile = File(outputDir, finalName)
-                outputFile.outputStream().use { out ->
-                    pdfDocument.writeTo(out)
-                }
-                pdfDocument.close()
-                
+
+                newDoc.save(outputFile)
+                newDoc.close()
+                sourceDoc.close()
+
                 scanFiles(context)
-                onSuccess(outputFile.absolutePath)
-            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onSuccess(outputFile.absolutePath)
+                }
+            } catch (e: Throwable) {
                 e.printStackTrace()
-                onError(e.message ?: "حدث خطأ أثناء حذف الصفحات")
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onError(e.message ?: "حدث خطأ أثناء حذف الصفحات")
+                }
             }
         }
     }
@@ -1452,7 +1394,7 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 if (imagePaths.isEmpty()) {
-                    onError("لم يتم اختيار أي صور")
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onError("لم يتم اختيار أي صور") }
                     return@launch
                 }
                 val pdfDocument = PdfDocument()
@@ -1478,10 +1420,14 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 pdfDocument.close()
                 
                 scanFiles(context)
-                onSuccess(outputFile.absolutePath)
-            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onSuccess(outputFile.absolutePath)
+                }
+            } catch (e: Throwable) {
                 e.printStackTrace()
-                onError(e.message ?: "حدث خطأ أثناء تحويل الصور إلى ملف PDF")
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onError(e.message ?: "حدث خطأ أثناء تحويل الصور إلى ملف PDF")
+                }
             }
         }
     }
@@ -1498,7 +1444,7 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
             try {
                 val file = File(filePath)
                 if (!file.exists()) {
-                    onError("الملف غير موجود")
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onError("الملف غير موجود") }
                     return@launch
                 }
                 val fileDescriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
@@ -1537,9 +1483,9 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 }
                 
                 if (pagesToExport.isEmpty()) {
-                    onError("لم يتم تحديد صفحات صالحة للتصدير")
                     renderer.close()
                     fileDescriptor.close()
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onError("لم يتم تحديد صفحات صالحة للتصدير") }
                     return@launch
                 }
                 
@@ -1579,10 +1525,14 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 renderer.close()
                 fileDescriptor.close()
                 
-                onSuccess(exportedPaths)
-            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onSuccess(exportedPaths)
+                }
+            } catch (e: Throwable) {
                 e.printStackTrace()
-                onError(e.message ?: "حدث خطأ أثناء تصدير الصفحات لصور")
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onError(e.message ?: "حدث خطأ أثناء تصدير الصفحات لصور")
+                }
             }
         }
     }
@@ -1603,7 +1553,7 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
             try {
                 val file = File(filePath)
                 if (!file.exists()) {
-                    onError("الملف غير موجود")
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onError("الملف غير موجود") }
                     return@launch
                 }
                 
@@ -1633,10 +1583,14 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 document.close()
                 
                 scanFiles(context)
-                onSuccess(outputFile.absolutePath)
-            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onSuccess(outputFile.absolutePath)
+                }
+            } catch (e: Throwable) {
                 e.printStackTrace()
-                onError(e.message ?: "حدث خطأ أثناء حماية وقفل الملف بكلمة سر")
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onError(e.message ?: "حدث خطأ أثناء حماية وقفل الملف بكلمة سر")
+                }
             }
         }
     }
@@ -1653,14 +1607,14 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
             try {
                 val file = File(filePath)
                 if (!file.exists()) {
-                    onError("الملف غير موجود")
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onError("الملف غير موجود") }
                     return@launch
                 }
                 
                 val document = try {
                     com.tom_roush.pdfbox.pdmodel.PDDocument.load(file, password)
-                } catch (e: Exception) {
-                    onError("كلمة المرور غير صحيحة أو الملف تالف")
+                } catch (e: Throwable) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { onError("كلمة المرور غير صحيحة أو الملف تالف") }
                     return@launch
                 }
                 
@@ -1677,10 +1631,14 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 document.close()
                 
                 scanFiles(context)
-                onSuccess(outputFile.absolutePath)
-            } catch (e: Exception) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onSuccess(outputFile.absolutePath)
+                }
+            } catch (e: Throwable) {
                 e.printStackTrace()
-                onError(e.message ?: "حدث خطأ أثناء فك قفل الملف")
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onError(e.message ?: "حدث خطأ أثناء فك قفل الملف")
+                }
             }
         }
     }
