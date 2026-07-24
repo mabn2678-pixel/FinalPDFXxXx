@@ -1550,22 +1550,13 @@ fun PdfWebView(
                                                 reportPageStatus();
                                                 try {
                                                     if (PDFViewerApplication.pdfViewer) {
-                                                        PDFViewerApplication.pdfViewer.removePageBorders = true;
                                                         PDFViewerApplication.pdfViewer.scrollMode = ${if (state.snapToPage) 3 else if (state.scrollMode == "horizontal") 1 else 0};
-                                                        PDFViewerApplication.pdfViewer.currentScaleValue = 'page-width';
                                                     }
                                                 } catch (err) {}
                                             });
 
                                             PDFViewerApplication.eventBus.on('pagesloaded', (e) => {
                                                 reportPageStatus();
-                                                try {
-                                                    if (PDFViewerApplication.pdfViewer) {
-                                                        PDFViewerApplication.pdfViewer.removePageBorders = true;
-                                                        PDFViewerApplication.pdfViewer.scrollMode = ${if (state.snapToPage) 3 else if (state.scrollMode == "horizontal") 1 else 0};
-                                                        PDFViewerApplication.pdfViewer.currentScaleValue = 'page-width';
-                                                    }
-                                                } catch (err) {}
                                             });
 
                                             // Report immediately
@@ -1627,7 +1618,7 @@ fun PdfWebView(
                                             style.type = 'text/css';
                                             style.innerHTML = `
                                                 :root {
-                                                    --page-margin: 0px auto 0px !important;
+                                                    --page-margin: 2px auto 6px !important;
                                                     --page-border: 0px solid transparent !important;
                                                 }
                                                 #toolbarContainer, .toolbar, #sidebarContainer, .findbar, #secondaryToolbar, #loadingBar { 
@@ -1665,7 +1656,7 @@ fun PdfWebView(
                                                     margin: 0 !important;
                                                 }
                                                 .pdfViewer .page, .spread .page, .page {
-                                                    margin: 0 auto 0px !important;
+                                                    margin: 2px auto 6px !important;
                                                     border: none !important;
                                                     border-image: none !important;
                                                     box-shadow: none !important;
@@ -1673,7 +1664,7 @@ fun PdfWebView(
                                                     background-clip: border-box !important;
                                                 }
                                                 .pdfViewer.removePageBorders .page {
-                                                    margin: 0 auto 0px !important;
+                                                    margin: 2px auto 6px !important;
                                                     border: none !important;
                                                     box-shadow: none !important;
                                                 }
@@ -1692,7 +1683,6 @@ fun PdfWebView(
                                                 .page, .spread, .dummyPage {
                                                     scroll-snap-align: none !important;
                                                     scroll-snap-stop: normal !important;
-                                                    contain: layout !important;
                                                 }
                                                 #outerContainer, #viewerContainer, #viewer, .page, .spread, .dummyPage, .canvasWrapper, .textLayer, .annotationLayer {
                                                     overflow-anchor: none !important;
