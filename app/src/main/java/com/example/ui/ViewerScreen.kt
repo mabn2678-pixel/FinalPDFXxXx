@@ -1573,11 +1573,31 @@ fun PdfWebView(
                                                 reportSearchMatches(e);
                                             });
 
+                                            PDFViewerApplication.eventBus.on('annotationeditormodechanged', (e) => {
+                                                if (e && typeof e.mode !== 'undefined' && window.AndroidBridge && window.AndroidBridge.onEditorModeChanged) {
+                                                    window.AndroidBridge.onEditorModeChanged(e.mode);
+                                                }
+                                            });
+
+                                            PDFViewerApplication.eventBus.on('annotationeditorparamschanged', (e) => {
+                                                if (e && e.details && window.AndroidBridge && window.AndroidBridge.onEditorParamsChanged) {
+                                                    var paramsObj = {};
+                                                    try {
+                                                        for (var entry of e.details) {
+                                                            if (Array.isArray(entry) && entry.length >= 2) {
+                                                                paramsObj[entry[0]] = entry[1];
+                                                            }
+                                                        }
+                                                    } catch(err) {}
+                                                    window.AndroidBridge.onEditorParamsChanged(JSON.stringify(paramsObj));
+                                                }
+                                            });
+
                                             // 3. Complete hide/vanish of PDF.js official viewer toolbar elements
                                             var style = document.createElement('style');
                                             style.type = 'text/css';
                                             style.innerHTML = `
-                                                #toolbarContainer, .toolbar, #sidebarContainer, .findbar, #secondaryToolbar { 
+                                                #toolbarContainer, .toolbar, #sidebarContainer, .findbar, #secondaryToolbar, .editorParamsToolbar, .annotationEditorParamsToolbar, #editorHighlightParamsToolbar, #editorFreeTextParamsToolbar, #editorInkParamsToolbar, #editorStampParamsToolbar { 
                                                     display: none !important; 
                                                 } 
                                                 #outerContainer {
@@ -2090,6 +2110,20 @@ fun PdfWebView(
                     fun onScaleChanged(scale: Float) {
                         coroutineScope.launch {
                             viewModel.updateScaleFromJs(scale)
+                        }
+                    }
+
+                    @android.webkit.JavascriptInterface
+                    fun onEditorModeChanged(mode: Int) {
+                        coroutineScope.launch {
+                            viewModel.onEditorModeChanged(mode)
+                        }
+                    }
+
+                    @android.webkit.JavascriptInterface
+                    fun onEditorParamsChanged(paramsJson: String) {
+                        coroutineScope.launch {
+                            viewModel.onEditorParamsChanged(paramsJson)
                         }
                     }
 
@@ -5616,91 +5650,90 @@ fun AnnotationToolsSheet(
             .padding(horizontal = 20.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = "أدوات التحرير والرسم",
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
-            color = MaterialTheme.colorScheme.onSurface,
+        // Top Header with Undo / Redo / Title
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 4.dp),
-            textAlign = TextAlign.Start
-        )
+                .padding(bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "أدوات التحرير والرسم",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
 
-        Text(
-            text = "اختر الأداة المطلوبة للرسم أو إضافة نصوص وختومات على المستند",
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 20.dp),
-            textAlign = TextAlign.Start
-        )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = { viewModel.triggerUndo() },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Undo,
+                        contentDescription = "تراجع",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
 
+                Spacer(modifier = Modifier.width(4.dp))
+
+                IconButton(
+                    onClick = { viewModel.triggerRedo() },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Redo,
+                        contentDescription = "إعادة",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+
+        // Tools selector items row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 1. Highlight (تظليل) -> Mode 9
             AnnotationToolItem(
                 icon = Icons.Default.BorderColor,
                 label = "تظليل",
                 isSelected = (currentMode == 9),
                 activeColor = Color(0xFFFFC107),
-                onClick = {
-                    viewModel.setAnnotationEditorMode(9)
-                    onDismiss()
-                }
+                onClick = { viewModel.setAnnotationEditorMode(9) }
             )
 
-            Spacer(modifier = Modifier.width(10.dp))
-
-            // 2. Draw / Ink (رسم حر) -> Mode 15
             AnnotationToolItem(
                 icon = Icons.Default.Create,
                 label = "رسم حر",
                 isSelected = (currentMode == 15),
                 activeColor = Color(0xFF9C27B0),
-                onClick = {
-                    viewModel.setAnnotationEditorMode(15)
-                    onDismiss()
-                }
+                onClick = { viewModel.setAnnotationEditorMode(15) }
             )
 
-            Spacer(modifier = Modifier.width(10.dp))
-
-            // 3. FreeText (نص حر) -> Mode 3
             AnnotationToolItem(
                 icon = Icons.Default.TextFields,
                 label = "نص حر",
                 isSelected = (currentMode == 3),
                 activeColor = Color(0xFF2196F3),
-                onClick = {
-                    viewModel.setAnnotationEditorMode(3)
-                    onDismiss()
-                }
+                onClick = { viewModel.setAnnotationEditorMode(3) }
             )
 
-            Spacer(modifier = Modifier.width(10.dp))
-
-            // 4. Stamp (ختم/صورة) -> Mode 13
             AnnotationToolItem(
                 icon = Icons.Default.Approval,
                 label = "ختم / صورة",
                 isSelected = (currentMode == 13),
                 activeColor = Color(0xFF009688),
-                onClick = {
-                    viewModel.setAnnotationEditorMode(13)
-                    onDismiss()
-                }
+                onClick = { viewModel.setAnnotationEditorMode(13) }
             )
 
-            Spacer(modifier = Modifier.width(14.dp))
-
-            // 5. Cancel / None (إلغاء التحديد) -> Mode 0
             AnnotationToolItem(
                 icon = Icons.Default.Close,
                 label = "إلغاء التحديد",
@@ -5709,12 +5742,218 @@ fun AnnotationToolsSheet(
                 isResetBtn = true,
                 onClick = {
                     viewModel.setAnnotationEditorMode(0)
-                    onDismiss()
                 }
             )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Contextual controls based on active mode
+        when (currentMode) {
+            15 -> { // INK (رسم حر)
+                Text(
+                    text = "إعدادات الرسم الحر (Ink)",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Start
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                val inkColors = listOf("#E53935", "#4CAF50", "#2196F3", "#FFEB3B", "#FF9800", "#9C27B0", "#000000", "#FFFFFF")
+                AnnotationColorPalette(
+                    selectedHex = state.inkColor,
+                    colors = inkColors,
+                    onColorSelected = { viewModel.updateAnnotationParam(4, it) }
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                AnnotationSliderRow(
+                    title = "سُمك الخط",
+                    value = state.inkThickness,
+                    valueRange = 1f..25f,
+                    unit = "px",
+                    onValueChange = { viewModel.updateAnnotationParam(5, it) }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                AnnotationSliderRow(
+                    title = "الشفافية",
+                    value = state.inkOpacity,
+                    valueRange = 10f..100f,
+                    unit = "%",
+                    onValueChange = { viewModel.updateAnnotationParam(6, it) }
+                )
+            }
+
+            9 -> { // HIGHLIGHT (تظليل)
+                Text(
+                    text = "إعدادات التظليل (Highlight)",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFFFA000),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Start
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                val highlightColors = listOf("#FFEB3B", "#8BC34A", "#03A9F4", "#E91E63", "#FF9800", "#9C27B0")
+                AnnotationColorPalette(
+                    selectedHex = state.highlightColor,
+                    colors = highlightColors,
+                    onColorSelected = { viewModel.updateAnnotationParam(7, it) }
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "تظليل حر (Free Highlight)",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Switch(
+                        checked = state.highlightFree,
+                        onCheckedChange = { viewModel.updateAnnotationParam(10, it) }
+                    )
+                }
+
+                if (state.highlightFree) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AnnotationSliderRow(
+                        title = "سُمك التظليل الحر",
+                        value = state.highlightThickness,
+                        valueRange = 4f..35f,
+                        unit = "px",
+                        onValueChange = { viewModel.updateAnnotationParam(9, it) }
+                    )
+                }
+            }
+
+            3 -> { // FREETEXT (نص حر)
+                Text(
+                    text = "إعدادات النص (FreeText)",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1976D2),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Start
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                val textColors = listOf("#212121", "#E53935", "#1976D2", "#388E3C", "#F57C00", "#7B1FA2", "#FFFFFF")
+                AnnotationColorPalette(
+                    selectedHex = state.freeTextColor,
+                    colors = textColors,
+                    onColorSelected = { viewModel.updateAnnotationParam(2, it) }
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                AnnotationSliderRow(
+                    title = "حجم الخط",
+                    value = state.freeTextSize,
+                    valueRange = 8f..48f,
+                    unit = "pt",
+                    onValueChange = { viewModel.updateAnnotationParam(1, it) }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                AnnotationSliderRow(
+                    title = "شفافية النص",
+                    value = state.freeTextOpacity,
+                    valueRange = 10f..100f,
+                    unit = "%",
+                    onValueChange = { viewModel.updateAnnotationParam(3, it) }
+                )
+            }
+
+            13 -> { // STAMP (ختم / صورة)
+                Text(
+                    text = "إضافة صورة أو ختم على المستند",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF00796B),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Start
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Button(
+                    onClick = { viewModel.updateAnnotationParam(12, "CREATE") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00796B))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AddPhotoAlternate,
+                        contentDescription = "اختيار صورة",
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("اختر صورة من المعرض لإضافتها", fontSize = 14.sp)
+                }
+            }
+
+            else -> {
+                Text(
+                    text = "انقر على أي أداة أعلاه للبدء بالتحرير، أو انقر على أي عنصر موجود بالصفحة للتعديل عليه مباشرة.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(vertical = 12.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Action Buttons Row (Save & Close)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Button(
+                onClick = {
+                    viewModel.requestSaveAnnotatedPdf()
+                    onDismiss()
+                },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Save,
+                    contentDescription = "حفظ والتطبيق",
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("حفظ التغييرات", fontSize = 14.sp)
+            }
+
+            OutlinedButton(
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("إغلاق اللوحة", fontSize = 14.sp)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
     }
 }
 
@@ -5772,4 +6011,96 @@ private fun AnnotationToolItem(
             color = if (isResetBtn) Color(0xFFC62828) else MaterialTheme.colorScheme.onSurface
         )
     }
+}
+
+@Composable
+private fun AnnotationColorPalette(
+    selectedHex: String,
+    colors: List<String>,
+    onColorSelected: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        colors.forEach { hex ->
+            val colorVal = parseAnnotationColor(hex)
+            val isSelected = selectedHex.equals(hex, ignoreCase = true)
+
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(colorVal)
+                    .border(
+                        width = if (isSelected) 3.dp else 1.dp,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.4f),
+                        shape = CircleShape
+                    )
+                    .clickable { onColorSelected(hex) },
+                contentAlignment = Alignment.Center
+            ) {
+                if (isSelected) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "محدد",
+                        tint = if (isColorDark(colorVal)) Color.White else Color.Black,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnnotationSliderRow(
+    title: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    unit: String,
+    onValueChange: (Float) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = title,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "${value.toInt()} $unit",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        Slider(
+            value = value.coerceIn(valueRange),
+            onValueChange = onValueChange,
+            valueRange = valueRange,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+private fun parseAnnotationColor(hex: String): Color {
+    return try {
+        Color(android.graphics.Color.parseColor(hex))
+    } catch (e: Exception) {
+        Color.Red
+    }
+}
+
+private fun isColorDark(color: Color): Boolean {
+    val luminance = 0.299f * color.red + 0.587f * color.green + 0.114f * color.blue
+    return luminance < 0.5f
 }

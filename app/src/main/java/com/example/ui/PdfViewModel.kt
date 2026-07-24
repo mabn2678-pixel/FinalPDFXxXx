@@ -131,7 +131,19 @@ data class PdfUiState(
     val annotationEditorMode: Int = 0, // 0: NONE, 3: FREETEXT, 9: HIGHLIGHT, 13: STAMP, 15: INK
     val editColor: String = "#FFFF00", // Hex color string (Yellow default)
     val editThickness: Float = 5f,
-    val editOpacity: Float = 100f
+    val editOpacity: Float = 100f,
+
+    // Detailed Native Sync Annotation State
+    val inkColor: String = "#E53935",
+    val inkThickness: Float = 5f,
+    val inkOpacity: Float = 100f,
+    val highlightColor: String = "#FFEB3B",
+    val highlightThickness: Float = 12f,
+    val highlightFree: Boolean = false,
+    val freeTextColor: String = "#212121",
+    val freeTextSize: Float = 14f,
+    val freeTextOpacity: Float = 100f,
+    val isElementSelected: Boolean = false
 )
 
 class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
@@ -398,6 +410,77 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 PDFViewerApplication.pdfViewer.annotationEditorMode = { mode: $mode };
             }
         """.trimIndent())
+    }
+
+    fun updateAnnotationParam(paramType: Int, value: Any) {
+        // Optimistic local state update
+        _uiState.update { curr ->
+            when (paramType) {
+                1 -> curr.copy(freeTextSize = (value as? Number)?.toFloat() ?: curr.freeTextSize)
+                2 -> curr.copy(freeTextColor = value.toString())
+                3 -> curr.copy(freeTextOpacity = (value as? Number)?.toFloat() ?: curr.freeTextOpacity)
+                4 -> curr.copy(inkColor = value.toString())
+                5 -> curr.copy(inkThickness = (value as? Number)?.toFloat() ?: curr.inkThickness)
+                6 -> curr.copy(inkOpacity = (value as? Number)?.toFloat() ?: curr.inkOpacity)
+                7 -> curr.copy(highlightColor = value.toString())
+                9 -> curr.copy(highlightThickness = (value as? Number)?.toFloat() ?: curr.highlightThickness)
+                10 -> curr.copy(highlightFree = (value as? Boolean) ?: curr.highlightFree)
+                else -> curr
+            }
+        }
+
+        val formattedVal = when (value) {
+            is String -> "'$value'"
+            is Boolean -> if (value) "true" else "false"
+            else -> value.toString()
+        }
+
+        sendJsCommand("""
+            if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.eventBus) {
+                PDFViewerApplication.eventBus.dispatch('switchannotationeditorparams', {
+                    source: window,
+                    type: $paramType,
+                    value: $formattedVal
+                });
+            }
+        """.trimIndent())
+    }
+
+    fun onEditorModeChanged(mode: Int) {
+        _uiState.update { 
+            it.copy(
+                annotationEditorMode = mode,
+                isEditMode = (mode != 0)
+            )
+        }
+    }
+
+    fun onEditorParamsChanged(paramsJson: String) {
+        try {
+            val json = org.json.JSONObject(paramsJson)
+            _uiState.update { curr ->
+                var state = curr.copy(isElementSelected = true)
+                val keys = json.keys()
+                while (keys.hasNext()) {
+                    val k = keys.next()
+                    val pType = k.toIntOrNull() ?: continue
+                    when (pType) {
+                        1 -> state = state.copy(freeTextSize = json.optDouble("1", state.freeTextSize.toDouble()).toFloat())
+                        2 -> state = state.copy(freeTextColor = json.optString("2", state.freeTextColor))
+                        3 -> state = state.copy(freeTextOpacity = json.optDouble("3", state.freeTextOpacity.toDouble()).toFloat())
+                        4 -> state = state.copy(inkColor = json.optString("4", state.inkColor))
+                        5 -> state = state.copy(inkThickness = json.optDouble("5", state.inkThickness.toDouble()).toFloat())
+                        6 -> state = state.copy(inkOpacity = json.optDouble("6", state.inkOpacity.toDouble()).toFloat())
+                        7 -> state = state.copy(highlightColor = json.optString("7", state.highlightColor))
+                        9 -> state = state.copy(highlightThickness = json.optDouble("9", state.highlightThickness.toDouble()).toFloat())
+                        10 -> state = state.copy(highlightFree = json.optBoolean("10", state.highlightFree))
+                    }
+                }
+                state
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     fun requestSaveAnnotatedPdf() {
