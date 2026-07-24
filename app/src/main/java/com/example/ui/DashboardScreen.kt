@@ -8,6 +8,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
@@ -826,8 +828,12 @@ fun HomeTabScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        val homeGridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
-        val homeListState = androidx.compose.foundation.lazy.rememberLazyListState()
+        val homeGridState = androidx.compose.runtime.saveable.rememberSaveable(saver = androidx.compose.foundation.lazy.grid.LazyGridState.Saver) {
+            androidx.compose.foundation.lazy.grid.LazyGridState()
+        }
+        val homeListState = androidx.compose.runtime.saveable.rememberSaveable(saver = androidx.compose.foundation.lazy.LazyListState.Saver) {
+            androidx.compose.foundation.lazy.LazyListState()
+        }
 
         // Files List / Grid Renderer
         if (filteredFiles.isEmpty()) {
@@ -2160,6 +2166,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
     var lockAllowAnnotations by remember { mutableStateOf(true) }
     var unlockPassword by remember { mutableStateOf("") }
     
+    var completedResultFilePath by remember { mutableStateOf<String?>(null) }
     var isProcessing by remember { mutableStateOf(false) }
 
     Column(
@@ -3127,7 +3134,8 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                                 onSuccess = { path ->
                                                     isProcessing = false
                                                     activeTool = ActiveTool.None
-                                                    Toast.makeText(context, "تم دمج المستندات بنجاح وحفظها!", Toast.LENGTH_LONG).show()
+                                                    completedResultFilePath = path
+                                                    viewModel.scanFiles(context)
                                                 },
                                                 onError = { err ->
                                                     isProcessing = false
@@ -3157,7 +3165,8 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                                 onSuccess = { path ->
                                                     isProcessing = false
                                                     activeTool = ActiveTool.None
-                                                    Toast.makeText(context, "تم تقسيم الملف بنجاح وحفظه!", Toast.LENGTH_LONG).show()
+                                                    completedResultFilePath = path
+                                                    viewModel.scanFiles(context)
                                                 },
                                                 onError = { err ->
                                                     isProcessing = false
@@ -3184,7 +3193,8 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                                 onSuccess = { path ->
                                                     isProcessing = false
                                                     activeTool = ActiveTool.None
-                                                    Toast.makeText(context, "تم ضغط الملف بنجاح وحفظه!", Toast.LENGTH_LONG).show()
+                                                    completedResultFilePath = path
+                                                    viewModel.scanFiles(context)
                                                 },
                                                 onError = { err ->
                                                     isProcessing = false
@@ -3213,7 +3223,8 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                                 onSuccess = { path ->
                                                     isProcessing = false
                                                     activeTool = ActiveTool.None
-                                                    Toast.makeText(context, "تم تدوير وحفظ الملف بنجاح!", Toast.LENGTH_LONG).show()
+                                                    completedResultFilePath = path
+                                                    viewModel.scanFiles(context)
                                                 },
                                                 onError = { err ->
                                                     isProcessing = false
@@ -3249,7 +3260,8 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                                 onSuccess = { path ->
                                                     isProcessing = false
                                                     activeTool = ActiveTool.None
-                                                    Toast.makeText(context, "تم إعادة ترتيب الصفحات بنجاح!", Toast.LENGTH_LONG).show()
+                                                    completedResultFilePath = path
+                                                    viewModel.scanFiles(context)
                                                 },
                                                 onError = { err ->
                                                     isProcessing = false
@@ -3285,7 +3297,8 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                                 onSuccess = { path ->
                                                     isProcessing = false
                                                     activeTool = ActiveTool.None
-                                                    Toast.makeText(context, "تم حذف الصفحات وحفظ الملف بنجاح!", Toast.LENGTH_LONG).show()
+                                                    completedResultFilePath = path
+                                                    viewModel.scanFiles(context)
                                                 },
                                                 onError = { err ->
                                                     isProcessing = false
@@ -3311,7 +3324,8 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                                 onSuccess = { path ->
                                                     isProcessing = false
                                                     activeTool = ActiveTool.None
-                                                    Toast.makeText(context, "تم تحويل الصور إلى PDF وحفظ الملف بنجاح!", Toast.LENGTH_LONG).show()
+                                                    completedResultFilePath = path
+                                                    viewModel.scanFiles(context)
                                                 },
                                                 onError = { err ->
                                                     isProcessing = false
@@ -3369,7 +3383,8 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                                 onSuccess = { path ->
                                                     isProcessing = false
                                                     activeTool = ActiveTool.None
-                                                    Toast.makeText(context, "تم قفل وحماية الملف بنجاح!", Toast.LENGTH_LONG).show()
+                                                    completedResultFilePath = path
+                                                    viewModel.scanFiles(context)
                                                 },
                                                 onError = { err ->
                                                     isProcessing = false
@@ -3400,7 +3415,8 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                                 onSuccess = { path ->
                                                     isProcessing = false
                                                     activeTool = ActiveTool.None
-                                                    Toast.makeText(context, "تم إزالة الحماية وحفظ الملف بنجاح!", Toast.LENGTH_LONG).show()
+                                                    completedResultFilePath = path
+                                                    viewModel.scanFiles(context)
                                                 },
                                                 onError = { err ->
                                                     isProcessing = false
@@ -3438,6 +3454,20 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                 }
             }
         }
+    }
+
+    if (completedResultFilePath != null) {
+        ToolResultDialog(
+            filePath = completedResultFilePath!!,
+            onDismiss = { completedResultFilePath = null },
+            onView = { path, name ->
+                completedResultFilePath = null
+                viewModel.selectPdf(path, name)
+            },
+            onShare = { path ->
+                sharePdfFile(context, path)
+            }
+        )
     }
 }
 
@@ -4716,6 +4746,261 @@ fun ToolFilePickerCard(
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+fun sharePdfFile(context: Context, filePath: String) {
+    try {
+        val file = File(filePath)
+        if (!file.exists()) return
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            file
+        )
+        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(android.content.Intent.createChooser(intent, "مشاركة الملف عبر:"))
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+
+@Composable
+fun ToolResultDialog(
+    filePath: String,
+    onDismiss: () -> Unit,
+    onView: (filePath: String, fileName: String) -> Unit,
+    onShare: (filePath: String) -> Unit
+) {
+    val file = remember(filePath) { File(filePath) }
+    val fileName = file.name
+    val fileSizeStr = remember(file) {
+        if (file.exists()) {
+            val size = file.length()
+            when {
+                size > 1024 * 1024 -> String.format(Locale.US, "%.1f MB", size / (1024f * 1024f))
+                size > 1024 -> String.format(Locale.US, "%.1f KB", size / 1024f)
+                else -> "$size Bytes"
+            }
+        } else "0 KB"
+    }
+    val pageCount = remember(filePath) { getPdfPageCount(filePath) }
+
+    var thumbnailBitmap by remember(filePath) { mutableStateOf<Bitmap?>(null) }
+
+    LaunchedEffect(filePath) {
+        withContext(Dispatchers.IO) {
+            try {
+                if (file.exists()) {
+                    val descriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+                    val renderer = android.graphics.pdf.PdfRenderer(descriptor)
+                    if (renderer.pageCount > 0) {
+                        val page = renderer.openPage(0)
+                        val bmp = Bitmap.createBitmap(page.width / 2, page.height / 2, Bitmap.Config.ARGB_8888)
+                        page.render(bmp, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                        page.close()
+                        thumbnailBitmap = bmp
+                    }
+                    renderer.close()
+                    descriptor.close()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFE8F5E9)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = "Success",
+                        tint = Color(0xFF2E7D32),
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = "تم إنجاز العملية بنجاح!",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = "تم حفظ الملف في مجلد FinalPDF بنجاح",
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(70.dp, 90.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surface),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (thumbnailBitmap != null) {
+                                Image(
+                                    bitmap = thumbnailBitmap!!.asImageBitmap(),
+                                    contentDescription = "PDF Thumbnail",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.PictureAsPdf,
+                                    contentDescription = "PDF File",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = fileName,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                ),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Folder,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "FinalPDF",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    ),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = "$fileSizeStr • $pageCount صفحة",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = { onView(filePath, fileName) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Visibility,
+                            contentDescription = "View",
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("عرض", fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = { onShare(filePath) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "مشاركة",
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("إغلاق", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

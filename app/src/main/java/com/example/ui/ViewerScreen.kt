@@ -420,22 +420,37 @@ fun ViewerScreen(
         }
     }
 
+    val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val isDark = when (state.appTheme) {
+        "dark" -> true
+        "light" -> false
+        else -> systemDark
+    }
+
     // Programmatic status bar icon color setup & visibility toggling
-    DisposableEffect(isBarsVisible) {
+    DisposableEffect(isBarsVisible, isBrowsing, isDark) {
         activity?.window?.let { window ->
             val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
-            insetsController.isAppearanceLightStatusBars = false // Force white status bar icons
-            if (isBarsVisible) {
+            if (isBrowsing) {
+                // In-app web browser mode: status bar is ALWAYS visible
                 insetsController.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+                // Light mode -> dark status bar icons (!isDark = true), Dark mode -> light icons (!isDark = false)
+                insetsController.isAppearanceLightStatusBars = !isDark
             } else {
-                insetsController.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars())
-                insetsController.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                if (isBarsVisible) {
+                    insetsController.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+                    insetsController.isAppearanceLightStatusBars = !isDark
+                } else {
+                    // Tap to hide controls: hide phone notification/status bar
+                    insetsController.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+                    insetsController.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                }
             }
         }
         onDispose {
             activity?.window?.let { window ->
                 val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
-                insetsController.isAppearanceLightStatusBars = true
+                insetsController.isAppearanceLightStatusBars = !isDark
                 insetsController.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
             }
         }
@@ -711,60 +726,7 @@ fun ViewerScreen(
                             .padding(horizontal = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        if (state.isEditMode) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                // 1. Save/Done Button (تم)
-                                Button(
-                                    onClick = { viewModel.requestSaveAnnotatedPdf() },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color(0xFF4CB050),
-                                        contentColor = Color.White
-                                    ),
-                                    shape = RoundedCornerShape(16.dp),
-                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "تم",
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("تم", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                }
-
-                                // 2. Undo & Redo buttons (أزرار التراجع والإعادة)
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    GlowingIconButton(
-                                        icon = Icons.AutoMirrored.Filled.Undo,
-                                        contentDescription = "تراجع",
-                                        onClick = { viewModel.triggerUndo() },
-                                        tint = Color(0xFF00BCD4)
-                                    )
-
-                                    GlowingIconButton(
-                                        icon = Icons.AutoMirrored.Filled.Redo,
-                                        contentDescription = "إعادة",
-                                        onClick = { viewModel.triggerRedo() },
-                                        tint = Color(0xFFFF9800)
-                                    )
-                                }
-
-                                // 3. Exit to Dashboard Button (خروج)
-                                GlowingIconButton(
-                                    icon = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "خروج",
-                                    onClick = { viewModel.goBackToDashboard() },
-                                    tint = Color(0xFFE91E63)
-                                )
-                            }
-                        } else if (state.isSearchActive) {
+                        if (state.isSearchActive) {
                             NativeSearchBar(
                                 viewModel = viewModel,
                                 state = state,
@@ -886,13 +848,7 @@ fun ViewerScreen(
                         .fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    if (state.isEditMode) {
-                        EditBottomBar(
-                            state = state,
-                            viewModel = viewModel
-                        )
-                    } else {
-                        // Sleek circular-dock style Bottom bar with 7 beautifully labeled items
+                        // Sleek circular-dock style Bottom bar with 6 beautifully labeled items
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -946,14 +902,6 @@ fun ViewerScreen(
                                     modifier = Modifier.weight(1f)
                                 )
                                 BottomBarItem(
-                                    icon = Icons.Default.Edit,
-                                    label = "تحرير",
-                                    onClick = { viewModel.toggleEditMode(true) },
-                                    tint = Color(0xFF00BCD4), // Cyan-blue
-                                    isSelected = state.isEditMode,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                BottomBarItem(
                                     icon = Icons.Default.MoreHoriz,
                                     label = "أدوات",
                                     onClick = { activeSheet = BottomSheetType.MoreOptions },
@@ -962,7 +910,6 @@ fun ViewerScreen(
                                 )
                             }
                         }
-                    }
                 }
             }
 

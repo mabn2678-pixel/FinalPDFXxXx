@@ -988,7 +988,13 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 }
                 
                 // 2. Scan standard directories recursively
+                val finalPdfDir = getFinalPdfOutputDir(context)
                 val publicDirs = listOf(
+                    finalPdfDir,
+                    File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "FinalPDF"),
+                    File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "FinalPDF"),
+                    File(context.getExternalFilesDir(null), "FinalPDF"),
+                    File(context.cacheDir, "processed_pdfs"),
                     Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
                     Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),
                     File("/sdcard/Download"),
@@ -1097,6 +1103,41 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
         }
     }
 
+    fun getFinalPdfOutputDir(context: Context): File {
+        val dirName = "FinalPDF"
+        try {
+            val docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+            val finalPdfDir = File(docsDir, dirName)
+            if (!finalPdfDir.exists()) {
+                finalPdfDir.mkdirs()
+            }
+            if (finalPdfDir.exists()) {
+                return finalPdfDir
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        
+        try {
+            val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            val finalPdfDownloadDir = File(downloadDir, dirName)
+            if (!finalPdfDownloadDir.exists()) {
+                finalPdfDownloadDir.mkdirs()
+            }
+            if (finalPdfDownloadDir.exists()) {
+                return finalPdfDownloadDir
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        
+        val extDir = File(context.getExternalFilesDir(null), dirName)
+        if (!extDir.exists()) {
+            extDir.mkdirs()
+        }
+        return extDir
+    }
+
     fun mergePdfs(context: Context, filePaths: List<String>, targetName: String, onSuccess: (String) -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
@@ -1126,13 +1167,18 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 }
                 
                 val finalName = if (targetName.lowercase().endsWith(".pdf")) targetName else "$targetName.pdf"
-                val outputDir = File(context.cacheDir, "processed_pdfs")
-                if (!outputDir.exists()) outputDir.mkdirs()
+                val outputDir = getFinalPdfOutputDir(context)
                 val outputFile = File(outputDir, finalName)
                 outputFile.outputStream().use { out ->
                     pdfDocument.writeTo(out)
                 }
                 pdfDocument.close()
+                
+                try {
+                    android.media.MediaScannerConnection.scanFile(context, arrayOf(outputFile.absolutePath), arrayOf("application/pdf"), null)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
                 
                 scanFiles(context)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -1184,13 +1230,18 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 fileDescriptor.close()
                 
                 val finalName = if (targetName.lowercase().endsWith(".pdf")) targetName else "$targetName.pdf"
-                val outputDir = File(context.cacheDir, "processed_pdfs")
-                if (!outputDir.exists()) outputDir.mkdirs()
+                val outputDir = getFinalPdfOutputDir(context)
                 val outputFile = File(outputDir, finalName)
                 outputFile.outputStream().use { out ->
                     pdfDocument.writeTo(out)
                 }
                 pdfDocument.close()
+                
+                try {
+                    android.media.MediaScannerConnection.scanFile(context, arrayOf(outputFile.absolutePath), arrayOf("application/pdf"), null)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
                 
                 scanFiles(context)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -1262,13 +1313,18 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 fileDescriptor.close()
                 
                 val finalName = if (targetName.lowercase().endsWith(".pdf")) targetName else "$targetName.pdf"
-                val outputDir = File(context.cacheDir, "processed_pdfs")
-                if (!outputDir.exists()) outputDir.mkdirs()
+                val outputDir = getFinalPdfOutputDir(context)
                 val outputFile = File(outputDir, finalName)
                 outputFile.outputStream().use { out ->
                     pdfDocument.writeTo(out)
                 }
                 pdfDocument.close()
+                
+                try {
+                    android.media.MediaScannerConnection.scanFile(context, arrayOf(outputFile.absolutePath), arrayOf("application/pdf"), null)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
                 
                 scanFiles(context)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -1338,13 +1394,18 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 fileDescriptor.close()
                 
                 val finalName = if (targetName.lowercase().endsWith(".pdf")) targetName else "$targetName.pdf"
-                val outputDir = File(context.cacheDir, "processed_pdfs")
-                if (!outputDir.exists()) outputDir.mkdirs()
+                val outputDir = getFinalPdfOutputDir(context)
                 val outputFile = File(outputDir, finalName)
                 outputFile.outputStream().use { out ->
                     pdfDocument.writeTo(out)
                 }
                 pdfDocument.close()
+                
+                try {
+                    android.media.MediaScannerConnection.scanFile(context, arrayOf(outputFile.absolutePath), arrayOf("application/pdf"), null)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
                 
                 scanFiles(context)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -1395,13 +1456,18 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 fileDescriptor.close()
                 
                 val finalName = if (targetName.lowercase().endsWith(".pdf")) targetName else "$targetName.pdf"
-                val outputDir = File(context.cacheDir, "processed_pdfs")
-                if (!outputDir.exists()) outputDir.mkdirs()
+                val outputDir = getFinalPdfOutputDir(context)
                 val outputFile = File(outputDir, finalName)
                 outputFile.outputStream().use { out ->
                     pdfDocument.writeTo(out)
                 }
                 pdfDocument.close()
+                
+                try {
+                    android.media.MediaScannerConnection.scanFile(context, arrayOf(outputFile.absolutePath), arrayOf("application/pdf"), null)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
                 
                 scanFiles(context)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -1462,13 +1528,18 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 }
                 
                 val finalName = if (targetName.lowercase().endsWith(".pdf")) targetName else "$targetName.pdf"
-                val outputDir = File(context.cacheDir, "processed_pdfs")
-                if (!outputDir.exists()) outputDir.mkdirs()
+                val outputDir = getFinalPdfOutputDir(context)
                 val outputFile = File(outputDir, finalName)
                 outputFile.outputStream().use { out ->
                     pdfDocument.writeTo(out)
                 }
                 pdfDocument.close()
+                
+                try {
+                    android.media.MediaScannerConnection.scanFile(context, arrayOf(outputFile.absolutePath), arrayOf("application/pdf"), null)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
                 
                 scanFiles(context)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -1506,13 +1577,18 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 }
                 
                 val finalName = if (targetName.lowercase().endsWith(".pdf")) targetName else "$targetName.pdf"
-                val outputDir = File(context.cacheDir, "processed_pdfs")
-                if (!outputDir.exists()) outputDir.mkdirs()
+                val outputDir = getFinalPdfOutputDir(context)
                 val outputFile = File(outputDir, finalName)
                 outputFile.outputStream().use { out ->
                     pdfDocument.writeTo(out)
                 }
                 pdfDocument.close()
+                
+                try {
+                    android.media.MediaScannerConnection.scanFile(context, arrayOf(outputFile.absolutePath), arrayOf("application/pdf"), null)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
                 
                 scanFiles(context)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -1676,12 +1752,17 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 document.protect(spp)
                 
                 val finalName = if (targetName.lowercase().endsWith(".pdf")) targetName else "$targetName.pdf"
-                val outputDir = File(context.cacheDir, "processed_pdfs")
-                if (!outputDir.exists()) outputDir.mkdirs()
+                val outputDir = getFinalPdfOutputDir(context)
                 val outputFile = File(outputDir, finalName)
                 
                 document.save(outputFile)
                 document.close()
+                
+                try {
+                    android.media.MediaScannerConnection.scanFile(context, arrayOf(outputFile.absolutePath), arrayOf("application/pdf"), null)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
                 
                 scanFiles(context)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -1728,12 +1809,17 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 }
                 
                 val finalName = if (targetName.lowercase().endsWith(".pdf")) targetName else "$targetName.pdf"
-                val outputDir = File(context.cacheDir, "processed_pdfs")
-                if (!outputDir.exists()) outputDir.mkdirs()
+                val outputDir = getFinalPdfOutputDir(context)
                 val outputFile = File(outputDir, finalName)
                 
                 document.save(outputFile)
                 document.close()
+                
+                try {
+                    android.media.MediaScannerConnection.scanFile(context, arrayOf(outputFile.absolutePath), arrayOf("application/pdf"), null)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
                 
                 scanFiles(context)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
