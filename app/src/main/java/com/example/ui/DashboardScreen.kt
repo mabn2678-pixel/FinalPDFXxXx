@@ -2131,7 +2131,8 @@ enum class ActiveTool {
     PdfToImages,
     LockPdf,
     UnlockPdf,
-    CameraOcr
+    CameraOcr,
+    CloudOcr
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -2166,6 +2167,10 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
     var lockAllowAnnotations by remember { mutableStateOf(true) }
     var unlockPassword by remember { mutableStateOf("") }
     
+    // Cloud OCR inputs
+    var ocrLanguage by remember { mutableStateOf("ara") }
+    var ocrStatusText by remember { mutableStateOf("جاري رفع الملف...") }
+    
     var completedResultFilePath by remember { mutableStateOf<String?>(null) }
     var isProcessing by remember { mutableStateOf(false) }
 
@@ -2192,21 +2197,36 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.weight(1f)
         ) {
-            // OCR CAMERA SECTION
+            // OCR SECTION
             item {
                 ToolSectionHeader(title = "الماسح الضوئي والتعرف على النصوص (OCR)")
             }
             item {
-                ToolGridCard(
-                    title = "ماسح الكاميرا الضوئي (Camera OCR)",
-                    desc = "تصوير أي مستند أو ورقة واستخراج النصوص فوراً بتقنية ML Kit مع تأثير مسح ليزري",
-                    icon = Icons.Default.DocumentScanner,
-                    color = Color(0xFFE8E0F5),
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        activeTool = ActiveTool.CameraOcr
-                    }
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ToolGridCard(
+                        title = "ماسح الكاميرا الضوئي (Camera OCR)",
+                        desc = "تصوير أي مستند واستخراج النصوص فوراً بتقنية ML Kit",
+                        icon = Icons.Default.DocumentScanner,
+                        color = Color(0xFFE8E0F5),
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            activeTool = ActiveTool.CameraOcr
+                        }
+                    )
+                    ToolGridCard(
+                        title = "تحويل PDF إلى نص (OCR السحابي)",
+                        desc = "تحويل ملفات الـ PDF المصورة إلى مستندات قابلة لتحديد ونسخ النص بدقة عالية عبر الإنترنت.",
+                        icon = Icons.Default.CloudSync,
+                        color = Color(0xFFE3F2FD),
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            activeTool = ActiveTool.CloudOcr
+                            targetFileName = "Scanned_Document"
+                            selectedSingleFilePath = uiState.allPdfFiles.firstOrNull()?.filePath ?: ""
+                            ocrLanguage = "ara"
+                        }
+                    )
+                }
             }
 
             // ORGANIZE SECTION
@@ -2408,6 +2428,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                         ActiveTool.PdfToImages -> cleanName
                         ActiveTool.LockPdf -> "${cleanName}_محمي"
                         ActiveTool.UnlockPdf -> "${cleanName}_مفتوح"
+                        ActiveTool.CloudOcr -> "${cleanName}_OCR"
                         else -> cleanName
                     }
                     viewModel.scanFiles(context)
@@ -2455,6 +2476,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                 ActiveTool.PdfToImages -> "تحويل PDF إلى صور" to "استخراج صفحات مستند الـ PDF وحفظها كصور عالية الجودة"
                 ActiveTool.LockPdf -> "تشفير وقفل ملف PDF" to "حماية مستند الـ PDF بكلمة سر وتعيين صلاحيات القراءة والطباعة"
                 ActiveTool.UnlockPdf -> "فك قفل وإزالة حماية PDF" to "إزالة كلمة السر والتشفير من مستند مشفر"
+                ActiveTool.CloudOcr -> "تحويل PDF (OCR)" to "تحويل ملفات الـ PDF المصورة إلى مستندات قابلة لتحديد ونسخ النص عبر التعرف السحابي"
                 else -> "" to ""
             }
 
@@ -3084,6 +3106,150 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                 }
                             }
 
+                            ActiveTool.CloudOcr -> {
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                    shape = RoundedCornerShape(16.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Text("إعدادات التصدير واللغة", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        OutlinedTextField(
+                                            value = targetFileName,
+                                            onValueChange = { targetFileName = it },
+                                            label = { Text("اسم الملف الناتج") },
+                                            singleLine = true,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                        Spacer(modifier = Modifier.height(14.dp))
+                                        Text("لغة التعرف الضوئي (OCR):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            listOf("ara" to "العربية 🇸🇦", "eng" to "الإنجليزي 🇬🇧", "deu" to "الألماني 🇩🇪").forEach { (code, name) ->
+                                                val isSelected = ocrLanguage == code
+                                                FilterChip(
+                                                    selected = isSelected,
+                                                    onClick = { ocrLanguage = code },
+                                                    label = { Text(name, fontSize = 12.sp) },
+                                                    leadingIcon = if (isSelected) {
+                                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                                    } else null,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                    shape = RoundedCornerShape(16.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Text("تحديد الملف المراد معالجته", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        
+                                        Button(
+                                            onClick = { toolSinglePickerLauncher.launch(arrayOf("application/pdf")) },
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("اختيار ملف من منتقي النظام (SAF)")
+                                        }
+
+                                        Spacer(modifier = Modifier.height(12.dp))
+
+                                        if (selectedSingleFilePath.isNotEmpty()) {
+                                            val selectedFile = File(selectedSingleFilePath)
+                                            Surface(
+                                                shape = RoundedCornerShape(12.dp),
+                                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(12.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.PictureAsPdf,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(28.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(10.dp))
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Text(
+                                                            text = selectedFile.name,
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontSize = 13.sp,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                        Text(
+                                                            text = "حجم الملف: ${android.text.format.Formatter.formatShortFileSize(context, selectedFile.length())}",
+                                                            fontSize = 11.sp,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                    Icon(
+                                                        imageVector = Icons.Default.CheckCircle,
+                                                        contentDescription = "تم الاختيار",
+                                                        tint = MaterialTheme.colorScheme.primary
+                                                    )
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                        }
+
+                                        if (uiState.allPdfFiles.isNotEmpty()) {
+                                            Text("أو حدد من مكتبة التطبيق:", fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            uiState.allPdfFiles.forEach { file ->
+                                                val isSelected = selectedSingleFilePath == file.filePath
+                                                Surface(
+                                                    onClick = {
+                                                        selectedSingleFilePath = file.filePath
+                                                        val cleanName = file.fileName.replace(".pdf", "", ignoreCase = true).replace("_", " ")
+                                                        targetFileName = "${cleanName}_OCR"
+                                                    },
+                                                    shape = RoundedCornerShape(10.dp),
+                                                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                                                ) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        modifier = Modifier.padding(12.dp)
+                                                    ) {
+                                                        RadioButton(
+                                                            selected = isSelected,
+                                                            onClick = {
+                                                                selectedSingleFilePath = file.filePath
+                                                                val cleanName = file.fileName.replace(".pdf", "", ignoreCase = true).replace("_", " ")
+                                                                targetFileName = "${cleanName}_OCR"
+                                                            }
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Column {
+                                                            Text(file.fileName, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                                            Text(file.fileSize, fontSize = 11.sp, color = Color.Gray)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             else -> {}
                         }
 
@@ -3100,7 +3266,11 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                 ) {
                                     CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                                     Spacer(modifier = Modifier.width(12.dp))
-                                    Text("جاري معالجة وتطبيق العملية على المستند...", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                    Text(
+                                        if (activeTool == ActiveTool.CloudOcr) ocrStatusText else "جاري معالجة وتطبيق العملية على المستند...",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
                                 }
                             }
                         }
@@ -3425,6 +3595,38 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                             )
                                         }
 
+                                        ActiveTool.CloudOcr -> {
+                                            if (selectedSingleFilePath.isEmpty()) {
+                                                Toast.makeText(context, "الرجاء اختيار ملف PDF أولاً", Toast.LENGTH_SHORT).show()
+                                                return@Button
+                                            }
+                                            if (targetFileName.trim().isEmpty()) {
+                                                Toast.makeText(context, "الرجاء إدخال اسم للملف الناتج", Toast.LENGTH_SHORT).show()
+                                                return@Button
+                                            }
+                                            isProcessing = true
+                                            ocrStatusText = "جاري رفع الملف..."
+                                            viewModel.convertPdfCloudOcr(
+                                                context = context,
+                                                filePath = selectedSingleFilePath,
+                                                language = ocrLanguage,
+                                                targetName = targetFileName,
+                                                onStatusChange = { status ->
+                                                    ocrStatusText = status
+                                                },
+                                                onSuccess = { path ->
+                                                    isProcessing = false
+                                                    activeTool = ActiveTool.None
+                                                    completedResultFilePath = path
+                                                    viewModel.scanFiles(context)
+                                                },
+                                                onError = { err ->
+                                                    isProcessing = false
+                                                    Toast.makeText(context, "خطأ: $err", Toast.LENGTH_LONG).show()
+                                                }
+                                            )
+                                        }
+
                                         else -> {}
                                     }
                                 },
@@ -3445,6 +3647,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                     ActiveTool.PdfToImages -> "تصدير الصور"
                                     ActiveTool.LockPdf -> "قفل وتشفير الملف"
                                     ActiveTool.UnlockPdf -> "فك حماية وقفل الملف"
+                                    ActiveTool.CloudOcr -> "تحويل المستند"
                                     else -> "تأكيد"
                                 }
                                 Text(buttonText, fontSize = 16.sp, fontWeight = FontWeight.Bold)

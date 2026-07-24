@@ -28,6 +28,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.asRequestBody
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -2051,6 +2053,148 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 }
             } catch (e: Exception) {
                 onError(e.message ?: "حدث خطأ أثناء حذف الملفات")
+            }
+        }
+    }
+
+    fun convertPdfCloudOcr(
+        context: Context,
+        filePath: String,
+        language: String,
+        targetName: String,
+        onStatusChange: (String) -> Unit,
+        onSuccess: (String) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val file = File(filePath)
+                if (!file.exists()) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        onError("الملف المحدد غير موجود")
+                    }
+                    return@launch
+                }
+
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onStatusChange("جاري رفع الملف...")
+                }
+
+                val client = okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
+                    .writeTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+
+                val mediaType = "application/pdf".toMediaType()
+                val requestFile = file.asRequestBody(mediaType)
+                val filePart = okhttp3.MultipartBody.Part.createFormData("file", file.name, requestFile)
+
+                val requestBody = okhttp3.MultipartBody.Builder()
+                    .setType(okhttp3.MultipartBody.FORM)
+                    .addFormDataPart("apikey", "K88448789188957")
+                    .addFormDataPart("language", if (language.isEmpty()) "ara" else language)
+                    .addFormDataPart("isCreateSearchablePdf", "true")
+                    .addFormDataPart("isSearchablePdfHideTextLayer", "true")
+                    .addFormDataPart("filetype", "PDF")
+                    .addPart(filePart)
+                    .build()
+
+                val request = okhttp3.Request.Builder()
+                    .url("https://api.ocr.space/parse/image")
+                    .post(requestBody)
+                    .build()
+
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onStatusChange("جاري المعالجة...")
+                }
+
+                val response = client.newCall(request).execute()
+                val responseBody = response.body?.string()
+
+                if (!response.isSuccessful || responseBody == null) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        onError("فشلت الاستجابة من خادم OCR (رمز الخطأ: ${response.code})")
+                    }
+                    return@launch
+                }
+
+                val json = org.json.JSONObject(responseBody)
+                val isErrored = json.optBoolean("IsErroredOnProcessing", false)
+                val errorMessage = json.optString("ErrorMessage", "")
+                val errorDetails = json.optString("ErrorDetails", "")
+
+                var searchablePdfUrl = json.optString("SearchablePDFURL", "")
+                if (searchablePdfUrl.isEmpty() && json.has("ParsedResults")) {
+                    val results = json.getJSONArray("ParsedResults")
+                    if (results.length() > 0) {
+                        val item = results.getJSONObject(0)
+                        searchablePdfUrl = item.optString("SearchablePDFURL", "")
+                    }
+                }
+
+                if (isErrored || searchablePdfUrl.isEmpty()) {
+                    val errText = when {
+                        errorMessage.isNotEmpty() -> errorMessage
+                        errorDetails.isNotEmpty() -> errorDetails
+                        else -> "تعذر استخراج رابط ملف PDF الناتج من خدمة OCR"
+                    }
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        onError("خطأ المعالجة: $errText")
+                    }
+                    return@launch
+                }
+
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onStatusChange("جاري تحميل الملف الجديد...")
+                }
+
+                val downloadRequest = okhttp3.Request.Builder()
+                    .url(searchablePdfUrl)
+                    .get()
+                    .build()
+
+                val downloadResponse = client.newCall(downloadRequest).execute()
+                val downloadBody = downloadResponse.body
+                if (!downloadResponse.isSuccessful || downloadBody == null) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        onError("فشل تحميل ملف الـ PDF المعالج من الرابط السحابي")
+                    }
+                    return@launch
+                }
+
+                val finalName = if (targetName.lowercase().endsWith(".pdf")) targetName else "$targetName.pdf"
+                val outputDir = getFinalPdfOutputDir(context)
+                val outputFile = File(outputDir, finalName)
+
+                downloadBody.byteStream().use { input ->
+                    outputFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+
+                try {
+                    android.media.MediaScannerConnection.scanFile(
+                        context,
+                        arrayOf(outputFile.absolutePath),
+                        arrayOf("application/pdf"),
+                        null
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+
+                scanFiles(context)
+
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onSuccess(outputFile.absolutePath)
+                }
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onError(e.message ?: "حدث خطأ أثناء معالجة المستند عبر الإنترنت")
+                }
             }
         }
     }
