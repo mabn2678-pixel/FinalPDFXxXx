@@ -420,17 +420,23 @@ fun ViewerScreen(
         }
     }
 
-    // Programmatic status bar icon color setup
-    DisposableEffect(Unit) {
+    // Programmatic status bar icon color setup & visibility toggling
+    DisposableEffect(isBarsVisible) {
         activity?.window?.let { window ->
             val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
             insetsController.isAppearanceLightStatusBars = false // Force white status bar icons
-            insetsController.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+            if (isBarsVisible) {
+                insetsController.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+            } else {
+                insetsController.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+                insetsController.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
         }
         onDispose {
             activity?.window?.let { window ->
                 val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
                 insetsController.isAppearanceLightStatusBars = true
+                insetsController.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
             }
         }
     }
@@ -669,7 +675,7 @@ fun ViewerScreen(
 
             // STATUS BAR DARK TRANSLUCENT BACKDROP OVERLAY
             val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-            if (statusBarHeight > 0.dp && !isBrowsing) {
+            if (statusBarHeight > 0.dp && !isBrowsing && isBarsVisible) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()

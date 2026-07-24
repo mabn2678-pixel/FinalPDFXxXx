@@ -809,7 +809,7 @@ fun HomeTabScreen(
 
                 // Grid / List Toggle Button
                 IconButton(
-                    onClick = { viewModel.toggleGridView() },
+                    onClick = { viewModel.toggleGridView(context) },
                     modifier = Modifier
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), CircleShape)
                         .size(36.dp)
@@ -826,6 +826,9 @@ fun HomeTabScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        val homeGridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+        val homeListState = androidx.compose.foundation.lazy.rememberLazyListState()
+
         // Files List / Grid Renderer
         if (filteredFiles.isEmpty()) {
             EmptyDashboardView(queryEmpty = uiState.dashboardSearchQuery.isNotEmpty())
@@ -834,6 +837,7 @@ fun HomeTabScreen(
                 // Grid Layout
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
+                    state = homeGridState,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier
@@ -880,6 +884,7 @@ fun HomeTabScreen(
             } else {
                 // List Layout
                 LazyColumn(
+                    state = homeListState,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
                         .fillMaxWidth()
