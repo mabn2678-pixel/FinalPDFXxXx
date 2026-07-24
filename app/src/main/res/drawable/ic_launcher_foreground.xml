@@ -1,0 +1,57 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Soft Base Shadow -->
+    <path
+        android:fillColor="#22000000"
+        android:pathData="M26,22h38l20,20v44c0,5.5 -4.5,10 -10,10h-48c-5.5,0 -10,-4.5 -10,-10z" />
+
+    <!-- Pure White Premium Paper Sheet -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M24,18h38l22,22v44c0,5.5 -4.5,10 -10,10h-50c-5.5,0 -10,-4.5 -10,-10z" />
+
+    <!-- Light Gray Sheet Inner Border for Depth -->
+    <path
+        android:strokeColor="#ECEFF1"
+        android:strokeWidth="1.5"
+        android:pathData="M24,18h38l22,22v44c0,5.5 -4.5,10 -10,10h-50c-5.5,0 -10,-4.5 -10,-10z" />
+
+    <!-- 3D Folded Page Corner -->
+    <path
+        android:fillColor="#CFD8DC"
+        android:pathData="M62,18l22,22h-22z" />
+    <path
+        android:fillColor="#90A4AE"
+        android:pathData="M62,40l8,8l14,-14h-22z"
+        android:fillAlpha="0.15" />
+
+    <!-- Stylized Modern 'F' Lettermark in Red Gradients -->
+    <!-- Stem of F -->
+    <path
+        android:fillColor="#E53935"
+        android:pathData="M34,32h8v44c0,2.2 -1.8,4 -4,4h-4z" />
+
+    <!-- Top bar of F (folded document ribbon design) -->
+    <path
+        android:fillColor="#D32F2F"
+        android:pathData="M34,32h40v8h-40z" />
+
+    <!-- Middle bar of F -->
+    <path
+        android:fillColor="#F44336"
+        android:pathData="M34,48h28v8h-28z" />
+
+    <!-- Red Accent Corner / Fold (Elegant details) -->
+    <path
+        android:fillColor="#B71C1C"
+        android:pathData="M74,32l4,4l-4,4z" />
+
+    <!-- Soft Horizontal Guidelines / Lines mimicking PDF content below the lettermark -->
+    <path
+        android:fillColor="#CFD8DC"
+        android:pathData="M34,64h40v3h-40z M34,71h30v3h-30z" />
+</vector>
