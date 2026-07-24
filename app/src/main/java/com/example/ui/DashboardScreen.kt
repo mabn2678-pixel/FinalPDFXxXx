@@ -809,7 +809,7 @@ fun HomeTabScreen(
 
                 // Grid / List Toggle Button
                 IconButton(
-                    onClick = { viewModel.toggleGridView(context) },
+                    onClick = { viewModel.toggleGridView() },
                     modifier = Modifier
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), CircleShape)
                         .size(36.dp)

@@ -420,7 +420,7 @@ fun ViewerScreen(
         }
     }
 
-    // Programmatic status bar icon color setup & immersive status bar control
+    // Programmatic status bar icon color setup
     DisposableEffect(Unit) {
         activity?.window?.let { window ->
             val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
@@ -430,21 +430,7 @@ fun ViewerScreen(
         onDispose {
             activity?.window?.let { window ->
                 val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
-                insetsController.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
                 insetsController.isAppearanceLightStatusBars = true
-            }
-        }
-    }
-
-    // Toggle system status bar & navigation bar immersive mode when toolbars are toggled
-    LaunchedEffect(isBarsVisible) {
-        activity?.window?.let { window ->
-            val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
-            if (isBarsVisible) {
-                insetsController.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-            } else {
-                insetsController.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-                insetsController.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             }
         }
     }
@@ -1613,19 +1599,12 @@ fun PdfWebView(
                                                 reportSearchMatches(e);
                                             });
 
-                                            // 3. Complete hide/vanish of PDF.js official viewer toolbar elements and gapless page layout
+                                            // 3. Complete hide/vanish of PDF.js official viewer toolbar elements
                                             var style = document.createElement('style');
                                             style.type = 'text/css';
                                             style.innerHTML = `
-                                                :root {
-                                                    --page-margin: 0px auto 0px !important;
-                                                    --page-border: 0px solid transparent !important;
-                                                }
-                                                #toolbarContainer, .toolbar, #sidebarContainer, .findbar, #secondaryToolbar, #loadingBar { 
+                                                #toolbarContainer, .toolbar, #sidebarContainer, .findbar, #secondaryToolbar { 
                                                     display: none !important; 
-                                                    visibility: hidden !important;
-                                                    height: 0 !important;
-                                                    min-height: 0 !important;
                                                 } 
                                                 #outerContainer {
                                                     position: fixed !important;
@@ -1639,7 +1618,7 @@ fun PdfWebView(
                                                     overscroll-behavior: none !important;
                                                     overscroll-behavior-y: none !important;
                                                 }
-                                                #viewerContainer, #viewer, .pdfViewer { 
+                                                #viewerContainer { 
                                                     position: absolute !important;
                                                     top: 0 !important; 
                                                     left: 0 !important;
@@ -1652,21 +1631,6 @@ fun PdfWebView(
                                                     overscroll-behavior: none !important;
                                                     overscroll-behavior-y: none !important;
                                                     -webkit-overflow-scrolling: touch !important;
-                                                    padding: 0 !important;
-                                                    margin: 0 !important;
-                                                }
-                                                .pdfViewer .page, .spread .page, .page {
-                                                    margin: 0 auto 0px !important;
-                                                    border: none !important;
-                                                    border-image: none !important;
-                                                    box-shadow: none !important;
-                                                    outline: none !important;
-                                                    background-clip: border-box !important;
-                                                }
-                                                .pdfViewer.removePageBorders .page {
-                                                    margin: 0 auto 0px !important;
-                                                    border: none !important;
-                                                    box-shadow: none !important;
                                                 }
                                                 html, body {
                                                     position: fixed !important;
@@ -1855,31 +1819,19 @@ fun PdfWebView(
 
                                             var initialTouchDist = 0;
                                             var initialScale = 1.0;
-                                            var pinchAnchorPage = 1;
-                                            var pinchAnchorRatio = 0;
 
                                             document.addEventListener('touchstart', function(e) {
                                                 if (e.touches.length === 2) {
                                                     var t1 = e.touches[0];
                                                     var t2 = e.touches[1];
                                                     initialTouchDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-                                                    initialScale = (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentScale) ? PDFViewerApplication.pdfViewer.currentScale : 1.0;
-                                                    
-                                                    // Pin the currently active page number & relative offset ratio
-                                                    pinchAnchorPage = (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentPageNumber) ? PDFViewerApplication.pdfViewer.currentPageNumber : 1;
-                                                    var pageEl = document.querySelector('.page[data-page-number="' + pinchAnchorPage + '"]');
-                                                    var container = document.getElementById('viewerContainer');
-                                                    if (pageEl && container && pageEl.clientHeight > 0) {
-                                                        pinchAnchorRatio = (container.scrollTop - pageEl.offsetTop) / pageEl.clientHeight;
-                                                    } else {
-                                                        pinchAnchorRatio = 0;
-                                                    }
+                                                    initialScale = PDFViewerApplication.pdfViewer.currentScale || 1.0;
                                                 }
                                             }, { passive: true });
 
                                             document.addEventListener('touchmove', function(e) {
                                                 if (e.touches.length === 2 && initialTouchDist > 0) {
-                                                    if (e.cancelable) e.preventDefault();
+                                                    e.preventDefault();
                                                     var t1 = e.touches[0];
                                                     var t2 = e.touches[1];
                                                     var dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
@@ -1890,35 +1842,14 @@ fun PdfWebView(
                                                     }
                                                     var minScale = window.defaultScale || 1.0;
                                                     newScale = Math.min(Math.max(newScale, minScale), 4.0);
-                                                    
                                                     window.setScale(newScale);
-
-                                                    // Re-align scroll position so the anchor page stays fixed
-                                                    var container = document.getElementById('viewerContainer');
-                                                    var pageEl = document.querySelector('.page[data-page-number="' + pinchAnchorPage + '"]');
-                                                    if (pageEl && container && pageEl.clientHeight > 0) {
-                                                        container.scrollTop = pageEl.offsetTop + (pinchAnchorRatio * pageEl.clientHeight);
-                                                    }
-
-                                                    if (window.AndroidBridge && window.AndroidBridge.onScaleChanged) {
-                                                        window.AndroidBridge.onScaleChanged(newScale);
-                                                    }
+                                                    AndroidBridge.onScaleChanged(newScale);
                                                 }
                                             }, { passive: false });
 
                                             document.addEventListener('touchend', function(e) {
                                                 if (e.touches.length < 2) {
-                                                    if (initialTouchDist > 0) {
-                                                        initialTouchDist = 0;
-                                                        var curScale = (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentScale) ? PDFViewerApplication.pdfViewer.currentScale : 1.0;
-                                                        var minScale = window.defaultScale || 1.0;
-                                                        // When scale reaches back near minimum scale, snap back cleanly to anchor page
-                                                        if (Math.abs(curScale - minScale) < 0.05) {
-                                                            if (pinchAnchorPage > 0 && typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
-                                                                PDFViewerApplication.pdfViewer.scrollPageIntoView({ pageNumber: pinchAnchorPage });
-                                                            }
-                                                        }
-                                                    }
+                                                    initialTouchDist = 0;
                                                 }
                                             }, { passive: true });
 
@@ -1960,25 +1891,8 @@ fun PdfWebView(
                                                     var curScale = (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentScale) ? PDFViewerApplication.pdfViewer.currentScale : baseScale;
 
                                                     var targetScale = (curScale < baseScale * 1.3) ? (baseScale * 2.0) : baseScale;
-                                                    var anchorPage = (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentPageNumber) ? PDFViewerApplication.pdfViewer.currentPageNumber : 1;
-                                                    var pageEl = document.querySelector('.page[data-page-number="' + anchorPage + '"]');
-                                                    var container = document.getElementById('viewerContainer');
-                                                    var ratio = 0;
-                                                    if (pageEl && container && pageEl.clientHeight > 0) {
-                                                        ratio = (container.scrollTop - pageEl.offsetTop) / pageEl.clientHeight;
-                                                    }
 
                                                     window.setScale(targetScale);
-
-                                                    var newPageEl = document.querySelector('.page[data-page-number="' + anchorPage + '"]');
-                                                    if (newPageEl && container && newPageEl.clientHeight > 0) {
-                                                        container.scrollTop = newPageEl.offsetTop + (ratio * newPageEl.clientHeight);
-                                                    }
-
-                                                    if (Math.abs(targetScale - baseScale) < 0.05 && anchorPage > 0 && typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
-                                                        PDFViewerApplication.pdfViewer.scrollPageIntoView({ pageNumber: anchorPage });
-                                                    }
-
                                                     if (window.AndroidBridge && window.AndroidBridge.onScaleChanged) {
                                                         window.AndroidBridge.onScaleChanged(targetScale);
                                                     }

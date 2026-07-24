@@ -33,10 +33,6 @@ See https://github.com/adobe-type-tools/cmap-resources
 
     <link rel="stylesheet" href="viewer.css">
     <style>
-      :root {
-          --page-margin: 0px auto 0px !important;
-          --page-border: 0px solid transparent !important;
-      }
       #toolbarContainer, .toolbar, #sidebarContainer, .findbar, #secondaryToolbar, #loadingBar { 
           display: none !important; 
           visibility: hidden !important;
@@ -53,7 +49,7 @@ See https://github.com/adobe-type-tools/cmap-resources
           margin: 0 !important;
           padding: 0 !important;
       }
-      #viewerContainer, #viewer, .pdfViewer { 
+      #viewerContainer { 
           position: absolute !important;
           top: 0 !important; 
           left: 0 !important;
@@ -62,21 +58,6 @@ See https://github.com/adobe-type-tools/cmap-resources
           width: 100% !important;
           height: 100% !important;
           overflow: auto !important;
-          padding: 0 !important;
-          margin: 0 !important;
-      }
-      .pdfViewer .page, .spread .page, .page {
-          margin: 0 auto 0px !important;
-          border: none !important;
-          border-image: none !important;
-          box-shadow: none !important;
-          outline: none !important;
-          background-clip: border-box !important;
-      }
-      .pdfViewer.removePageBorders .page {
-          margin: 0 auto 0px !important;
-          border: none !important;
-          box-shadow: none !important;
       }
     </style>
 
