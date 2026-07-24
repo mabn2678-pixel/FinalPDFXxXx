@@ -128,6 +128,7 @@ data class PdfUiState(
     // Edit / Annotation State
     val isEditMode: Boolean = false,
     val activeEditTool: String = "none", // "none", "pen", "text", "highlighter", "image"
+    val annotationEditorMode: Int = 0, // 0: NONE, 3: FREETEXT, 9: HIGHLIGHT, 13: STAMP, 15: INK
     val editColor: String = "#FFFF00", // Hex color string (Yellow default)
     val editThickness: Float = 5f,
     val editOpacity: Float = 100f
@@ -385,25 +386,47 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
         sendJsCommand("if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.annotationEditorUIManager) { PDFViewerApplication.pdfViewer.annotationEditorUIManager.redo(); }")
     }
 
+    fun setAnnotationEditorMode(mode: Int) {
+        _uiState.update { 
+            it.copy(
+                annotationEditorMode = mode,
+                isEditMode = (mode != 0)
+            ) 
+        }
+        sendJsCommand("""
+            if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
+                PDFViewerApplication.pdfViewer.annotationEditorMode = { mode: $mode };
+            }
+        """.trimIndent())
+    }
+
     fun requestSaveAnnotatedPdf() {
         sendJsCommand("""
-            (async function() {
+            (async () => {
                 try {
                     if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfDocument) {
-                        const bytes = await PDFViewerApplication.pdfDocument.saveDocument();
+                        const data = await PDFViewerApplication.pdfDocument.saveDocument();
                         let binary = '';
-                        const len = bytes.byteLength;
-                        const chunk = 8192;
-                        for (let i = 0; i < len; i += chunk) {
-                            binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+                        const bytes = new Uint8Array(data);
+                        const chunkSize = 8192;
+                        for (let i = 0; i < bytes.length; i += chunkSize) {
+                            binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
                         }
-                        const base64 = window.btoa(binary);
-                        AndroidBridge.onPdfSaved(base64);
+                        const base64 = btoa(binary);
+                        if (typeof AndroidBridge !== 'undefined' && AndroidBridge.onDocumentSaved) {
+                            AndroidBridge.onDocumentSaved(base64);
+                        } else if (typeof AndroidBridge !== 'undefined' && AndroidBridge.onPdfSaved) {
+                            AndroidBridge.onPdfSaved(base64);
+                        }
                     } else {
-                        AndroidBridge.onPdfSaveFailed("PDFViewerApplication is not ready or has no pdfDocument");
+                        if (typeof AndroidBridge !== 'undefined' && AndroidBridge.onSaveError) {
+                            AndroidBridge.onSaveError("PDFViewerApplication is not ready or has no pdfDocument");
+                        }
                     }
                 } catch (e) {
-                    AndroidBridge.onPdfSaveFailed(e.toString());
+                    if (typeof AndroidBridge !== 'undefined' && AndroidBridge.onSaveError) {
+                        AndroidBridge.onSaveError(e.message || e.toString());
+                    }
                 }
             })();
         """.trimIndent())

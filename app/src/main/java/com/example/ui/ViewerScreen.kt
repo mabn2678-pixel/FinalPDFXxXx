@@ -133,7 +133,8 @@ enum class BottomSheetType {
     AutoScroll,
     DocumentNavigation,
     OcrText,
-    CameraOcr
+    CameraOcr,
+    AnnotationTools
 }
 
 private val glassLavenderColorScheme = lightColorScheme(
@@ -763,18 +764,28 @@ fun ViewerScreen(
                                         iconSize = 18.dp
                                     )
 
-                                    GlowingIconButton(
-                                        icon = Icons.Default.Search,
-                                        contentDescription = "البحث",
-                                        onClick = { viewModel.openSearch() },
-                                        tint = Color(0xFF009688),
-                                        iconSize = 18.dp
-                                    )
+                                    if (state.annotationEditorMode != 0) {
+                                        GlowingIconButton(
+                                            icon = Icons.Default.Check,
+                                            contentDescription = "حفظ والتطبيق",
+                                            onClick = { viewModel.requestSaveAnnotatedPdf() },
+                                            tint = Color(0xFF4CAF50),
+                                            iconSize = 20.dp
+                                        )
+                                    } else {
+                                        GlowingIconButton(
+                                            icon = Icons.Default.Search,
+                                            contentDescription = "البحث",
+                                            onClick = { viewModel.openSearch() },
+                                            tint = Color(0xFF009688),
+                                            iconSize = 18.dp
+                                        )
+                                    }
 
                                     GlowingIconButton(
-                                        icon = Icons.Default.MenuBook,
-                                        contentDescription = "تصفح المستند",
-                                        onClick = { activeSheet = BottomSheetType.DocumentNavigation },
+                                        icon = Icons.Default.Edit,
+                                        contentDescription = "أدوات التحرير والرسم",
+                                        onClick = { activeSheet = BottomSheetType.AnnotationTools },
                                         tint = Color(0xFF4CB050),
                                         iconSize = 20.dp
                                     )
@@ -1033,6 +1044,11 @@ fun ViewerScreen(
                                             state = state,
                                             onDismiss = { activeSheet = BottomSheetType.None }
                                         )
+                                        BottomSheetType.AnnotationTools -> AnnotationToolsSheet(
+                                            viewModel = viewModel,
+                                            state = state,
+                                            onDismiss = { activeSheet = BottomSheetType.None }
+                                        )
                                         else -> {}
                                     }
                                 }
@@ -1103,6 +1119,11 @@ fun ViewerScreen(
                                         onDismiss = { activeSheet = BottomSheetType.None }
                                     )
                                     BottomSheetType.CameraOcr -> CameraOcrSheet(
+                                        viewModel = viewModel,
+                                        state = state,
+                                        onDismiss = { activeSheet = BottomSheetType.None }
+                                    )
+                                    BottomSheetType.AnnotationTools -> AnnotationToolsSheet(
                                         viewModel = viewModel,
                                         state = state,
                                         onDismiss = { activeSheet = BottomSheetType.None }
@@ -2073,6 +2094,20 @@ fun PdfWebView(
                     }
 
                     @android.webkit.JavascriptInterface
+                    fun onDocumentSaved(base64Data: String) {
+                        coroutineScope.launch {
+                            viewModel.saveAnnotatedPdf(context, base64Data)
+                        }
+                    }
+
+                    @android.webkit.JavascriptInterface
+                    fun onSaveError(error: String) {
+                        coroutineScope.launch {
+                            viewModel.onPdfSaveFailed(context, error)
+                        }
+                    }
+
+                    @android.webkit.JavascriptInterface
                     fun onPdfSaved(base64Data: String) {
                         coroutineScope.launch {
                             viewModel.saveAnnotatedPdf(context, base64Data)
@@ -2308,6 +2343,21 @@ fun MoreOptionsSheet(
                         onDismiss()
                         state.currentPdfPath?.let { path ->
                             sharePdf(context, path, state.currentPdfName ?: "doc.pdf")
+                        }
+                    }
+                )
+                MoreOptionGridItem(
+                    icon = Icons.Outlined.PhotoLibrary,
+                    label = "تصدير الصفحة (PNG)",
+                    onClick = {
+                        onDismiss()
+                        state.currentPdfPath?.let { path ->
+                            exportPageAsPngToGallery(
+                                context = context,
+                                filePath = path,
+                                pageNumber = state.currentPage,
+                                pdfName = state.currentPdfName ?: "doc.pdf"
+                            )
                         }
                     }
                 )
@@ -3440,6 +3490,123 @@ fun printPdf(context: Context, filePath: String, fileName: String) {
         }
     } catch (e: Exception) {
         e.printStackTrace()
+    }
+}
+
+fun exportPageAsPngToGallery(
+    context: Context,
+    filePath: String,
+    pageNumber: Int,
+    pdfName: String
+) {
+    kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+        try {
+            val file = File(filePath)
+            if (!file.exists()) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "الملف غير موجود!", Toast.LENGTH_SHORT).show()
+                }
+                return@launch
+            }
+
+            val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+            if (pfd == null) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "فشل فتح المستند!", Toast.LENGTH_SHORT).show()
+                }
+                return@launch
+            }
+
+            val renderer = PdfRenderer(pfd)
+            if (renderer.pageCount == 0) {
+                renderer.close()
+                pfd.close()
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "المستند فارغ!", Toast.LENGTH_SHORT).show()
+                }
+                return@launch
+            }
+
+            val pageIndex = (pageNumber - 1).coerceIn(0, renderer.pageCount - 1)
+            val page = renderer.openPage(pageIndex)
+
+            // High resolution scale (~2400px width) for crystal-clear PNG image quality
+            val targetWidthPx = 2400f
+            val scale = (targetWidthPx / page.width.toFloat()).coerceAtLeast(2.5f)
+            val bitmapWidth = (page.width * scale).toInt()
+            val bitmapHeight = (page.height * scale).toInt()
+
+            val bitmap = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(bitmap)
+            canvas.drawColor(android.graphics.Color.WHITE)
+
+            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+
+            page.close()
+            renderer.close()
+            pfd.close()
+
+            val cleanName = pdfName.substringBeforeLast(".pdf").replace(" ", "_")
+            val fileName = "${cleanName}_صفحة_${pageIndex + 1}_${System.currentTimeMillis()}.png"
+
+            var isSaved = false
+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                val contentValues = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "image/png")
+                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_PICTURES + "/FinalPDF")
+                    put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1)
+                }
+
+                val resolver = context.contentResolver
+                val uri = resolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
+
+                if (uri != null) {
+                    resolver.openOutputStream(uri)?.use { stream ->
+                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                    }
+                    contentValues.clear()
+                    contentValues.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0)
+                    resolver.update(uri, contentValues, null, null)
+                    isSaved = true
+                }
+            } else {
+                val picturesDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES)
+                val appFolder = File(picturesDir, "FinalPDF")
+                if (!appFolder.exists()) {
+                    appFolder.mkdirs()
+                }
+                val imageFile = File(appFolder, fileName)
+                FileOutputStream(imageFile).use { stream ->
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+                }
+                android.media.MediaScannerConnection.scanFile(
+                    context,
+                    arrayOf(imageFile.absolutePath),
+                    arrayOf("image/png"),
+                    null
+                )
+                isSaved = true
+            }
+
+            withContext(Dispatchers.Main) {
+                if (isSaved) {
+                    Toast.makeText(
+                        context,
+                        "تم حفظ الصفحة ${pageIndex + 1} كصورة PNG عالية الجودة في المعرض! 🖼️",
+                        Toast.LENGTH_LONG
+                    ).show()
+                } else {
+                    Toast.makeText(context, "تعذر حفظ الصورة في المعرض", Toast.LENGTH_SHORT).show()
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "خطأ أثناء تصدير الصفحة: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 }
 
@@ -5432,5 +5599,177 @@ fun OcrTextSheet(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun AnnotationToolsSheet(
+    viewModel: PdfViewModel,
+    state: PdfUiState,
+    onDismiss: () -> Unit
+) {
+    val currentMode = state.annotationEditorMode
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = "أدوات التحرير والرسم",
+            fontWeight = FontWeight.Bold,
+            fontSize = 18.sp,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 4.dp),
+            textAlign = TextAlign.Start
+        )
+
+        Text(
+            text = "اختر الأداة المطلوبة للرسم أو إضافة نصوص وختومات على المستند",
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 20.dp),
+            textAlign = TextAlign.Start
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 1. Highlight (تظليل) -> Mode 9
+            AnnotationToolItem(
+                icon = Icons.Default.BorderColor,
+                label = "تظليل",
+                isSelected = (currentMode == 9),
+                activeColor = Color(0xFFFFC107),
+                onClick = {
+                    viewModel.setAnnotationEditorMode(9)
+                    onDismiss()
+                }
+            )
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            // 2. Draw / Ink (رسم حر) -> Mode 15
+            AnnotationToolItem(
+                icon = Icons.Default.Create,
+                label = "رسم حر",
+                isSelected = (currentMode == 15),
+                activeColor = Color(0xFF9C27B0),
+                onClick = {
+                    viewModel.setAnnotationEditorMode(15)
+                    onDismiss()
+                }
+            )
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            // 3. FreeText (نص حر) -> Mode 3
+            AnnotationToolItem(
+                icon = Icons.Default.TextFields,
+                label = "نص حر",
+                isSelected = (currentMode == 3),
+                activeColor = Color(0xFF2196F3),
+                onClick = {
+                    viewModel.setAnnotationEditorMode(3)
+                    onDismiss()
+                }
+            )
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            // 4. Stamp (ختم/صورة) -> Mode 13
+            AnnotationToolItem(
+                icon = Icons.Default.Approval,
+                label = "ختم / صورة",
+                isSelected = (currentMode == 13),
+                activeColor = Color(0xFF009688),
+                onClick = {
+                    viewModel.setAnnotationEditorMode(13)
+                    onDismiss()
+                }
+            )
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            // 5. Cancel / None (إلغاء التحديد) -> Mode 0
+            AnnotationToolItem(
+                icon = Icons.Default.Close,
+                label = "إلغاء التحديد",
+                isSelected = (currentMode == 0),
+                activeColor = Color(0xFFE53935),
+                isResetBtn = true,
+                onClick = {
+                    viewModel.setAnnotationEditorMode(0)
+                    onDismiss()
+                }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun AnnotationToolItem(
+    icon: ImageVector,
+    label: String,
+    isSelected: Boolean,
+    activeColor: Color,
+    isResetBtn: Boolean = false,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                if (isResetBtn) Color(0xFFFFEBEE)
+                else if (isSelected) activeColor.copy(alpha = 0.18f)
+                else Color.White.copy(alpha = 0.7f)
+            )
+            .border(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = if (isResetBtn) Color(0xFFEF5350)
+                        else if (isSelected) activeColor
+                        else Color.LightGray.copy(alpha = 0.5f),
+                shape = RoundedCornerShape(16.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(
+                    if (isResetBtn) Color(0xFFE53935)
+                    else if (isSelected) activeColor
+                    else activeColor.copy(alpha = 0.12f)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = if (isResetBtn || isSelected) Color.White else activeColor,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = if (isSelected || isResetBtn) FontWeight.Bold else FontWeight.Normal,
+            color = if (isResetBtn) Color(0xFFC62828) else MaterialTheme.colorScheme.onSurface
+        )
     }
 }
