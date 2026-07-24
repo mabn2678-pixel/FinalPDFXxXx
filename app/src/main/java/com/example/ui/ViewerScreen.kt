@@ -420,7 +420,7 @@ fun ViewerScreen(
         }
     }
 
-    // Programmatic status bar icon color setup
+    // Programmatic status bar icon color setup & immersive status bar control
     DisposableEffect(Unit) {
         activity?.window?.let { window ->
             val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
@@ -430,20 +430,20 @@ fun ViewerScreen(
         onDispose {
             activity?.window?.let { window ->
                 val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+                insetsController.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
                 insetsController.isAppearanceLightStatusBars = true
             }
         }
     }
 
-    // Toggle System Status Bar based on isBarsVisible (Fullscreen mode when toolbars hide)
+    // Toggle system status bar & navigation bar immersive mode when toolbars are toggled
     LaunchedEffect(isBarsVisible) {
         activity?.window?.let { window ->
             val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
             if (isBarsVisible) {
-                insetsController.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
-                insetsController.isAppearanceLightStatusBars = true
+                insetsController.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
             } else {
-                insetsController.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+                insetsController.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
                 insetsController.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             }
         }
@@ -701,16 +701,16 @@ fun ViewerScreen(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
                     .widthIn(max = 480.dp)
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 40.dp, max = 48.dp)
+                        .heightIn(min = 54.dp, max = 72.dp)
                         .clip(RoundedCornerShape(percent = 50))
-                        .background(Color(0xFFEDE7F6))
-                        .border(BorderStroke(1.2.dp, Color(0xFFC4B5FD)), RoundedCornerShape(percent = 50)),
+                        .background(Color(0xF2ECE6F8))
+                        .border(BorderStroke(1.dp, Color(0x407C5CFF)), RoundedCornerShape(percent = 50)),
                     contentAlignment = Alignment.Center
                 ) {
                     Box(
@@ -783,10 +783,9 @@ fun ViewerScreen(
                         } else {
                             val fileName = state.currentPdfName ?: "عرض ملف PDF"
                             val fileNameFontSize = when {
-                                fileName.length > 35 -> 10.sp
-                                fileName.length > 20 -> 11.sp
-                                fileName.length > 12 -> 12.sp
-                                else -> 13.sp
+                                fileName.length > 30 -> 12.sp
+                                fileName.length > 18 -> 13.sp
+                                else -> 14.sp
                             }
 
                             Row(
@@ -827,17 +826,17 @@ fun ViewerScreen(
                                     )
                                 }
 
-                                // Centered Title text - Single line compact filename with auto-scaling font
+                                // Centered Title text - Full filename with up to 4 lines
                                 Text(
                                     text = fileName,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = fileNameFontSize,
-                                    maxLines = 1,
+                                    maxLines = 4,
                                     overflow = TextOverflow.Ellipsis,
-                                    lineHeight = (fileNameFontSize.value + 1).sp,
+                                    lineHeight = (fileNameFontSize.value + 2).sp,
                                     modifier = Modifier
                                         .weight(1f)
-                                        .padding(horizontal = 4.dp),
+                                        .padding(horizontal = 8.dp),
                                     color = Color(0xFF1C182B),
                                     textAlign = TextAlign.Center
                                 )
@@ -907,8 +906,8 @@ fun ViewerScreen(
                                 .fillMaxWidth()
                                 .testTag("native_bottom_bar")
                                 .clip(RoundedCornerShape(28.dp))
-                                .background(Color(0xFFEDE7F6))
-                                .border(BorderStroke(1.2.dp, Color(0xFFC4B5FD)), RoundedCornerShape(28.dp))
+                                .background(Color(0xF2ECE6F8))
+                                .border(BorderStroke(1.dp, Color(0x407C5CFF)), RoundedCornerShape(28.dp))
                         ) {
                             Row(
                                 modifier = Modifier
@@ -1549,14 +1548,15 @@ fun PdfWebView(
                                             PDFViewerApplication.eventBus.on('pagesinit', (e) => {
                                                 reportPageStatus();
                                                 try {
-                                                    if (PDFViewerApplication.pdfViewer) {
-                                                        PDFViewerApplication.pdfViewer.scrollMode = ${if (state.snapToPage) 3 else if (state.scrollMode == "horizontal") 1 else 0};
-                                                    }
+                                                    PDFViewerApplication.pdfViewer.scrollMode = ${if (state.snapToPage) 3 else if (state.scrollMode == "horizontal") 1 else 0};
                                                 } catch (err) {}
                                             });
 
                                             PDFViewerApplication.eventBus.on('pagesloaded', (e) => {
                                                 reportPageStatus();
+                                                try {
+                                                    PDFViewerApplication.pdfViewer.scrollMode = ${if (state.snapToPage) 3 else if (state.scrollMode == "horizontal") 1 else 0};
+                                                } catch (err) {}
                                             });
 
                                             // Report immediately
@@ -1618,7 +1618,7 @@ fun PdfWebView(
                                             style.type = 'text/css';
                                             style.innerHTML = `
                                                 :root {
-                                                    --page-margin: 2px auto 6px !important;
+                                                    --page-margin: 0px auto 0px !important;
                                                     --page-border: 0px solid transparent !important;
                                                 }
                                                 #toolbarContainer, .toolbar, #sidebarContainer, .findbar, #secondaryToolbar, #loadingBar { 
@@ -1656,7 +1656,7 @@ fun PdfWebView(
                                                     margin: 0 !important;
                                                 }
                                                 .pdfViewer .page, .spread .page, .page {
-                                                    margin: 2px auto 6px !important;
+                                                    margin: 0 auto 0px !important;
                                                     border: none !important;
                                                     border-image: none !important;
                                                     box-shadow: none !important;
@@ -1664,7 +1664,7 @@ fun PdfWebView(
                                                     background-clip: border-box !important;
                                                 }
                                                 .pdfViewer.removePageBorders .page {
-                                                    margin: 2px auto 6px !important;
+                                                    margin: 0 auto 0px !important;
                                                     border: none !important;
                                                     box-shadow: none !important;
                                                 }
@@ -1683,6 +1683,7 @@ fun PdfWebView(
                                                 .page, .spread, .dummyPage {
                                                     scroll-snap-align: none !important;
                                                     scroll-snap-stop: normal !important;
+                                                    contain: layout !important;
                                                 }
                                                 #outerContainer, #viewerContainer, #viewer, .page, .spread, .dummyPage, .canvasWrapper, .textLayer, .annotationLayer {
                                                     overflow-anchor: none !important;
