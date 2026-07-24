@@ -809,7 +809,7 @@ fun HomeTabScreen(
 
                 // Grid / List Toggle Button
                 IconButton(
-                    onClick = { viewModel.toggleGridView() },
+                    onClick = { viewModel.toggleGridView(context) },
                     modifier = Modifier
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), CircleShape)
                         .size(36.dp)
@@ -2378,6 +2378,48 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
             }
         }
 
+        val toolSinglePickerLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocument()
+        ) { uri: Uri? ->
+            uri?.let {
+                val fileName = getFileName(context, uri) ?: "ملف_من_النظام.pdf"
+                val cachedPath = viewModel.copyUriToCache(context, uri, fileName)
+                if (cachedPath != null) {
+                    selectedSingleFilePath = cachedPath
+                    val cleanName = fileName.replace(".pdf", "", ignoreCase = true).replace("_", " ")
+                    targetFileName = when (activeTool) {
+                        ActiveTool.Split -> "${cleanName}_مقسم"
+                        ActiveTool.Compress -> "${cleanName}_مضغوط"
+                        ActiveTool.Rotate -> "${cleanName}_مدور"
+                        ActiveTool.Reorder -> "${cleanName}_مرتب"
+                        ActiveTool.DeletePages -> "${cleanName}_بعد_الحذف"
+                        ActiveTool.PdfToImages -> cleanName
+                        ActiveTool.LockPdf -> "${cleanName}_محمي"
+                        ActiveTool.UnlockPdf -> "${cleanName}_مفتوح"
+                        else -> cleanName
+                    }
+                    viewModel.scanFiles(context)
+                }
+            }
+        }
+
+        val toolMultiPickerLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenMultipleDocuments()
+        ) { uris: List<Uri> ->
+            if (uris.isNotEmpty()) {
+                val newPaths = mutableListOf<String>()
+                uris.forEach { uri ->
+                    val fileName = getFileName(context, uri) ?: "ملف_من_النظام.pdf"
+                    val cachedPath = viewModel.copyUriToCache(context, uri, fileName)
+                    if (cachedPath != null) {
+                        newPaths.add(cachedPath)
+                    }
+                }
+                selectedFilePaths = selectedFilePaths + newPaths
+                viewModel.scanFiles(context)
+            }
+        }
+
         if (activeTool == ActiveTool.CameraOcr) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
@@ -2488,9 +2530,22 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                     Column(modifier = Modifier.padding(16.dp)) {
                                         Text("حدد الملفات المراد دمجها (${selectedFilePaths.size} محددة)", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                         Spacer(modifier = Modifier.height(8.dp))
-                                        if (uiState.allPdfFiles.isEmpty()) {
-                                            Text("لا يوجد ملفات PDF متوفرة في مكتبتك.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
+                                        Button(
+                                            onClick = { toolMultiPickerLauncher.launch(arrayOf("application/pdf")) },
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("اختيار ملفات من منتقي النظام (SAF)")
+                                        }
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        if (uiState.allPdfFiles.isEmpty() && selectedFilePaths.isEmpty()) {
+                                            Text("لا يوجد ملفات PDF متوفرة حالياً.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
                                         } else {
+                                            Text("أو حدد من مكتبة التطبيق:", fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
+                                            Spacer(modifier = Modifier.height(6.dp))
                                             uiState.allPdfFiles.forEach { file ->
                                                 val isSelected = selectedFilePaths.contains(file.filePath)
                                                 Surface(
@@ -2527,8 +2582,18 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                             }
 
                             ActiveTool.Split -> {
-                                var dropdownExpanded by remember { mutableStateOf(false) }
-                                val selectedFile = uiState.allPdfFiles.find { it.filePath == selectedSingleFilePath }
+                                ToolFilePickerCard(
+                                    title = "اختر ملف الـ PDF المراد تقسيمه",
+                                    selectedFilePath = selectedSingleFilePath,
+                                    allPdfFiles = uiState.allPdfFiles,
+                                    onFileSelected = { path, name ->
+                                        selectedSingleFilePath = path
+                                        targetFileName = "${name}_مقسم"
+                                    },
+                                    onOpenSafPicker = {
+                                        toolSinglePickerLauncher.launch(arrayOf("application/pdf"))
+                                    }
+                                )
 
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -2536,37 +2601,8 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("اختر ملف الـ PDF المراد تقسيمه", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text("إعدادات النطاق والتسمية", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                         Spacer(modifier = Modifier.height(8.dp))
-                                        Box(modifier = Modifier.fillMaxWidth()) {
-                                            OutlinedButton(
-                                                onClick = { dropdownExpanded = true },
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                                    Text(selectedFile?.fileName ?: "اضغط لاختيار ملف...", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                    Icon(Icons.Default.ArrowDropDown, null)
-                                                }
-                                            }
-                                            DropdownMenu(
-                                                expanded = dropdownExpanded,
-                                                onDismissRequest = { dropdownExpanded = false },
-                                                modifier = Modifier.fillMaxWidth(0.85f)
-                                            ) {
-                                                uiState.allPdfFiles.forEach { file ->
-                                                    DropdownMenuItem(
-                                                        text = { Text(file.fileName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                                        onClick = {
-                                                            selectedSingleFilePath = file.filePath
-                                                            targetFileName = "${file.fileName}_مقسم"
-                                                            dropdownExpanded = false
-                                                        }
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.height(12.dp))
                                         OutlinedTextField(
                                             value = targetFileName,
                                             onValueChange = { targetFileName = it },
@@ -2574,17 +2610,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                             singleLine = true,
                                             modifier = Modifier.fillMaxWidth()
                                         )
-                                    }
-                                }
-
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("حدد نطاق الصفحات المراد فصلها", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Spacer(modifier = Modifier.height(12.dp))
                                         Row(
                                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                                             modifier = Modifier.fillMaxWidth()
@@ -2611,8 +2637,18 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                             }
 
                             ActiveTool.Compress -> {
-                                var dropdownExpanded by remember { mutableStateOf(false) }
-                                val selectedFile = uiState.allPdfFiles.find { it.filePath == selectedSingleFilePath }
+                                ToolFilePickerCard(
+                                    title = "اختر الملف المراد ضغطه",
+                                    selectedFilePath = selectedSingleFilePath,
+                                    allPdfFiles = uiState.allPdfFiles,
+                                    onFileSelected = { path, name ->
+                                        selectedSingleFilePath = path
+                                        targetFileName = "${name}_مضغوط"
+                                    },
+                                    onOpenSafPicker = {
+                                        toolSinglePickerLauncher.launch(arrayOf("application/pdf"))
+                                    }
+                                )
 
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -2620,37 +2656,8 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("اختر الملف المراد ضغطه", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text("إعدادات الضغط والاسم", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                         Spacer(modifier = Modifier.height(8.dp))
-                                        Box(modifier = Modifier.fillMaxWidth()) {
-                                            OutlinedButton(
-                                                onClick = { dropdownExpanded = true },
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                                    Text(selectedFile?.fileName ?: "اضغط لاختيار ملف...", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                    Icon(Icons.Default.ArrowDropDown, null)
-                                                }
-                                            }
-                                            DropdownMenu(
-                                                expanded = dropdownExpanded,
-                                                onDismissRequest = { dropdownExpanded = false },
-                                                modifier = Modifier.fillMaxWidth(0.85f)
-                                            ) {
-                                                uiState.allPdfFiles.forEach { file ->
-                                                    DropdownMenuItem(
-                                                        text = { Text(file.fileName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                                        onClick = {
-                                                            selectedSingleFilePath = file.filePath
-                                                            targetFileName = "${file.fileName}_مضغوط"
-                                                            dropdownExpanded = false
-                                                        }
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.height(12.dp))
                                         OutlinedTextField(
                                             value = targetFileName,
                                             onValueChange = { targetFileName = it },
@@ -2658,17 +2665,9 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                             singleLine = true,
                                             modifier = Modifier.fillMaxWidth()
                                         )
-                                    }
-                                }
-
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("مستوى الضغط المطلوبة", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text("مستوى الضغط المطلوب", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                        Spacer(modifier = Modifier.height(6.dp))
                                         
                                         val levels = listOf(
                                             "low" to "منخفض (جودة عالية)",
@@ -2695,8 +2694,18 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                             }
 
                             ActiveTool.Rotate -> {
-                                var dropdownExpanded by remember { mutableStateOf(false) }
-                                val selectedFile = uiState.allPdfFiles.find { it.filePath == selectedSingleFilePath }
+                                ToolFilePickerCard(
+                                    title = "اختر ملف الـ PDF المراد تدويره",
+                                    selectedFilePath = selectedSingleFilePath,
+                                    allPdfFiles = uiState.allPdfFiles,
+                                    onFileSelected = { path, name ->
+                                        selectedSingleFilePath = path
+                                        targetFileName = "${name}_مدور"
+                                    },
+                                    onOpenSafPicker = {
+                                        toolSinglePickerLauncher.launch(arrayOf("application/pdf"))
+                                    }
+                                )
 
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -2704,37 +2713,8 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("اختر ملف الـ PDF", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text("إعدادات التدوير", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                         Spacer(modifier = Modifier.height(8.dp))
-                                        Box(modifier = Modifier.fillMaxWidth()) {
-                                            OutlinedButton(
-                                                onClick = { dropdownExpanded = true },
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                                    Text(selectedFile?.fileName ?: "اضغط لاختيار ملف...", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                    Icon(Icons.Default.ArrowDropDown, null)
-                                                }
-                                            }
-                                            DropdownMenu(
-                                                expanded = dropdownExpanded,
-                                                onDismissRequest = { dropdownExpanded = false },
-                                                modifier = Modifier.fillMaxWidth(0.85f)
-                                            ) {
-                                                uiState.allPdfFiles.forEach { file ->
-                                                    DropdownMenuItem(
-                                                        text = { Text(file.fileName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                                        onClick = {
-                                                            selectedSingleFilePath = file.filePath
-                                                            targetFileName = "${file.fileName}_مدور"
-                                                            dropdownExpanded = false
-                                                        }
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.height(12.dp))
                                         OutlinedTextField(
                                             value = targetFileName,
                                             onValueChange = { targetFileName = it },
@@ -2742,17 +2722,9 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                             singleLine = true,
                                             modifier = Modifier.fillMaxWidth()
                                         )
-                                    }
-                                }
-
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("درجة التدوير المطلوبة", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text("درجة التدوير المطلوبة", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                        Spacer(modifier = Modifier.height(6.dp))
                                         Row(
                                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                                             modifier = Modifier.fillMaxWidth()
@@ -2761,7 +2733,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                                 FilterChip(
                                                     selected = rotateDegrees == deg,
                                                     onClick = { rotateDegrees = deg },
-                                                    label = { Text(label, fontSize = 12.sp) },
+                                                    label = { Text(label, fontSize = 11.sp) },
                                                     modifier = Modifier.weight(1f)
                                                 )
                                             }
@@ -2780,8 +2752,18 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                             }
 
                             ActiveTool.Reorder -> {
-                                var dropdownExpanded by remember { mutableStateOf(false) }
-                                val selectedFile = uiState.allPdfFiles.find { it.filePath == selectedSingleFilePath }
+                                ToolFilePickerCard(
+                                    title = "اختر ملف الـ PDF المراد إعادة ترتيبه",
+                                    selectedFilePath = selectedSingleFilePath,
+                                    allPdfFiles = uiState.allPdfFiles,
+                                    onFileSelected = { path, name ->
+                                        selectedSingleFilePath = path
+                                        targetFileName = "${name}_مرتب"
+                                    },
+                                    onOpenSafPicker = {
+                                        toolSinglePickerLauncher.launch(arrayOf("application/pdf"))
+                                    }
+                                )
 
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -2789,37 +2771,8 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("اختر ملف الـ PDF المراد إعادة ترتيبه", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text("إعدادات الترتيب والاسم", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                         Spacer(modifier = Modifier.height(8.dp))
-                                        Box(modifier = Modifier.fillMaxWidth()) {
-                                            OutlinedButton(
-                                                onClick = { dropdownExpanded = true },
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                                    Text(selectedFile?.fileName ?: "اضغط لاختيار ملف...", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                    Icon(Icons.Default.ArrowDropDown, null)
-                                                }
-                                            }
-                                            DropdownMenu(
-                                                expanded = dropdownExpanded,
-                                                onDismissRequest = { dropdownExpanded = false },
-                                                modifier = Modifier.fillMaxWidth(0.85f)
-                                            ) {
-                                                uiState.allPdfFiles.forEach { file ->
-                                                    DropdownMenuItem(
-                                                        text = { Text(file.fileName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                                        onClick = {
-                                                            selectedSingleFilePath = file.filePath
-                                                            targetFileName = "${file.fileName}_مرتب"
-                                                            dropdownExpanded = false
-                                                        }
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.height(12.dp))
                                         OutlinedTextField(
                                             value = targetFileName,
                                             onValueChange = { targetFileName = it },
@@ -2827,18 +2780,10 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                             singleLine = true,
                                             modifier = Modifier.fillMaxWidth()
                                         )
-                                    }
-                                }
-
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("ترتيب الصفحات الجديد", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text("ترتيب الصفحات الجديد", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                         Text("أدخل أرقام الصفحات بالترتيب الجديد مفصولة بفواصل:", fontSize = 11.sp, color = Color.Gray)
-                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Spacer(modifier = Modifier.height(6.dp))
                                         OutlinedTextField(
                                             value = reorderSequence,
                                             onValueChange = { reorderSequence = it },
@@ -2851,8 +2796,18 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                             }
 
                             ActiveTool.DeletePages -> {
-                                var dropdownExpanded by remember { mutableStateOf(false) }
-                                val selectedFile = uiState.allPdfFiles.find { it.filePath == selectedSingleFilePath }
+                                ToolFilePickerCard(
+                                    title = "اختر ملف الـ PDF لحذف صفحات منه",
+                                    selectedFilePath = selectedSingleFilePath,
+                                    allPdfFiles = uiState.allPdfFiles,
+                                    onFileSelected = { path, name ->
+                                        selectedSingleFilePath = path
+                                        targetFileName = "${name}_معدل"
+                                    },
+                                    onOpenSafPicker = {
+                                        toolSinglePickerLauncher.launch(arrayOf("application/pdf"))
+                                    }
+                                )
 
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -2860,37 +2815,8 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("اختر ملف الـ PDF لحذف صفحات منه", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text("إعدادات الحذف والاسم", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                         Spacer(modifier = Modifier.height(8.dp))
-                                        Box(modifier = Modifier.fillMaxWidth()) {
-                                            OutlinedButton(
-                                                onClick = { dropdownExpanded = true },
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                                    Text(selectedFile?.fileName ?: "اضغط لاختيار ملف...", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                    Icon(Icons.Default.ArrowDropDown, null)
-                                                }
-                                            }
-                                            DropdownMenu(
-                                                expanded = dropdownExpanded,
-                                                onDismissRequest = { dropdownExpanded = false },
-                                                modifier = Modifier.fillMaxWidth(0.85f)
-                                            ) {
-                                                uiState.allPdfFiles.forEach { file ->
-                                                    DropdownMenuItem(
-                                                        text = { Text(file.fileName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                                        onClick = {
-                                                            selectedSingleFilePath = file.filePath
-                                                            targetFileName = "${file.fileName}_معدل"
-                                                            dropdownExpanded = false
-                                                        }
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.height(12.dp))
                                         OutlinedTextField(
                                             value = targetFileName,
                                             onValueChange = { targetFileName = it },
@@ -2898,18 +2824,10 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                             singleLine = true,
                                             modifier = Modifier.fillMaxWidth()
                                         )
-                                    }
-                                }
-
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("أرقام الصفحات المراد حذفها", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text("أرقام الصفحات المراد حذفها", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                         Text("أدخل الصفحات المراد حذفها مفصولة بفواصل:", fontSize = 11.sp, color = Color.Gray)
-                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Spacer(modifier = Modifier.height(6.dp))
                                         OutlinedTextField(
                                             value = deletePagesSetInput,
                                             onValueChange = { deletePagesSetInput = it },
@@ -2997,8 +2915,17 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                             }
 
                             ActiveTool.PdfToImages -> {
-                                var dropdownExpanded by remember { mutableStateOf(false) }
-                                val selectedFile = uiState.allPdfFiles.find { it.filePath == selectedSingleFilePath }
+                                ToolFilePickerCard(
+                                    title = "اختر ملف الـ PDF لتحويله لصور",
+                                    selectedFilePath = selectedSingleFilePath,
+                                    allPdfFiles = uiState.allPdfFiles,
+                                    onFileSelected = { path, name ->
+                                        selectedSingleFilePath = path
+                                    },
+                                    onOpenSafPicker = {
+                                        toolSinglePickerLauncher.launch(arrayOf("application/pdf"))
+                                    }
+                                )
 
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -3006,36 +2933,6 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("اختر ملف الـ PDF لتحويله لصور", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Box(modifier = Modifier.fillMaxWidth()) {
-                                            OutlinedButton(
-                                                onClick = { dropdownExpanded = true },
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                                    Text(selectedFile?.fileName ?: "اضغط لاختيار ملف...", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                    Icon(Icons.Default.ArrowDropDown, null)
-                                                }
-                                            }
-                                            DropdownMenu(
-                                                expanded = dropdownExpanded,
-                                                onDismissRequest = { dropdownExpanded = false },
-                                                modifier = Modifier.fillMaxWidth(0.85f)
-                                            ) {
-                                                uiState.allPdfFiles.forEach { file ->
-                                                    DropdownMenuItem(
-                                                        text = { Text(file.fileName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                                        onClick = {
-                                                            selectedSingleFilePath = file.filePath
-                                                            dropdownExpanded = false
-                                                        }
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.height(12.dp))
                                         Text("صيغة الصور الناتجة:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                         Row(
                                             horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -3065,8 +2962,18 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                             }
 
                             ActiveTool.LockPdf -> {
-                                var dropdownExpanded by remember { mutableStateOf(false) }
-                                val selectedFile = uiState.allPdfFiles.find { it.filePath == selectedSingleFilePath }
+                                ToolFilePickerCard(
+                                    title = "اختر ملف الـ PDF المراد تشفيره",
+                                    selectedFilePath = selectedSingleFilePath,
+                                    allPdfFiles = uiState.allPdfFiles,
+                                    onFileSelected = { path, name ->
+                                        selectedSingleFilePath = path
+                                        targetFileName = "${name}_محمي"
+                                    },
+                                    onOpenSafPicker = {
+                                        toolSinglePickerLauncher.launch(arrayOf("application/pdf"))
+                                    }
+                                )
 
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -3074,37 +2981,8 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("اختر ملف الـ PDF المراد تشفيره", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text("إعدادات التشفير والكلمة السرية", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                         Spacer(modifier = Modifier.height(8.dp))
-                                        Box(modifier = Modifier.fillMaxWidth()) {
-                                            OutlinedButton(
-                                                onClick = { dropdownExpanded = true },
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                                    Text(selectedFile?.fileName ?: "اضغط لاختيار ملف...", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                    Icon(Icons.Default.ArrowDropDown, null)
-                                                }
-                                            }
-                                            DropdownMenu(
-                                                expanded = dropdownExpanded,
-                                                onDismissRequest = { dropdownExpanded = false },
-                                                modifier = Modifier.fillMaxWidth(0.85f)
-                                            ) {
-                                                uiState.allPdfFiles.forEach { file ->
-                                                    DropdownMenuItem(
-                                                        text = { Text(file.fileName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                                        onClick = {
-                                                            selectedSingleFilePath = file.filePath
-                                                            targetFileName = "${file.fileName}_محمي"
-                                                            dropdownExpanded = false
-                                                        }
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.height(12.dp))
                                         OutlinedTextField(
                                             value = targetFileName,
                                             onValueChange = { targetFileName = it },
@@ -3153,8 +3031,18 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                             }
 
                             ActiveTool.UnlockPdf -> {
-                                var dropdownExpanded by remember { mutableStateOf(false) }
-                                val selectedFile = uiState.allPdfFiles.find { it.filePath == selectedSingleFilePath }
+                                ToolFilePickerCard(
+                                    title = "اختر ملف الـ PDF المشفر",
+                                    selectedFilePath = selectedSingleFilePath,
+                                    allPdfFiles = uiState.allPdfFiles,
+                                    onFileSelected = { path, name ->
+                                        selectedSingleFilePath = path
+                                        targetFileName = "${name}_مفتوح"
+                                    },
+                                    onOpenSafPicker = {
+                                        toolSinglePickerLauncher.launch(arrayOf("application/pdf"))
+                                    }
+                                )
 
                                 Card(
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -3162,37 +3050,8 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("اختر ملف الـ PDF المشفر", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text("إعدادات فك التشفير", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                         Spacer(modifier = Modifier.height(8.dp))
-                                        Box(modifier = Modifier.fillMaxWidth()) {
-                                            OutlinedButton(
-                                                onClick = { dropdownExpanded = true },
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                                    Text(selectedFile?.fileName ?: "اضغط لاختيار ملف...", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                    Icon(Icons.Default.ArrowDropDown, null)
-                                                }
-                                            }
-                                            DropdownMenu(
-                                                expanded = dropdownExpanded,
-                                                onDismissRequest = { dropdownExpanded = false },
-                                                modifier = Modifier.fillMaxWidth(0.85f)
-                                            ) {
-                                                uiState.allPdfFiles.forEach { file ->
-                                                    DropdownMenuItem(
-                                                        text = { Text(file.fileName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                                        onClick = {
-                                                            selectedSingleFilePath = file.filePath
-                                                            targetFileName = "${file.fileName}_مفتوح"
-                                                            dropdownExpanded = false
-                                                        }
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.height(12.dp))
                                         OutlinedTextField(
                                             value = targetFileName,
                                             onValueChange = { targetFileName = it },
@@ -3574,1223 +3433,6 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                 }
             }
         }
-    }
-
-    // Dialog / Sheet for Merge Tool
-    if (activeTool == ActiveTool.Merge) {
-        AlertDialog(
-            onDismissRequest = { if (!isProcessing) activeTool = ActiveTool.None },
-            title = { Text("دمج ملفات PDF", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 350.dp)
-                ) {
-                    Text("اختر ملفات الـ PDF التي ترغب في دمجها بالترتيب المناسب:", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 8.dp))
-                    
-                    OutlinedTextField(
-                        value = targetFileName,
-                        onValueChange = { targetFileName = it },
-                        label = { Text("اسم الملف الناتج") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                    )
-
-                    if (uiState.allPdfFiles.isEmpty()) {
-                        Text("لا يوجد ملفات PDF متوفرة في مكتبتك حالياً للدمج.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier.weight(1f).fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            items(uiState.allPdfFiles) { file ->
-                                val isSelected = selectedFilePaths.contains(file.filePath)
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            selectedFilePaths = if (isSelected) {
-                                                selectedFilePaths - file.filePath
-                                            } else {
-                                                selectedFilePaths + file.filePath
-                                            }
-                                        }
-                                        .background(
-                                            if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
-                                            else Color.Transparent,
-                                            RoundedCornerShape(8.dp)
-                                        )
-                                        .padding(8.dp)
-                                ) {
-                                    Checkbox(
-                                        checked = isSelected,
-                                        onCheckedChange = {
-                                            selectedFilePaths = if (isSelected) {
-                                                selectedFilePaths - file.filePath
-                                            } else {
-                                                selectedFilePaths + file.filePath
-                                            }
-                                        }
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(file.fileName, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                                        Text("${file.fileSize} - ${file.folderName}", fontSize = 11.sp, color = Color.Gray)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    if (isProcessing) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text("جاري دمج وحفظ الملف...", fontSize = 13.sp)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (targetFileName.trim().isEmpty()) {
-                            Toast.makeText(context, "الرجاء إدخال اسم للملف الناتج", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        if (selectedFilePaths.size < 2) {
-                            Toast.makeText(context, "الرجاء اختيار ملفين على الأقل للدمج", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        isProcessing = true
-                        viewModel.mergePdfs(
-                            context = context,
-                            filePaths = selectedFilePaths.toList(),
-                            targetName = targetFileName,
-                            onSuccess = { path ->
-                                isProcessing = false
-                                activeTool = ActiveTool.None
-                                Toast.makeText(context, "تم دمج الملفات بنجاح وحفظها في: $path", Toast.LENGTH_LONG).show()
-                            },
-                            onError = { err ->
-                                isProcessing = false
-                                Toast.makeText(context, "خطأ: $err", Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    },
-                    enabled = !isProcessing && selectedFilePaths.size >= 2
-                ) {
-                    Text("دمج المستندات")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { activeTool = ActiveTool.None }, enabled = !isProcessing) {
-                    Text("إلغاء")
-                }
-            }
-        )
-    }
-
-    // Dialog / Sheet for Split Tool
-    if (activeTool == ActiveTool.Split) {
-        var dropdownExpanded by remember { mutableStateOf(false) }
-        val selectedFile = uiState.allPdfFiles.find { it.filePath == selectedSingleFilePath }
-        
-        AlertDialog(
-            onDismissRequest = { if (!isProcessing) activeTool = ActiveTool.None },
-            title = { Text("تقسيم ملف PDF", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text("اختر الملف والصفحات المراد استخراجها في ملف جديد منفصل:", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 8.dp))
-                    
-                    // Single File Picker Dropdown
-                    Box(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-                        OutlinedButton(
-                            onClick = { dropdownExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                Text(selectedFile?.fileName ?: "اختر الملف المراد تقسيمه...", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Icon(Icons.Default.ArrowDropDown, null)
-                            }
-                        }
-                        DropdownMenu(
-                            expanded = dropdownExpanded,
-                            onDismissRequest = { dropdownExpanded = false },
-                            modifier = Modifier.fillMaxWidth(0.85f)
-                        ) {
-                            uiState.allPdfFiles.forEach { file ->
-                                DropdownMenuItem(
-                                    text = { Text(file.fileName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                    onClick = {
-                                        selectedSingleFilePath = file.filePath
-                                        targetFileName = "${file.fileName}_مقتطع"
-                                        dropdownExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = targetFileName,
-                        onValueChange = { targetFileName = it },
-                        label = { Text("اسم الملف الناتج") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = splitFromPage,
-                            onValueChange = { splitFromPage = it },
-                            label = { Text("من صفحة") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = splitToPage,
-                            onValueChange = { splitToPage = it },
-                            label = { Text("إلى صفحة") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-
-                    if (isProcessing) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text("جاري معالجة وتصدير الملف...", fontSize = 13.sp)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val from = splitFromPage.toIntOrNull()
-                        val to = splitToPage.toIntOrNull()
-                        if (selectedSingleFilePath.isEmpty()) {
-                            Toast.makeText(context, "الرجاء اختيار ملف أولاً", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        if (targetFileName.trim().isEmpty()) {
-                            Toast.makeText(context, "الرجاء إدخال اسم للملف الناتج", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        if (from == null || to == null || from < 1 || to < from) {
-                            Toast.makeText(context, "الرجاء إدخال أرقام صفحات صحيحة (من صفحة يجب أن تكون أصغر من أو تساوي إلى صفحة)", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        isProcessing = true
-                        viewModel.splitPdf(
-                            context = context,
-                            filePath = selectedSingleFilePath,
-                            fromPage = from,
-                            toPage = to,
-                            targetName = targetFileName,
-                            onSuccess = { path ->
-                                isProcessing = false
-                                activeTool = ActiveTool.None
-                                Toast.makeText(context, "تم تقسيم الملف وحفظ الصفحات في: $path", Toast.LENGTH_LONG).show()
-                            },
-                            onError = { err ->
-                                isProcessing = false
-                                Toast.makeText(context, "خطأ: $err", Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    },
-                    enabled = !isProcessing && selectedSingleFilePath.isNotEmpty()
-                ) {
-                    Text("تقسيم وحفظ")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { activeTool = ActiveTool.None }, enabled = !isProcessing) {
-                    Text("إلغاء")
-                }
-            }
-        )
-    }
-
-    // Dialog / Sheet for Compress Tool
-    if (activeTool == ActiveTool.Compress) {
-        var dropdownExpanded by remember { mutableStateOf(false) }
-        val selectedFile = uiState.allPdfFiles.find { it.filePath == selectedSingleFilePath }
-
-        AlertDialog(
-            onDismissRequest = { if (!isProcessing) activeTool = ActiveTool.None },
-            title = { Text("ضغط ملف PDF", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text("قم بتقليل حجم الملف مع الحفاظ على أعلى جودة قراءة:", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 8.dp))
-
-                    Box(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-                        OutlinedButton(
-                            onClick = { dropdownExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                Text(selectedFile?.fileName ?: "اختر الملف المراد ضغطه...", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Icon(Icons.Default.ArrowDropDown, null)
-                            }
-                        }
-                        DropdownMenu(
-                            expanded = dropdownExpanded,
-                            onDismissRequest = { dropdownExpanded = false },
-                            modifier = Modifier.fillMaxWidth(0.85f)
-                        ) {
-                            uiState.allPdfFiles.forEach { file ->
-                                DropdownMenuItem(
-                                    text = { Text(file.fileName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                    onClick = {
-                                        selectedSingleFilePath = file.filePath
-                                        targetFileName = "${file.fileName}_مضغوط"
-                                        dropdownExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = targetFileName,
-                        onValueChange = { targetFileName = it },
-                        label = { Text("اسم الملف الناتج") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                    )
-
-                    Text("قوة الضغط المطلوبة:", fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        listOf(
-                            Triple("low", "منخفضة (جودة عالية)", Color(0xFFD4EDDA)),
-                            Triple("medium", "متوسطة (أفضل توازن)", Color(0xFFFFF3CD)),
-                            Triple("high", "عالية (أصغر حجم)", Color(0xFFF8D7DA))
-                        ).forEach { (level, name, color) ->
-                            val isSelected = compressionLevel == level
-                            Surface(
-                                onClick = { compressionLevel = level },
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (isSelected) color else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
-                                modifier = Modifier.weight(1f).height(44.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(4.dp)) {
-                                    Text(name, fontSize = 9.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                                }
-                            }
-                        }
-                    }
-
-                    if (isProcessing) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text("جاري الضغط وتقليل حجم المستند...", fontSize = 13.sp)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (selectedSingleFilePath.isEmpty()) {
-                            Toast.makeText(context, "الرجاء اختيار ملف أولاً", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        if (targetFileName.trim().isEmpty()) {
-                            Toast.makeText(context, "الرجاء إدخال اسم للملف الناتج", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        isProcessing = true
-                        viewModel.compressPdf(
-                            context = context,
-                            filePath = selectedSingleFilePath,
-                            qualityLevel = compressionLevel,
-                            targetName = targetFileName,
-                            onSuccess = { path ->
-                                isProcessing = false
-                                activeTool = ActiveTool.None
-                                Toast.makeText(context, "تم ضغط الملف بنجاح وحفظه في: $path", Toast.LENGTH_LONG).show()
-                            },
-                            onError = { err ->
-                                isProcessing = false
-                                Toast.makeText(context, "خطأ: $err", Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    },
-                    enabled = !isProcessing && selectedSingleFilePath.isNotEmpty()
-                ) {
-                    Text("ابدأ الضغط الآن")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { activeTool = ActiveTool.None }, enabled = !isProcessing) {
-                    Text("إلغاء")
-                }
-            }
-        )
-    }
-
-    // Dialog / Sheet for Rotate Tool
-    if (activeTool == ActiveTool.Rotate) {
-        var dropdownExpanded by remember { mutableStateOf(false) }
-        val selectedFile = uiState.allPdfFiles.find { it.filePath == selectedSingleFilePath }
-
-        AlertDialog(
-            onDismissRequest = { if (!isProcessing) activeTool = ActiveTool.None },
-            title = { Text("تدوير صفحات PDF", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text("تعديل وتدوير اتجاه صفحات مستند الـ PDF:", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 8.dp))
-
-                    Box(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-                        OutlinedButton(
-                            onClick = { dropdownExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                Text(selectedFile?.fileName ?: "اختر الملف المراد تعديله...", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Icon(Icons.Default.ArrowDropDown, null)
-                            }
-                        }
-                        DropdownMenu(
-                            expanded = dropdownExpanded,
-                            onDismissRequest = { dropdownExpanded = false },
-                            modifier = Modifier.fillMaxWidth(0.85f)
-                        ) {
-                            uiState.allPdfFiles.forEach { file ->
-                                DropdownMenuItem(
-                                    text = { Text(file.fileName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                    onClick = {
-                                        selectedSingleFilePath = file.filePath
-                                        targetFileName = "${file.fileName}_مدور"
-                                        dropdownExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = targetFileName,
-                        onValueChange = { targetFileName = it },
-                        label = { Text("اسم الملف الناتج") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                    )
-
-                    Text("زاوية التدوير:", fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        listOf(90, 180, 270).forEach { deg ->
-                            val isSelected = rotateDegrees == deg
-                            Surface(
-                                onClick = { rotateDegrees = deg },
-                                shape = RoundedCornerShape(10.dp),
-                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
-                                modifier = Modifier.weight(1f).height(44.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text("$deg°", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = rotateTargetPage,
-                        onValueChange = { rotateTargetPage = it },
-                        label = { Text("الصفحة المستهدفة (-1 لجميع الصفحات)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    if (isProcessing) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text("جاري تدوير صفحات المستند...", fontSize = 13.sp)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (selectedSingleFilePath.isEmpty()) {
-                            Toast.makeText(context, "الرجاء اختيار ملف أولاً", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        if (targetFileName.trim().isEmpty()) {
-                            Toast.makeText(context, "الرجاء إدخال اسم للملف الناتج", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        val pageVal = rotateTargetPage.toIntOrNull() ?: -1
-                        isProcessing = true
-                        viewModel.rotatePdf(
-                            context = context,
-                            filePath = selectedSingleFilePath,
-                            degrees = rotateDegrees,
-                            targetPage = pageVal,
-                            targetName = targetFileName,
-                            onSuccess = { path ->
-                                isProcessing = false
-                                activeTool = ActiveTool.None
-                                Toast.makeText(context, "تم تدوير وحفظ الملف بنجاح في: $path", Toast.LENGTH_LONG).show()
-                            },
-                            onError = { err ->
-                                isProcessing = false
-                                Toast.makeText(context, "خطأ: $err", Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    },
-                    enabled = !isProcessing && selectedSingleFilePath.isNotEmpty()
-                ) {
-                    Text("تدوير وحفظ")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { activeTool = ActiveTool.None }, enabled = !isProcessing) {
-                    Text("إلغاء")
-                }
-            }
-        )
-    }
-
-    // Dialog / Sheet for Reorder Tool
-    if (activeTool == ActiveTool.Reorder) {
-        var dropdownExpanded by remember { mutableStateOf(false) }
-        val selectedFile = uiState.allPdfFiles.find { it.filePath == selectedSingleFilePath }
-
-        AlertDialog(
-            onDismissRequest = { if (!isProcessing) activeTool = ActiveTool.None },
-            title = { Text("إعادة ترتيب الصفحات", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text("أدخل أرقام الصفحات بالترتيب الجديد المطلوب (مفصولة بفواصل):", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 8.dp))
-
-                    Box(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-                        OutlinedButton(
-                            onClick = { dropdownExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                Text(selectedFile?.fileName ?: "اختر الملف المراد إعادة ترتيبه...", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Icon(Icons.Default.ArrowDropDown, null)
-                            }
-                        }
-                        DropdownMenu(
-                            expanded = dropdownExpanded,
-                            onDismissRequest = { dropdownExpanded = false },
-                            modifier = Modifier.fillMaxWidth(0.85f)
-                        ) {
-                            uiState.allPdfFiles.forEach { file ->
-                                DropdownMenuItem(
-                                    text = { Text(file.fileName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                    onClick = {
-                                        selectedSingleFilePath = file.filePath
-                                        targetFileName = "${file.fileName}_مرتب"
-                                        dropdownExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = targetFileName,
-                        onValueChange = { targetFileName = it },
-                        label = { Text("اسم الملف الناتج") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                    )
-
-                    OutlinedTextField(
-                        value = reorderSequence,
-                        onValueChange = { reorderSequence = it },
-                        label = { Text("ترتيب الصفحات (مثال: 3, 1, 2, 4)") },
-                        placeholder = { Text("مثال: 3, 1, 2, 4") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    if (isProcessing) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text("جاري إعادة ترتيب وحفظ الصفحات...", fontSize = 13.sp)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (selectedSingleFilePath.isEmpty()) {
-                            Toast.makeText(context, "الرجاء اختيار ملف أولاً", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        if (targetFileName.trim().isEmpty()) {
-                            Toast.makeText(context, "الرجاء إدخال اسم للملف الناتج", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        val orderList = reorderSequence.split(",").mapNotNull { it.trim().toIntOrNull() }
-                        if (orderList.isEmpty()) {
-                            Toast.makeText(context, "الرجاء إدخال ترتيب صفحات صحيح (مثال: 3,1,2)", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        isProcessing = true
-                        viewModel.reorderPdf(
-                            context = context,
-                            filePath = selectedSingleFilePath,
-                            pageOrderList = orderList,
-                            targetName = targetFileName,
-                            onSuccess = { path ->
-                                isProcessing = false
-                                activeTool = ActiveTool.None
-                                Toast.makeText(context, "تم إعادة ترتيب الصفحات وحفظ الملف في: $path", Toast.LENGTH_LONG).show()
-                            },
-                            onError = { err ->
-                                isProcessing = false
-                                Toast.makeText(context, "خطأ: $err", Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    },
-                    enabled = !isProcessing && selectedSingleFilePath.isNotEmpty()
-                ) {
-                    Text("إعادة الترتيب وحفظ")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { activeTool = ActiveTool.None }, enabled = !isProcessing) {
-                    Text("إلغاء")
-                }
-            }
-        )
-    }
-
-    // Dialog / Sheet for DeletePages Tool
-    if (activeTool == ActiveTool.DeletePages) {
-        var dropdownExpanded by remember { mutableStateOf(false) }
-        val selectedFile = uiState.allPdfFiles.find { it.filePath == selectedSingleFilePath }
-
-        AlertDialog(
-            onDismissRequest = { if (!isProcessing) activeTool = ActiveTool.None },
-            title = { Text("حذف صفحات من PDF", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text("أدخل أرقام الصفحات التي ترغب بحذفها (مفصولة بفواصل):", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 8.dp))
-
-                    Box(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-                        OutlinedButton(
-                            onClick = { dropdownExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                Text(selectedFile?.fileName ?: "اختر الملف لحذف صفحات منه...", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Icon(Icons.Default.ArrowDropDown, null)
-                            }
-                        }
-                        DropdownMenu(
-                            expanded = dropdownExpanded,
-                            onDismissRequest = { dropdownExpanded = false },
-                            modifier = Modifier.fillMaxWidth(0.85f)
-                        ) {
-                            uiState.allPdfFiles.forEach { file ->
-                                DropdownMenuItem(
-                                    text = { Text(file.fileName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                    onClick = {
-                                        selectedSingleFilePath = file.filePath
-                                        targetFileName = "${file.fileName}_معدل"
-                                        dropdownExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = targetFileName,
-                        onValueChange = { targetFileName = it },
-                        label = { Text("اسم الملف الناتج") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                    )
-
-                    OutlinedTextField(
-                        value = deletePagesSetInput,
-                        onValueChange = { deletePagesSetInput = it },
-                        label = { Text("رقم الصفحات للحذف (مثال: 2, 4)") },
-                        placeholder = { Text("مثال: 2, 4") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    if (isProcessing) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text("جاري حذف الصفحات المحددة وحفظ المستند...", fontSize = 13.sp)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (selectedSingleFilePath.isEmpty()) {
-                            Toast.makeText(context, "الرجاء اختيار ملف أولاً", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        if (targetFileName.trim().isEmpty()) {
-                            Toast.makeText(context, "الرجاء إدخال اسم للملف الناتج", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        val pagesToDelete = deletePagesSetInput.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()
-                        if (pagesToDelete.isEmpty()) {
-                            Toast.makeText(context, "الرجاء إدخال أرقام صفحات صحيحة لحذفها", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        isProcessing = true
-                        viewModel.deletePagesPdf(
-                            context = context,
-                            filePath = selectedSingleFilePath,
-                            pagesToDelete = pagesToDelete,
-                            targetName = targetFileName,
-                            onSuccess = { path ->
-                                isProcessing = false
-                                activeTool = ActiveTool.None
-                                Toast.makeText(context, "تم حذف الصفحات بنجاح وحفظ الملف في: $path", Toast.LENGTH_LONG).show()
-                            },
-                            onError = { err ->
-                                isProcessing = false
-                                Toast.makeText(context, "خطأ: $err", Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    },
-                    enabled = !isProcessing && selectedSingleFilePath.isNotEmpty()
-                ) {
-                    Text("تأكيد الحذف وحفظ")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { activeTool = ActiveTool.None }, enabled = !isProcessing) {
-                    Text("إلغاء")
-                }
-            }
-        )
-    }
-
-    // Dialog / Sheet for ImageToPdf Tool
-    if (activeTool == ActiveTool.ImageToPdf) {
-        val imagePickerLauncher = rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.GetMultipleContents()
-        ) { uris ->
-            val paths = uris.mapNotNull { uri ->
-                viewModel.copyUriToCache(context, uri, "img_${System.currentTimeMillis()}_${uri.lastPathSegment}.jpg")
-            }
-            selectedImagePaths = selectedImagePaths + paths
-        }
-
-        AlertDialog(
-            onDismissRequest = { if (!isProcessing) activeTool = ActiveTool.None },
-            title = { Text("تحويل صور إلى PDF", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 350.dp)
-                ) {
-                    Text("اختر صورة أو أكثر لتحويلها إلى ملف PDF بالترتيب المناسب:", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 8.dp))
-                    
-                    OutlinedTextField(
-                        value = targetFileName,
-                        onValueChange = { targetFileName = it },
-                        label = { Text("اسم ملف الـ PDF الناتج") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                    )
-
-                    Button(
-                        onClick = { imagePickerLauncher.launch("image/*") },
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("إضافة صور من المعرض (${selectedImagePaths.size})")
-                    }
-
-                    if (selectedImagePaths.isEmpty()) {
-                        Text("لم يتم اختيار أي صور حتى الآن.", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp))
-                    } else {
-                        Text("الصور المحددة (اسحب للحذف):", fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
-                        LazyColumn(
-                            modifier = Modifier.weight(1f).fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            itemsIndexed(selectedImagePaths) { index, path ->
-                                val file = File(path)
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
-                                        .padding(8.dp)
-                                ) {
-                                    Text("${index + 1}. ${file.name}", fontSize = 12.sp, modifier = Modifier.weight(1f), maxLines = 1)
-                                    IconButton(
-                                        onClick = {
-                                            selectedImagePaths = selectedImagePaths.toMutableList().apply { removeAt(index) }
-                                        },
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color.Red, modifier = Modifier.size(16.dp))
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if (isProcessing) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text("جاري تحويل الصور وتوليد الـ PDF...", fontSize = 13.sp)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (targetFileName.trim().isEmpty()) {
-                            Toast.makeText(context, "الرجاء إدخال اسم الملف الناتج", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        if (selectedImagePaths.isEmpty()) {
-                            Toast.makeText(context, "الرجاء اختيار صورة واحدة على الأقل", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        isProcessing = true
-                        viewModel.imageToPdf(
-                            context = context,
-                            imagePaths = selectedImagePaths,
-                            targetName = targetFileName,
-                            onSuccess = { path ->
-                                isProcessing = false
-                                activeTool = ActiveTool.None
-                                Toast.makeText(context, "تم حفظ الملف بنجاح في: $path", Toast.LENGTH_LONG).show()
-                            },
-                            onError = { err ->
-                                isProcessing = false
-                                Toast.makeText(context, "خطأ: $err", Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    },
-                    enabled = !isProcessing && selectedImagePaths.isNotEmpty()
-                ) {
-                    Text("إنشاء ملف PDF")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { activeTool = ActiveTool.None }, enabled = !isProcessing) {
-                    Text("إلغاء")
-                }
-            }
-        )
-    }
-
-    // Dialog / Sheet for PdfToImages Tool
-    if (activeTool == ActiveTool.PdfToImages) {
-        var dropdownExpanded by remember { mutableStateOf(false) }
-        val selectedFile = uiState.allPdfFiles.find { it.filePath == selectedSingleFilePath }
-
-        AlertDialog(
-            onDismissRequest = { if (!isProcessing) activeTool = ActiveTool.None },
-            title = { Text("تحويل PDF إلى صور", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text("اختر ملف الـ PDF وصيغة التصدير:", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 8.dp))
-
-                    Box(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-                        OutlinedButton(
-                            onClick = { dropdownExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                Text(selectedFile?.fileName ?: "اختر الملف لتحويله...", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Icon(Icons.Default.ArrowDropDown, null)
-                            }
-                        }
-                        DropdownMenu(
-                            expanded = dropdownExpanded,
-                            onDismissRequest = { dropdownExpanded = false },
-                            modifier = Modifier.fillMaxWidth(0.85f)
-                        ) {
-                            uiState.allPdfFiles.forEach { file ->
-                                DropdownMenuItem(
-                                    text = { Text(file.fileName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                    onClick = {
-                                        selectedSingleFilePath = file.filePath
-                                        dropdownExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    Text("صيغة الصور الناتجة:", fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { pdfToImagesFormat = "PNG" }) {
-                            RadioButton(selected = pdfToImagesFormat == "PNG", onClick = { pdfToImagesFormat = "PNG" })
-                            Text("PNG (جودة عالية)")
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { pdfToImagesFormat = "JPG" }) {
-                            RadioButton(selected = pdfToImagesFormat == "JPG", onClick = { pdfToImagesFormat = "JPG" })
-                            Text("JPG (حجم مدمج)")
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = pdfToImagesPages,
-                        onValueChange = { pdfToImagesPages = it },
-                        label = { Text("تصدير صفحات معينة (اختياري)") },
-                        placeholder = { Text("مثال: 1, 2, 5-8 (اتركه فارغاً للكل)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    if (isProcessing) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text("جاري تصدير صفحات الـ PDF لصور...", fontSize = 13.sp)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (selectedSingleFilePath.isEmpty()) {
-                            Toast.makeText(context, "الرجاء اختيار ملف أولاً", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        isProcessing = true
-                        viewModel.pdfToImages(
-                            context = context,
-                            filePath = selectedSingleFilePath,
-                            format = pdfToImagesFormat,
-                            customPagesStr = pdfToImagesPages,
-                            onSuccess = { paths ->
-                                isProcessing = false
-                                activeTool = ActiveTool.None
-                                Toast.makeText(context, "تم تصدير ${paths.size} صور بنجاح وحفظها في الصور التطبيقية!", Toast.LENGTH_LONG).show()
-                            },
-                            onError = { err ->
-                                isProcessing = false
-                                Toast.makeText(context, "خطأ: $err", Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    },
-                    enabled = !isProcessing && selectedSingleFilePath.isNotEmpty()
-                ) {
-                    Text("تصدير الصور")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { activeTool = ActiveTool.None }, enabled = !isProcessing) {
-                    Text("إلغاء")
-                }
-            }
-        )
-    }
-
-    // Dialog / Sheet for LockPdf Tool
-    if (activeTool == ActiveTool.LockPdf) {
-        var dropdownExpanded by remember { mutableStateOf(false) }
-        val selectedFile = uiState.allPdfFiles.find { it.filePath == selectedSingleFilePath }
-
-        AlertDialog(
-            onDismissRequest = { if (!isProcessing) activeTool = ActiveTool.None },
-            title = { Text("تشفير وقفل ملف PDF", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 350.dp)
-                ) {
-                    Text("اختر ملف الـ PDF وأدخل كلمة سر لحمايته:", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 8.dp))
-
-                    Box(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-                        OutlinedButton(
-                            onClick = { dropdownExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                Text(selectedFile?.fileName ?: "اختر ملف الـ PDF...", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Icon(Icons.Default.ArrowDropDown, null)
-                            }
-                        }
-                        DropdownMenu(
-                            expanded = dropdownExpanded,
-                            onDismissRequest = { dropdownExpanded = false },
-                            modifier = Modifier.fillMaxWidth(0.85f)
-                        ) {
-                            uiState.allPdfFiles.forEach { file ->
-                                DropdownMenuItem(
-                                    text = { Text(file.fileName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                    onClick = {
-                                        selectedSingleFilePath = file.filePath
-                                        targetFileName = "${file.fileName}_محمي"
-                                        dropdownExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = targetFileName,
-                        onValueChange = { targetFileName = it },
-                        label = { Text("اسم الملف الناتج") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                    )
-
-                    OutlinedTextField(
-                        value = lockPassword,
-                        onValueChange = { lockPassword = it },
-                        label = { Text("كلمة سر فتح الملف") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                    )
-
-                    Text("خيارات الصلاحيات:", fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
-                    LazyColumn(
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        item {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { lockAllowPrinting = !lockAllowPrinting }) {
-                                Checkbox(checked = lockAllowPrinting, onCheckedChange = { lockAllowPrinting = it })
-                                Text("السماح بطباعة الملف", fontSize = 12.sp)
-                            }
-                        }
-                        item {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { lockAllowCopying = !lockAllowCopying }) {
-                                Checkbox(checked = lockAllowCopying, onCheckedChange = { lockAllowCopying = it })
-                                Text("السماح بنسخ النصوص والمحتوى", fontSize = 12.sp)
-                            }
-                        }
-                        item {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { lockAllowModifying = !lockAllowModifying }) {
-                                Checkbox(checked = lockAllowModifying, onCheckedChange = { lockAllowModifying = it })
-                                Text("السماح بتعديل صفحات الملف", fontSize = 12.sp)
-                            }
-                        }
-                        item {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { lockAllowAnnotations = !lockAllowAnnotations }) {
-                                Checkbox(checked = lockAllowAnnotations, onCheckedChange = { lockAllowAnnotations = it })
-                                Text("السماح بإضافة تعليقات وشروح", fontSize = 12.sp)
-                            }
-                        }
-                    }
-
-                    if (isProcessing) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text("جاري تشفير وحماية الملف بكلمة سر...", fontSize = 13.sp)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (selectedSingleFilePath.isEmpty()) {
-                            Toast.makeText(context, "الرجاء اختيار ملف أولاً", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        if (targetFileName.trim().isEmpty()) {
-                            Toast.makeText(context, "الرجاء إدخال اسم للملف الناتج", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        if (lockPassword.isEmpty()) {
-                            Toast.makeText(context, "الرجاء إدخال كلمة سر لقفل الملف", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        isProcessing = true
-                        viewModel.lockPdf(
-                            context = context,
-                            filePath = selectedSingleFilePath,
-                            userPassword = lockPassword,
-                            allowPrinting = lockAllowPrinting,
-                            allowCopying = lockAllowCopying,
-                            allowModifying = lockAllowModifying,
-                            allowAnnotations = lockAllowAnnotations,
-                            targetName = targetFileName,
-                            onSuccess = { path ->
-                                isProcessing = false
-                                activeTool = ActiveTool.None
-                                Toast.makeText(context, "تم قفل وحماية الملف بنجاح وحفظه في: $path", Toast.LENGTH_LONG).show()
-                            },
-                            onError = { err ->
-                                isProcessing = false
-                                Toast.makeText(context, "خطأ: $err", Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    },
-                    enabled = !isProcessing && selectedSingleFilePath.isNotEmpty()
-                ) {
-                    Text("قفل وتشفير الملف")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { activeTool = ActiveTool.None }, enabled = !isProcessing) {
-                    Text("إلغاء")
-                }
-            }
-        )
-    }
-
-    // Dialog / Sheet for UnlockPdf Tool
-    if (activeTool == ActiveTool.UnlockPdf) {
-        var dropdownExpanded by remember { mutableStateOf(false) }
-        val selectedFile = uiState.allPdfFiles.find { it.filePath == selectedSingleFilePath }
-
-        AlertDialog(
-            onDismissRequest = { if (!isProcessing) activeTool = ActiveTool.None },
-            title = { Text("فك قفل وإزالة حماية PDF", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text("اختر ملف الـ PDF المشفر وأدخل كلمة السر لإزالة الحماية:", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(bottom = 8.dp))
-
-                    Box(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-                        OutlinedButton(
-                            onClick = { dropdownExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                Text(selectedFile?.fileName ?: "اختر ملف الـ PDF المشفر...", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Icon(Icons.Default.ArrowDropDown, null)
-                            }
-                        }
-                        DropdownMenu(
-                            expanded = dropdownExpanded,
-                            onDismissRequest = { dropdownExpanded = false },
-                            modifier = Modifier.fillMaxWidth(0.85f)
-                        ) {
-                            uiState.allPdfFiles.forEach { file ->
-                                DropdownMenuItem(
-                                    text = { Text(file.fileName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                    onClick = {
-                                        selectedSingleFilePath = file.filePath
-                                        targetFileName = "${file.fileName}_مفتوح"
-                                        dropdownExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = targetFileName,
-                        onValueChange = { targetFileName = it },
-                        label = { Text("اسم الملف الناتج") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                    )
-
-                    OutlinedTextField(
-                        value = unlockPassword,
-                        onValueChange = { unlockPassword = it },
-                        label = { Text("كلمة السر الحالية لفتح الملف") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    if (isProcessing) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text("جاري معالجة وفك تشفير الملف...", fontSize = 13.sp)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (selectedSingleFilePath.isEmpty()) {
-                            Toast.makeText(context, "الرجاء اختيار ملف أولاً", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        if (targetFileName.trim().isEmpty()) {
-                            Toast.makeText(context, "الرجاء إدخال اسم للملف الناتج", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        if (unlockPassword.isEmpty()) {
-                            Toast.makeText(context, "الرجاء إدخال كلمة السر الحالية لإلغاء الحماية", Toast.LENGTH_SHORT).show()
-                            return@Button
-                        }
-                        isProcessing = true
-                        viewModel.unlockPdf(
-                            context = context,
-                            filePath = selectedSingleFilePath,
-                            password = unlockPassword,
-                            targetName = targetFileName,
-                            onSuccess = { path ->
-                                isProcessing = false
-                                activeTool = ActiveTool.None
-                                Toast.makeText(context, "تم إزالة الحماية وحفظ الملف بنجاح في: $path", Toast.LENGTH_LONG).show()
-                            },
-                            onError = { err ->
-                                isProcessing = false
-                                Toast.makeText(context, "خطأ: $err", Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                    },
-                    enabled = !isProcessing && selectedSingleFilePath.isNotEmpty()
-                ) {
-                    Text("فك حماية وقفل الملف")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { activeTool = ActiveTool.None }, enabled = !isProcessing) {
-                    Text("إلغاء")
-                }
-            }
-        )
     }
 }
 
@@ -5902,4 +4544,177 @@ fun shareMultiplePdfs(context: Context, filePaths: List<String>) {
         e.printStackTrace()
     }
 }
+
+@Composable
+fun ToolFilePickerCard(
+    title: String,
+    selectedFilePath: String,
+    allPdfFiles: List<LocalPdfFile>,
+    onFileSelected: (filePath: String, fileName: String) -> Unit,
+    onOpenSafPicker: () -> Unit
+) {
+    var showLibraryPicker by remember { mutableStateOf(false) }
+    val selectedFile = allPdfFiles.find { it.filePath == selectedFilePath }
+    val displayName = if (selectedFile != null) selectedFile.fileName else if (selectedFilePath.isNotEmpty()) File(selectedFilePath).name else null
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Spacer(modifier = Modifier.height(10.dp))
+
+            if (displayName != null) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PictureAsPdf,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = displayName,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (selectedFile != null) {
+                                Text(
+                                    text = "${selectedFile.fileSize} • ${selectedFile.folderName}",
+                                    fontSize = 11.sp,
+                                    color = Color.Gray
+                                )
+                            } else {
+                                Text(
+                                    text = "ملف من النظام (SAF)",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+            } else {
+                Text(
+                    text = "لم يتم اختيار ملف بعد. اختر ملفاً عبر منتقي ملفات النظام (SAF) أو من المكتبة.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Button(
+                    onClick = onOpenSafPicker,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FolderOpen,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("منتقي ملفات النظام (SAF)", fontSize = 11.sp, maxLines = 1)
+                }
+
+                OutlinedButton(
+                    onClick = { showLibraryPicker = !showLibraryPicker },
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LibraryBooks,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("من المكتبة (${allPdfFiles.size})", fontSize = 11.sp, maxLines = 1)
+                }
+            }
+
+            if (showLibraryPicker) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Divider(color = Color.Gray.copy(alpha = 0.2f))
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("اختر ملفاً من مكتبة التطبيق:", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color.Gray)
+                Spacer(modifier = Modifier.height(6.dp))
+                
+                if (allPdfFiles.isEmpty()) {
+                    Text("لا توجد ملفات PDF متوفرة حالياً في المكتبة.", fontSize = 12.sp, color = Color.Gray)
+                } else {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 200.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        allPdfFiles.forEach { file ->
+                            val isSelected = file.filePath == selectedFilePath
+                            Surface(
+                                onClick = {
+                                    onFileSelected(file.filePath, file.fileName)
+                                    showLibraryPicker = false
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.PictureAsPdf,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = file.fileName,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    if (isSelected) {
+                                        Icon(
+                                            Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 

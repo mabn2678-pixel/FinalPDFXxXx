@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <!--
 Copyright 2012 Mozilla Foundation
 
@@ -32,6 +32,34 @@ See https://github.com/adobe-type-tools/cmap-resources
 <script src="../build/pdf.mjs" type="module"></script>
 
     <link rel="stylesheet" href="viewer.css">
+    <style>
+      #toolbarContainer, .toolbar, #sidebarContainer, .findbar, #secondaryToolbar, #loadingBar { 
+          display: none !important; 
+          visibility: hidden !important;
+          height: 0 !important;
+          min-height: 0 !important;
+      } 
+      #outerContainer {
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+          overflow: hidden !important;
+          margin: 0 !important;
+          padding: 0 !important;
+      }
+      #viewerContainer { 
+          position: absolute !important;
+          top: 0 !important; 
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important; 
+          width: 100% !important;
+          height: 100% !important;
+          overflow: auto !important;
+      }
+    </style>
 
   <script src="viewer.mjs" type="module"></script>
   </head>

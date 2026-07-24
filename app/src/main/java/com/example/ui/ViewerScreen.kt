@@ -420,22 +420,17 @@ fun ViewerScreen(
         }
     }
 
-    // Programmatic status bar visibility based on control bars visibility
-    DisposableEffect(isBarsVisible, isBrowsing) {
+    // Programmatic status bar icon color setup
+    DisposableEffect(Unit) {
         activity?.window?.let { window ->
             val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
-            val showStatusBar = isBarsVisible || isBrowsing
-            if (showStatusBar) {
-                insetsController.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
-            } else {
-                insetsController.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars())
-                insetsController.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            }
+            insetsController.isAppearanceLightStatusBars = false // Force white status bar icons
+            insetsController.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
         }
         onDispose {
             activity?.window?.let { window ->
                 val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
-                insetsController.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+                insetsController.isAppearanceLightStatusBars = true
             }
         }
     }
@@ -468,38 +463,38 @@ fun ViewerScreen(
         ) {
             // Main WebView rendering PDF.js
             if (state.currentPdfPath != null) {
-                PdfWebView(
-                    pdfPath = state.currentPdfPath!!,
-                    viewModel = viewModel,
-                    onWebViewCreated = { webViewRef = it },
-                    onSingleTap = { 
-                        if (!isBrowsing) {
-                            isBarsVisible = !isBarsVisible 
-                        }
-                    },
-                    onScrollEvent = {
-                        pageIndicatorTrigger = System.currentTimeMillis()
-                    },
-                    onAudioLinkClicked = { url -> playAudio(url) },
-                    onBrowsingStateChanged = { browsing ->
-                        if (!browsing) {
-                            if (browsingUrl == null) {
-                                isBrowsing = false
+                key(state.currentPdfPath) {
+                    PdfWebView(
+                        pdfPath = state.currentPdfPath!!,
+                        viewModel = viewModel,
+                        onWebViewCreated = { webViewRef = it },
+                        onSingleTap = { 
+                            if (!isBrowsing) {
+                                isBarsVisible = !isBarsVisible 
                             }
-                        } else {
+                        },
+                        onScrollEvent = {
+                            pageIndicatorTrigger = System.currentTimeMillis()
+                        },
+                        onAudioLinkClicked = { url -> playAudio(url) },
+                        onBrowsingStateChanged = { browsing ->
+                            if (!browsing) {
+                                if (browsingUrl == null) {
+                                    isBrowsing = false
+                                }
+                            } else {
+                                isBrowsing = true
+                            }
+                        },
+                        onExternalLinkClicked = { url ->
+                            browsingUrl = url
                             isBrowsing = true
-                        }
-                    },
-                    onExternalLinkClicked = { url ->
-                        browsingUrl = url
-                        isBrowsing = true
-                    },
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .then(if (isBrowsing) Modifier.statusBarsPadding() else Modifier)
-                )
-
-
+                        },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .then(if (isBrowsing) Modifier.statusBarsPadding() else Modifier)
+                    )
+                }
             } else {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -670,6 +665,18 @@ fun ViewerScreen(
                         modifier = Modifier.fillMaxSize()
                     )
                 }
+            }
+
+            // STATUS BAR DARK TRANSLUCENT BACKDROP OVERLAY
+            val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+            if (statusBarHeight > 0.dp && !isBrowsing) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(statusBarHeight)
+                        .align(Alignment.TopCenter)
+                        .background(Color.Black.copy(alpha = 0.85f))
+                )
             }
 
             // FLOATING TOP BAR WITH STATUS BAR BACKDROP (CAPSULE/DYNAMIC ISLAND STYLE)

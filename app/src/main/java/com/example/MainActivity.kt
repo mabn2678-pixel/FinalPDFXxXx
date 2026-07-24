@@ -114,7 +114,9 @@ class MainActivity : ComponentActivity() {
           fileName = "$fileName.pdf"
         }
 
-        val cacheFile = File(cacheDir, fileName)
+        val cleanBaseName = fileName.replace(".pdf", "", ignoreCase = true)
+        val safeFileName = "open_${System.currentTimeMillis()}_${fileName}"
+        val cacheFile = File(cacheDir, safeFileName)
         contentResolver.openInputStream(data)?.use { inputStream ->
           FileOutputStream(cacheFile).use { outputStream ->
             inputStream.copyTo(outputStream)
@@ -122,7 +124,7 @@ class MainActivity : ComponentActivity() {
         }
         
         if (cacheFile.exists() && cacheFile.length() > 0) {
-          val displayName = fileName.replace(".pdf", "", ignoreCase = true).replace("_", " ")
+          val displayName = cleanBaseName.replace("_", " ")
           viewModel.selectPdf(cacheFile.absolutePath, displayName)
         }
       } catch (e: Exception) {

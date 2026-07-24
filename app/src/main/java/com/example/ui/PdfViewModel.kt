@@ -694,6 +694,8 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
         
         val starredSet = prefs.getStringSet("starred_pdfs", emptySet()) ?: emptySet()
         
+        val savedIsGridView = prefs.getBoolean("is_grid_view", true)
+
         // Load persistent viewer state
         val lastScreen = prefs.getString("last_screen", "Dashboard")
         val savedPath = prefs.getString("last_opened_pdf_path", null)
@@ -745,6 +747,7 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 appTheme = theme,
                 bottomBarColorIndex = bottomBarColorIdx,
                 sortOption = sortOpt,
+                isGridView = savedIsGridView,
                 currentScreen = nextScreen,
                 currentPdfPath = path,
                 currentPdfName = name,
@@ -816,8 +819,14 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
         _uiState.update { it.copy(dashboardSearchQuery = query) }
     }
     
-    fun toggleGridView() {
-        _uiState.update { it.copy(isGridView = !it.isGridView) }
+    fun toggleGridView(context: Context? = null) {
+        val nextValue = !_uiState.value.isGridView
+        val ctx = context ?: appContext
+        ctx?.let {
+            val prefs = it.getSharedPreferences("pdf_reader_prefs", Context.MODE_PRIVATE)
+            prefs.edit().putBoolean("is_grid_view", nextValue).apply()
+        }
+        _uiState.update { it.copy(isGridView = nextValue) }
     }
     
     fun setFileFilter(filter: FileFilter) {
