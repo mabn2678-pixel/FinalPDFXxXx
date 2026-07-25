@@ -5273,9 +5273,11 @@ suspend fun extractTextFromPdfPageOnline(
                 val imagePart = JSONObject().apply {
                     val inlineData = JSONObject().apply {
                         put("mimeType", "image/jpeg")
+                        put("mime_type", "image/jpeg")
                         put("data", base64Image)
                     }
                     put("inlineData", inlineData)
+                    put("inline_data", inlineData)
                 }
 
                 partsArray.put(textPart)
@@ -5292,6 +5294,8 @@ suspend fun extractTextFromPdfPageOnline(
 
             // Try valid Gemini model endpoints
             val candidateModels = listOf(
+                "gemini-flash-latest",
+                "gemini-2.5-flash",
                 "gemini-2.0-flash",
                 "gemini-1.5-flash",
                 "gemini-1.5-pro"

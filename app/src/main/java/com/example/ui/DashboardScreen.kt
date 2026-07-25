@@ -10,6 +10,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -57,6 +58,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -235,13 +239,17 @@ fun DashboardScreen(
         }
     }
 
-    // Back handler to return to the Home/Main tab from other tabs or clear selection mode
+    var showExitConfirmSheet by remember { mutableStateOf(false) }
+
+    // Back handler to return to the Home/Main tab, clear selection, or show exit confirmation sheet
     val isInSelectionMode = selectedFilePaths.isNotEmpty()
-    BackHandler(enabled = isInSelectionMode || uiState.selectedTab != DashboardTab.Home) {
+    BackHandler(enabled = true) {
         if (isInSelectionMode) {
             selectedFilePaths = emptySet()
-        } else {
+        } else if (uiState.selectedTab != DashboardTab.Home) {
             viewModel.setTab(DashboardTab.Home)
+        } else {
+            showExitConfirmSheet = true
         }
     }
 
@@ -261,17 +269,54 @@ fun DashboardScreen(
     val primaryColor = MaterialTheme.colorScheme.primary
     val containerBg = MaterialTheme.colorScheme.background
 
+    var isBottomBarVisible by remember { mutableStateOf(true) }
+
+    // Reset bottom bar visibility whenever active tab or selection state changes
+    LaunchedEffect(uiState.selectedTab, selectedFilePaths.size) {
+        isBottomBarVisible = true
+    }
+
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val delta = available.y
+                if (delta < -10f) {
+                    // Scrolling DOWN (dragging content up) -> Hide bottom bar
+                    if (isBottomBarVisible) {
+                        isBottomBarVisible = false
+                    }
+                } else if (delta > 10f) {
+                    // Scrolling UP (dragging content down) -> Show bottom bar
+                    if (!isBottomBarVisible) {
+                        isBottomBarVisible = true
+                    }
+                }
+                return Offset.Zero
+            }
+        }
+    }
+
     Scaffold(
         bottomBar = {
-            CustomBottomBar(
-                selectedTab = uiState.selectedTab,
-                showTools = uiState.showToolsTab,
-                bottomBarColorIndex = uiState.bottomBarColorIndex,
-                onTabSelected = { viewModel.setTab(it) }
-            )
+            AnimatedVisibility(
+                visible = isBottomBarVisible,
+                enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(280)) + fadeIn(animationSpec = tween(200)),
+                exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(280)) + fadeOut(animationSpec = tween(200))
+            ) {
+                CustomBottomBar(
+                    selectedTab = uiState.selectedTab,
+                    showTools = uiState.showToolsTab,
+                    bottomBarColorIndex = uiState.bottomBarColorIndex,
+                    onTabSelected = { viewModel.setTab(it) }
+                )
+            }
         },
         floatingActionButton = {
-            if (uiState.selectedTab == DashboardTab.Home && selectedFilePaths.isEmpty()) {
+            AnimatedVisibility(
+                visible = uiState.selectedTab == DashboardTab.Home && selectedFilePaths.isEmpty() && isBottomBarVisible,
+                enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(280)) + fadeIn(animationSpec = tween(200)),
+                exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(280)) + fadeOut(animationSpec = tween(200))
+            ) {
                 FloatingActionButton(
                     onClick = { filePickerLauncher.launch(arrayOf("application/pdf")) },
                     containerColor = primaryColor,
@@ -290,7 +335,9 @@ fun DashboardScreen(
             }
         },
         floatingActionButtonPosition = FabPosition.End,
-        modifier = modifier.fillMaxSize()
+        modifier = modifier
+            .fillMaxSize()
+            .nestedScroll(nestedScrollConnection)
     ) { innerPadding ->
         Box(
             modifier = Modifier
@@ -463,6 +510,12 @@ fun DashboardScreen(
                     Text("إلغاء")
                 }
             }
+        )
+    }
+
+    if (showExitConfirmSheet) {
+        ExitAppBottomSheet(
+            onDismiss = { showExitConfirmSheet = false }
         )
     }
 

@@ -31,6 +31,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import android.util.Base64
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -120,7 +122,7 @@ data class PdfUiState(
     val welcomeCompleted: Boolean = false,
     val dashboardSearchQuery: String = "",
     val isGridView: Boolean = true,
-    val selectedFilter: FileFilter = FileFilter.All,
+    val selectedFilter: FileFilter = FileFilter.Recent,
     val sortOption: SortOption = SortOption.ALPHA_ASC,
     val totalReadingTimeSeconds: Long = 0L,
     val starredPdfs: Set<String> = emptySet(),
@@ -2140,155 +2142,239 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 val outputDir = getFinalPdfOutputDir(context)
                 val outputFile = File(outputDir, finalName)
 
-                var cloudSuccess = false
-
-                // 1) Try Cloud OCR Space only if file size <= 1MB (1,048,576 bytes) to prevent HTTP 413
-                if (file.length() <= 1024 * 1024) {
-                    try {
-                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                            onStatusChange("جاري معالجة الملف سحابياً...")
-                        }
-
-                        val client = okhttp3.OkHttpClient.Builder()
-                            .connectTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
-                            .readTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
-                            .writeTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
-                            .build()
-
-                        val mediaType = "application/pdf".toMediaType()
-                        val requestFile = file.asRequestBody(mediaType)
-                        val filePart = okhttp3.MultipartBody.Part.createFormData("file", file.name, requestFile)
-
-                        val requestBody = okhttp3.MultipartBody.Builder()
-                            .setType(okhttp3.MultipartBody.FORM)
-                            .addFormDataPart("apikey", "K88448789188957")
-                            .addFormDataPart("language", if (language.isEmpty()) "ara" else language)
-                            .addFormDataPart("isCreateSearchablePdf", "true")
-                            .addFormDataPart("isSearchablePdfHideTextLayer", "true")
-                            .addFormDataPart("filetype", "PDF")
-                            .addPart(filePart)
-                            .build()
-
-                        val request = okhttp3.Request.Builder()
-                            .url("https://api.ocr.space/parse/image")
-                            .post(requestBody)
-                            .build()
-
-                        val response = client.newCall(request).execute()
-                        val responseBody = response.body?.string()
-
-                        if (response.isSuccessful && responseBody != null) {
-                            val json = org.json.JSONObject(responseBody)
-                            val isErrored = json.optBoolean("IsErroredOnProcessing", false)
-                            var searchablePdfUrl = json.optString("SearchablePDFURL", "")
-                            if (searchablePdfUrl.isEmpty() && json.has("ParsedResults")) {
-                                val results = json.getJSONArray("ParsedResults")
-                                if (results.length() > 0) {
-                                    searchablePdfUrl = results.getJSONObject(0).optString("SearchablePDFURL", "")
-                                }
-                            }
-
-                            if (!isErrored && searchablePdfUrl.isNotEmpty()) {
-                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                    onStatusChange("جاري تحميل الملف الناتج...")
-                                }
-                                val downloadRequest = okhttp3.Request.Builder().url(searchablePdfUrl).get().build()
-                                val downloadResponse = client.newCall(downloadRequest).execute()
-                                val downloadBody = downloadResponse.body
-                                if (downloadResponse.isSuccessful && downloadBody != null) {
-                                    downloadBody.byteStream().use { input ->
-                                        outputFile.outputStream().use { output ->
-                                            input.copyTo(output)
-                                        }
-                                    }
-                                    cloudSuccess = true
-                                }
-                            }
-                        }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    onStatusChange("جاري تحضير ملف PDF وحقن طبقة النصوص...")
                 }
 
-                // 2) Fallback or large file (>1MB): High-performance Page-by-Page OCR PDF Builder
-                if (!cloudSuccess) {
+                // Initialize PDFBox
+                com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(context.applicationContext)
+                val document = com.tom_roush.pdfbox.pdmodel.PDDocument.load(file)
+
+                val fontStream = try {
+                    context.assets.open("pdfjs/web/standard_fonts/LiberationSans-Regular.ttf")
+                } catch (e: Exception) { null }
+
+                val pdfFont: com.tom_roush.pdfbox.pdmodel.font.PDFont = if (fontStream != null) {
+                    try {
+                        com.tom_roush.pdfbox.pdmodel.font.PDType0Font.load(document, fontStream)
+                    } catch (e: Exception) {
+                        com.tom_roush.pdfbox.pdmodel.font.PDType1Font.HELVETICA
+                    }
+                } else {
+                    com.tom_roush.pdfbox.pdmodel.font.PDType1Font.HELVETICA
+                }
+
+                val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+                val renderer = PdfRenderer(pfd)
+                val pageCount = renderer.pageCount
+                val recognizer = com.google.mlkit.vision.text.TextRecognition.getClient(
+                    com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS
+                )
+                val apiKey = com.example.data.SecureKeyManager.getGeminiApiKey(context)
+
+                data class TempLineBox(
+                    val text: String,
+                    val normXmin: Float,
+                    val normYmin: Float,
+                    val normXmax: Float,
+                    val normYmax: Float
+                )
+
+                for (i in 0 until pageCount) {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        onStatusChange("جاري معالجة صفحات المستند وتوليد طبقة النصوص...")
+                        onStatusChange("جاري تحليل وحقن نصوص الصفحة ${i + 1} من $pageCount...")
                     }
 
-                    val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-                    val renderer = PdfRenderer(pfd)
-                    val pageCount = renderer.pageCount
+                    val rendererPage = renderer.openPage(i)
+                    val origWidth = rendererPage.width
+                    val origHeight = rendererPage.height
+                    val scale = 2f
+                    val renderWidth = (origWidth * scale).toInt()
+                    val renderHeight = (origHeight * scale).toInt()
+                    val pageBitmap = Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.ARGB_8888)
+                    rendererPage.render(pageBitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                    rendererPage.close()
 
-                    val pdfDocument = android.graphics.pdf.PdfDocument()
-                    val recognizer = com.google.mlkit.vision.text.TextRecognition.getClient(
-                        com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS
-                    )
+                    val extractedLines = mutableListOf<TempLineBox>()
+                    var engineUsed = "None"
 
-                    for (i in 0 until pageCount) {
-                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                            onStatusChange("جاري معالجة الصفحة ${i + 1} من $pageCount...")
-                        }
-
-                        val rendererPage = renderer.openPage(i)
-                        val origWidth = rendererPage.width
-                        val origHeight = rendererPage.height
-                        val scale = 2f
-                        val renderWidth = (origWidth * scale).toInt()
-                        val renderHeight = (origHeight * scale).toInt()
-                        val pageBitmap = Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.ARGB_8888)
-                        rendererPage.render(pageBitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                        rendererPage.close()
-
-                        var visionText: com.google.mlkit.vision.text.Text? = null
+                    // A) Try Gemini Vision AI if API key is valid
+                    if (apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY") {
                         try {
-                            val inputImage = com.google.mlkit.vision.common.InputImage.fromBitmap(pageBitmap, 0)
-                            visionText = com.google.android.gms.tasks.Tasks.await(recognizer.process(inputImage))
+                            val baos = ByteArrayOutputStream()
+                            pageBitmap.compress(Bitmap.CompressFormat.JPEG, 85, baos)
+                            val base64Image = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
+
+                            val prompt = "أنت نظام OCR متقدم. استخرج جميع النصوص والكلمات من صفحة الكتاب هذه بالكامل (عربي/ألماني/إنجليزي/رموز). أرجع النتيجة فقط بتنسيق JSON بالشكل: {\"lines\": [{\"text\": \"النص\", \"box\": [ymin, xmin, ymax, xmax]}]} بدون كلام إضافي أو markdown. أعداد ymin, xmin, ymax, xmax بين 0 و 1000."
+
+                            val jsonPayload = org.json.JSONObject().apply {
+                                put("contents", org.json.JSONArray().put(
+                                    org.json.JSONObject().put("parts", org.json.JSONArray().apply {
+                                        put(org.json.JSONObject().put("text", prompt))
+                                        put(org.json.JSONObject().put("inline_data", org.json.JSONObject().apply {
+                                            put("mime_type", "image/jpeg")
+                                            put("data", base64Image)
+                                        }))
+                                    })
+                                ))
+                            }
+
+                            val client = okhttp3.OkHttpClient.Builder()
+                                .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                                .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                                .build()
+
+                            val candidateModels = listOf(
+                                "gemini-flash-latest",
+                                "gemini-2.5-flash",
+                                "gemini-2.0-flash",
+                                "gemini-1.5-flash",
+                                "gemini-1.5-pro"
+                            )
+
+                            for (model in candidateModels) {
+                                try {
+                                    val request = okhttp3.Request.Builder()
+                                        .url("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey")
+                                        .addHeader("x-goog-api-key", apiKey)
+                                        .post(jsonPayload.toString().toRequestBody("application/json".toMediaType()))
+                                        .build()
+
+                                    val response = client.newCall(request).execute()
+                                    val respStr = response.body?.string() ?: ""
+                                    if (response.isSuccessful && respStr.isNotBlank()) {
+                                        val respJson = org.json.JSONObject(respStr)
+                                        val candidates = respJson.optJSONArray("candidates")
+                                        if (candidates != null && candidates.length() > 0) {
+                                            val contentObj = candidates.getJSONObject(0).optJSONObject("content")
+                                            val parts = contentObj?.optJSONArray("parts")
+                                            if (parts != null && parts.length() > 0) {
+                                                var textContent = parts.getJSONObject(0).optString("text", "")
+                                                if (textContent.contains("```json")) {
+                                                    textContent = textContent.substringAfter("```json").substringBefore("```")
+                                                } else if (textContent.contains("```")) {
+                                                    textContent = textContent.substringAfter("```").substringBefore("```")
+                                                }
+                                                textContent = textContent.trim()
+
+                                                if (textContent.startsWith("{") && textContent.contains("lines")) {
+                                                    val parsedJson = org.json.JSONObject(textContent)
+                                                    val linesArray = parsedJson.optJSONArray("lines")
+                                                    if (linesArray != null) {
+                                                        for (lIdx in 0 until linesArray.length()) {
+                                                            val item = linesArray.getJSONObject(lIdx)
+                                                            val lText = item.optString("text", "").trim()
+                                                            val boxArr = item.optJSONArray("box")
+                                                            if (lText.isNotBlank() && boxArr != null && boxArr.length() == 4) {
+                                                                val ymin = boxArr.optDouble(0, 0.0).toFloat() / 1000f
+                                                                val xmin = boxArr.optDouble(1, 0.0).toFloat() / 1000f
+                                                                val ymax = boxArr.optDouble(2, 0.0).toFloat() / 1000f
+                                                                val xmax = boxArr.optDouble(3, 0.0).toFloat() / 1000f
+                                                                extractedLines.add(TempLineBox(lText, xmin, ymin, xmax, ymax))
+                                                            }
+                                                        }
+                                                        if (extractedLines.isNotEmpty()) {
+                                                            engineUsed = "Gemini AI Online ($model)"
+                                                            break
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            }
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }
+                    }
 
-                        val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(origWidth, origHeight, i + 1).create()
-                        val newPdfPage = pdfDocument.startPage(pageInfo)
-                        val canvas = newPdfPage.canvas
-
-                        val destRect = Rect(0, 0, origWidth, origHeight)
-                        canvas.drawBitmap(pageBitmap, null, destRect, null)
-                        pageBitmap.recycle()
-
-                        if (visionText != null && visionText.textBlocks.isNotEmpty()) {
-                            val transparentPaint = android.graphics.Paint().apply {
-                                color = android.graphics.Color.TRANSPARENT
-                                isAntiAlias = true
-                            }
-                            for (block in visionText.textBlocks) {
-                                for (line in block.lines) {
-                                    val box = line.boundingBox
-                                    if (box != null && line.text.isNotBlank()) {
-                                        val x = box.left.toFloat() / scale
-                                        val y = box.bottom.toFloat() / scale
-                                        val boxHeight = box.height().toFloat() / scale
-                                        if (boxHeight > 2f) {
-                                            transparentPaint.textSize = boxHeight * 0.85f
-                                        } else {
-                                            transparentPaint.textSize = 12f
+                    // B) Fallback to ML Kit if Gemini is unavailable or didn't populate lines
+                    if (extractedLines.isEmpty()) {
+                        try {
+                            val inputImage = com.google.mlkit.vision.common.InputImage.fromBitmap(pageBitmap, 0)
+                            val visionText = com.google.android.gms.tasks.Tasks.await(recognizer.process(inputImage))
+                            if (visionText != null) {
+                                for (block in visionText.textBlocks) {
+                                    for (line in block.lines) {
+                                        val box = line.boundingBox
+                                        if (box != null && line.text.isNotBlank()) {
+                                            val xmin = box.left.toFloat() / renderWidth
+                                            val ymin = box.top.toFloat() / renderHeight
+                                            val xmax = box.right.toFloat() / renderWidth
+                                            val ymax = box.bottom.toFloat() / renderHeight
+                                            extractedLines.add(TempLineBox(line.text, xmin, ymin, xmax, ymax))
                                         }
-                                        canvas.drawText(line.text, x, y, transparentPaint)
+                                    }
+                                }
+                                if (extractedLines.isNotEmpty()) {
+                                    engineUsed = "ML Kit Local"
+                                }
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+
+                    pageBitmap.recycle()
+
+                    // Log output per page
+                    val charCount = extractedLines.sumOf { it.text.length }
+                    val wordCount = extractedLines.sumOf { it.text.split("\\s+".toRegex()).filter { w -> w.isNotBlank() }.size }
+                    android.util.Log.d("PdfOcrEngine", "Page ${i + 1}/$pageCount: Extracted $charCount chars, $wordCount words using $engineUsed")
+
+                    // C) Inject invisible text layer into PDFPage
+                    if (i < document.numberOfPages) {
+                        val pdPage = document.getPage(i)
+                        val mediaBox = pdPage.mediaBox
+                        val pageWidth = mediaBox.width
+                        val pageHeight = mediaBox.height
+
+                        val contentStream = com.tom_roush.pdfbox.pdmodel.PDPageContentStream(
+                            document,
+                            pdPage,
+                            com.tom_roush.pdfbox.pdmodel.PDPageContentStream.AppendMode.APPEND,
+                            true,
+                            true
+                        )
+
+                        for (line in extractedLines) {
+                            val boxHeight = (line.normYmax - line.normYmin) * pageHeight
+                            val pdfX = line.normXmin * pageWidth
+                            val pdfY = pageHeight - (line.normYmax * pageHeight)
+                            val fontSize = boxHeight.coerceIn(6f, 48f)
+
+                            contentStream.beginText()
+                            contentStream.setFont(pdfFont, fontSize)
+                            // 3 Tr = Neither fill nor stroke text (Invisible text layer in PDF standard)
+                            contentStream.appendRawCommands("3 Tr\n")
+                            contentStream.newLineAtOffset(pdfX, pdfY)
+
+                            val cleanStr = line.text.replace("\r", "").replace("\n", "").replace("\t", " ")
+                            if (cleanStr.isNotBlank()) {
+                                try {
+                                    contentStream.showText(cleanStr)
+                                } catch (e: Exception) {
+                                    for (ch in cleanStr) {
+                                        try {
+                                            contentStream.showText(ch.toString())
+                                        } catch (ignored: Exception) {}
                                     }
                                 }
                             }
+                            contentStream.endText()
                         }
-
-                        pdfDocument.finishPage(newPdfPage)
+                        contentStream.close()
                     }
-
-                    outputFile.outputStream().use { out ->
-                        pdfDocument.writeTo(out)
-                    }
-                    pdfDocument.close()
-                    renderer.close()
-                    pfd.close()
                 }
+
+                renderer.close()
+                pfd.close()
+
+                document.save(outputFile)
+                document.close()
 
                 try {
                     android.media.MediaScannerConnection.scanFile(
