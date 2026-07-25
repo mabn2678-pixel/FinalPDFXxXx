@@ -1091,7 +1091,7 @@ fun PdfGridItem(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Small badges
+                // Small badges - Matching folder card badge style
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center,
@@ -1099,13 +1099,13 @@ fun PdfGridItem(
                 ) {
                     Box(
                         modifier = Modifier
-                            .background(Color(0xFFFFF9C4), RoundedCornerShape(4.dp))
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                            .background(Color(0xFFFFF9C4), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         val badgeFontSize = when {
-                            file.folderName.length > 25 -> 6.sp
-                            file.folderName.length > 15 -> 7.sp
-                            else -> 8.sp
+                            file.folderName.length > 25 -> 7.sp
+                            file.folderName.length > 15 -> 8.sp
+                            else -> 9.sp
                         }
                         Text(
                             text = file.folderName,
@@ -1117,12 +1117,19 @@ fun PdfGridItem(
                         )
                     }
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = file.fileSize,
-                        fontSize = 8.sp,
-                        color = Color.Gray,
-                        maxLines = 1
-                    )
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0xFFFFF3E0), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = file.fileSize,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFE65100),
+                            maxLines = 1
+                        )
+                    }
                 }
                 
                 // Reading progress and last opened label
@@ -1156,7 +1163,7 @@ fun PdfListItem(
     modifier: Modifier = Modifier
 ) {
     Card(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surface
         ),
@@ -1169,64 +1176,87 @@ fun PdfListItem(
             )
             .border(
                 border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else BorderStroke(0.dp, Color.Transparent),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(14.dp)
             )
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(10.dp),
+                .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // PDF cover thumbnail
+            // PDF cover thumbnail with circular amber badge
             Box(
                 modifier = Modifier
-                    .size(width = 44.dp, height = 58.dp)
-                    .clip(RoundedCornerShape(6.dp))
+                    .size(width = 46.dp, height = 60.dp)
             ) {
-                PdfThumbnail(
-                    filePath = file.filePath,
-                    modifier = Modifier.fillMaxSize()
-                )
-                
-                if (progressPercent != null && progressPercent > 0) {
-                    LinearProgressIndicator(
-                        progress = { progressPercent / 100f },
-                        color = Color(0xFF1E88E5),
-                        trackColor = Color(0xFF1E88E5).copy(alpha = 0.2f),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .align(Alignment.BottomCenter)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(8.dp))
+                ) {
+                    PdfThumbnail(
+                        filePath = file.filePath,
+                        modifier = Modifier.fillMaxSize()
                     )
-                }
-
-                if (isSelected) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.4f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = "محدد",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
+                    
+                    if (progressPercent != null && progressPercent > 0) {
+                        LinearProgressIndicator(
+                            progress = { progressPercent / 100f },
+                            color = Color(0xFF1E88E5),
+                            trackColor = Color(0xFF1E88E5).copy(alpha = 0.2f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .align(Alignment.BottomCenter)
                         )
                     }
+
+                    if (isSelected) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.4f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "محدد",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Small circular PDF amber icon badge overlay
+                Box(
+                    modifier = Modifier
+                        .size(18.dp)
+                        .align(Alignment.TopStart)
+                        .offset(x = (-3).dp, y = (-3).dp)
+                        .background(Color(0xFFFFF9C4), CircleShape)
+                        .border(1.dp, Color.White, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PictureAsPdf,
+                        contentDescription = null,
+                        tint = Color(0xFFFBC02D),
+                        modifier = Modifier.size(11.dp)
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(14.dp))
 
             // File Details
             Column(modifier = Modifier.weight(1f)) {
                 val listFileNameFontSize = when {
-                    file.fileName.length > 35 -> 10.sp
-                    file.fileName.length > 25 -> 11.sp
-                    file.fileName.length > 15 -> 12.sp
-                    else -> 13.sp
+                    file.fileName.length > 35 -> 11.sp
+                    file.fileName.length > 25 -> 12.sp
+                    file.fileName.length > 15 -> 13.sp
+                    else -> 14.sp
                 }
                 Text(
                     text = file.fileName,
@@ -1235,24 +1265,25 @@ fun PdfListItem(
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    lineHeight = (listFileNameFontSize.value + 2).sp
+                    lineHeight = (listFileNameFontSize.value + 3).sp
                 )
                 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    // Folder Badge
                     Box(
                         modifier = Modifier
-                            .background(Color(0xFFFFF9C4), RoundedCornerShape(4.dp))
-                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                            .background(Color(0xFFFFF9C4), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         val badgeFontSize = when {
-                            file.folderName.length > 25 -> 6.sp
-                            file.folderName.length > 15 -> 7.sp
-                            else -> 8.sp
+                            file.folderName.length > 25 -> 7.sp
+                            file.folderName.length > 15 -> 8.sp
+                            else -> 9.sp
                         }
                         Text(
                             text = file.folderName,
@@ -1263,11 +1294,21 @@ fun PdfListItem(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    Text(
-                        text = file.fileSize,
-                        fontSize = 9.sp,
-                        color = Color.Gray
-                    )
+
+                    // File Size Badge (Matching orange translucent badge style)
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0xFFFFF3E0), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = file.fileSize,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFE65100),
+                            maxLines = 1
+                        )
+                    }
                     
                     if (lastOpenedText != null) {
                         Text(
@@ -1867,43 +1908,11 @@ fun FoldersTabScreen(
             .padding(16.dp)
     ) {
         // Folders Header Stats
-        Card(
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFF1EEFF)),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "مستعرض المجلدات",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "تصنيف منظم لسهولة العثور على الكتب",
-                        fontSize = 12.sp,
-                        color = Color.Gray
-                    )
-                }
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    FolderStatColumn(num = folderGroups.keys.size, label = "مجلدات")
-                    FolderStatColumn(num = uiState.allPdfFiles.size, label = "مستندات")
-                }
-            }
-        }
+        FolderStatsRow(
+            pdfCount = uiState.allPdfFiles.size,
+            folderCount = folderGroups.keys.size,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
 
         if (expandedFolder == null) {
             // Folders List View
@@ -1978,10 +1987,25 @@ fun FoldersTabScreen(
             }
         } else {
             // Expanded Folder Content View
+            var folderFilter by remember { mutableStateOf(FileFilter.All) }
+            val folderFiles = folderGroups[expandedFolder] ?: emptyList()
+
+            val filteredFolderFiles = remember(folderFiles, folderFilter, recentPdfsMap) {
+                when (folderFilter) {
+                    FileFilter.All -> folderFiles
+                    FileFilter.Favorites -> folderFiles.filter { it.isFavorite }
+                    FileFilter.Recent -> {
+                        folderFiles.filter { recentPdfsMap.containsKey(it.filePath) }
+                            .sortedByDescending { recentPdfsMap[it.filePath]?.lastOpened ?: 0L }
+                    }
+                }
+            }
+
+            // Folder Title Header Row with Back Button
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = { expandedFolder = null }) {
@@ -1991,65 +2015,213 @@ fun FoldersTabScreen(
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(4.dp))
                 val expandedFolderTitleFontSize = when {
-                    (expandedFolder ?: "").length > 30 -> 12.sp
-                    (expandedFolder ?: "").length > 20 -> 14.sp
-                    else -> 16.sp
+                    (expandedFolder ?: "").length > 30 -> 13.sp
+                    (expandedFolder ?: "").length > 20 -> 15.sp
+                    else -> 17.sp
                 }
-                Text(
-                    text = expandedFolder ?: "",
-                    fontSize = expandedFolderTitleFontSize,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = expandedFolder ?: "",
+                        fontSize = expandedFolderTitleFontSize,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "يتضمن ${folderFiles.size} مستندات داخل المجلد",
+                        fontSize = 11.sp,
+                        color = Color.Gray
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            val folderFiles = folderGroups[expandedFolder] ?: emptyList()
-
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxSize()
+            // Filter Pills and Action Controls (Refresh + List/Grid Toggle) - Same as Home
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                items(folderFiles, key = { it.filePath }) { file ->
-                    val recentInfo = recentPdfsMap[file.filePath]
-                    val progressPercent = if (recentInfo != null && recentInfo.totalPages > 0) {
-                        (recentInfo.lastPage.toFloat() / recentInfo.totalPages.toFloat() * 100).toInt().coerceIn(0, 100)
-                    } else null
-                    val lastOpenedText = recentInfo?.let { formatLastOpened(it.lastOpened) }
-
-                    val isSelected = selectedFilePaths.contains(file.filePath)
-                    val isInSelectionMode = selectedFilePaths.isNotEmpty()
-
-                    PdfListItem(
-                        file = file,
-                        progressPercent = progressPercent,
-                        lastOpenedText = lastOpenedText,
-                        isSelected = isSelected,
-                        isInSelectionMode = isInSelectionMode,
-                        onClick = {
-                            if (isInSelectionMode) {
-                                onToggleSelectFile(file.filePath)
-                            } else {
-                                viewModel.selectPdf(file.filePath, file.fileName)
-                            }
-                        },
-                        onLongClick = {
-                            if (isInSelectionMode) {
-                                onToggleSelectFile(file.filePath)
-                            } else {
-                                onShowFileActions(file)
-                            }
-                        },
-                        onMenuClick = {
-                            onShowFileActions(file)
-                        },
-                        modifier = Modifier.animateItem()
+                // Filter Pills Row
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    FilterPill(
+                        label = "كل الملفات",
+                        selected = folderFilter == FileFilter.All,
+                        onClick = { folderFilter = FileFilter.All }
                     )
+                    FilterPill(
+                        label = "المفضلة",
+                        selected = folderFilter == FileFilter.Favorites,
+                        onClick = { folderFilter = FileFilter.Favorites }
+                    )
+                    FilterPill(
+                        label = "الأخيرة",
+                        selected = folderFilter == FileFilter.Recent,
+                        onClick = { folderFilter = FileFilter.Recent }
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                // Controls Row (Refresh scan + Grid/List Toggle)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Refresh Button
+                    IconButton(
+                        onClick = {
+                            viewModel.scanFiles(context)
+                            Toast.makeText(context, "تم تحديث وفحص المجلد الحالي!", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), CircleShape)
+                            .size(34.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "تحديث",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+
+                    // Grid / List Toggle Button
+                    IconButton(
+                        onClick = { viewModel.toggleGridView(context) },
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), CircleShape)
+                            .size(34.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (uiState.isGridView) Icons.Default.List else Icons.Default.GridView,
+                            contentDescription = "تبديل المظهر",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (filteredFolderFiles.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Outlined.FolderOpen,
+                            contentDescription = null,
+                            tint = Color.LightGray,
+                            modifier = Modifier.size(64.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "لا توجد ملفات في هذا التصنيف داخل المجلد",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Gray
+                        )
+                    }
+                }
+            } else {
+                if (uiState.isGridView) {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(filteredFolderFiles, key = { it.filePath }) { file ->
+                            val recentInfo = recentPdfsMap[file.filePath]
+                            val progressPercent = if (recentInfo != null && recentInfo.totalPages > 0) {
+                                (recentInfo.lastPage.toFloat() / recentInfo.totalPages.toFloat() * 100).toInt().coerceIn(0, 100)
+                            } else null
+                            val lastOpenedText = recentInfo?.let { formatLastOpened(it.lastOpened) }
+
+                            val isSelected = selectedFilePaths.contains(file.filePath)
+                            val isInSelectionMode = selectedFilePaths.isNotEmpty()
+
+                            PdfGridItem(
+                                file = file,
+                                progressPercent = progressPercent,
+                                lastOpenedText = lastOpenedText,
+                                isSelected = isSelected,
+                                isInSelectionMode = isInSelectionMode,
+                                onClick = {
+                                    if (isInSelectionMode) {
+                                        onToggleSelectFile(file.filePath)
+                                    } else {
+                                        viewModel.selectPdf(file.filePath, file.fileName)
+                                    }
+                                },
+                                onLongClick = {
+                                    if (isInSelectionMode) {
+                                        onToggleSelectFile(file.filePath)
+                                    } else {
+                                        onShowFileActions(file)
+                                    }
+                                },
+                                onMenuClick = {
+                                    onShowFileActions(file)
+                                },
+                                modifier = Modifier.animateItem()
+                            )
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(filteredFolderFiles, key = { it.filePath }) { file ->
+                            val recentInfo = recentPdfsMap[file.filePath]
+                            val progressPercent = if (recentInfo != null && recentInfo.totalPages > 0) {
+                                (recentInfo.lastPage.toFloat() / recentInfo.totalPages.toFloat() * 100).toInt().coerceIn(0, 100)
+                            } else null
+                            val lastOpenedText = recentInfo?.let { formatLastOpened(it.lastOpened) }
+
+                            val isSelected = selectedFilePaths.contains(file.filePath)
+                            val isInSelectionMode = selectedFilePaths.isNotEmpty()
+
+                            PdfListItem(
+                                file = file,
+                                progressPercent = progressPercent,
+                                lastOpenedText = lastOpenedText,
+                                isSelected = isSelected,
+                                isInSelectionMode = isInSelectionMode,
+                                onClick = {
+                                    if (isInSelectionMode) {
+                                        onToggleSelectFile(file.filePath)
+                                    } else {
+                                        viewModel.selectPdf(file.filePath, file.fileName)
+                                    }
+                                },
+                                onLongClick = {
+                                    if (isInSelectionMode) {
+                                        onToggleSelectFile(file.filePath)
+                                    } else {
+                                        onShowFileActions(file)
+                                    }
+                                },
+                                onMenuClick = {
+                                    onShowFileActions(file)
+                                },
+                                modifier = Modifier.animateItem()
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -2057,19 +2229,108 @@ fun FoldersTabScreen(
 }
 
 @Composable
-fun FolderStatColumn(num: Int, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = num.toString(),
-            fontSize = 18.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Text(
-            text = label,
-            fontSize = 11.sp,
-            color = Color.Gray
-        )
+fun FolderStatsRow(
+    pdfCount: Int,
+    folderCount: Int,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // PDF Files Stat Card (Dark Navy Blue Translucent Box)
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color(0xFF111C2E))
+                .border(1.dp, Color(0xFF1E3A8A).copy(alpha = 0.35f), RoundedCornerShape(20.dp))
+                .padding(horizontal = 16.dp, vertical = 18.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = pdfCount.toString(),
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "PDFs",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF94A3B8)
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .background(Color(0xFF1E3A8A).copy(alpha = 0.5f), CircleShape)
+                        .border(1.dp, Color(0xFF3B82F6).copy(alpha = 0.4f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Description,
+                        contentDescription = "PDFs",
+                        tint = Color(0xFF60A5FA),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+        }
+
+        // Folders Stat Card (Dark Amber/Orange Translucent Box)
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color(0xFF271A12))
+                .border(1.dp, Color(0xFF7C2D12).copy(alpha = 0.35f), RoundedCornerShape(20.dp))
+                .padding(horizontal = 16.dp, vertical = 18.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = folderCount.toString(),
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Folders",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFFD1D5DB)
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .background(Color(0xFF7C2D12).copy(alpha = 0.5f), CircleShape)
+                        .border(1.dp, Color(0xFFF97316).copy(alpha = 0.4f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Folder,
+                        contentDescription = "Folders",
+                        tint = Color(0xFFFB923C),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -2090,6 +2351,16 @@ enum class ActiveTool {
     UnlockPdf,
     CameraOcr,
     CloudOcr
+}
+
+enum class SettingSheetType {
+    APP_THEME,
+    SCROLL_MODE,
+    DEFAULT_ZOOM,
+    DOUBLE_TAP_ZOOM,
+    READING_THEME,
+    BRIGHTNESS,
+    SCREEN_ORIENTATION
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -2130,6 +2401,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
     
     var completedResultFilePath by remember { mutableStateOf<String?>(null) }
     var isProcessing by remember { mutableStateOf(false) }
+    var showLibraryPickerSheet by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -2179,7 +2451,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                         onClick = {
                             activeTool = ActiveTool.CloudOcr
                             targetFileName = "Scanned_Document"
-                            selectedSingleFilePath = uiState.allPdfFiles.firstOrNull()?.filePath ?: ""
+                            selectedSingleFilePath = ""
                             ocrLanguage = "ara"
                         }
                     )
@@ -2213,7 +2485,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                         onClick = {
                             activeTool = ActiveTool.Split
                             targetFileName = "تقسيم_الملف"
-                            selectedSingleFilePath = uiState.allPdfFiles.firstOrNull()?.filePath ?: ""
+                            selectedSingleFilePath = ""
                             splitFromPage = "1"
                             splitToPage = "1"
                         }
@@ -2231,7 +2503,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                         onClick = {
                             activeTool = ActiveTool.Compress
                             targetFileName = "الملف_المضغوط"
-                            selectedSingleFilePath = uiState.allPdfFiles.firstOrNull()?.filePath ?: ""
+                            selectedSingleFilePath = ""
                             compressionLevel = "medium"
                         }
                     )
@@ -2244,7 +2516,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                         onClick = {
                             activeTool = ActiveTool.Rotate
                             targetFileName = "الملف_المعدل"
-                            selectedSingleFilePath = uiState.allPdfFiles.firstOrNull()?.filePath ?: ""
+                            selectedSingleFilePath = ""
                             rotateDegrees = 90
                             rotateTargetPage = "-1"
                         }
@@ -2267,7 +2539,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                         onClick = {
                             activeTool = ActiveTool.Reorder
                             targetFileName = "الملف_المرتب"
-                            selectedSingleFilePath = uiState.allPdfFiles.firstOrNull()?.filePath ?: ""
+                            selectedSingleFilePath = ""
                             reorderSequence = ""
                         }
                     )
@@ -2280,7 +2552,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                         onClick = {
                             activeTool = ActiveTool.DeletePages
                             targetFileName = "الملف_بعد_الحذف"
-                            selectedSingleFilePath = uiState.allPdfFiles.firstOrNull()?.filePath ?: ""
+                            selectedSingleFilePath = ""
                             deletePagesSetInput = ""
                         }
                     )
@@ -2313,7 +2585,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                         modifier = Modifier.weight(1f),
                         onClick = {
                             activeTool = ActiveTool.PdfToImages
-                            selectedSingleFilePath = uiState.allPdfFiles.firstOrNull()?.filePath ?: ""
+                            selectedSingleFilePath = ""
                             pdfToImagesFormat = "PNG"
                             pdfToImagesPages = ""
                         }
@@ -2330,7 +2602,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                         modifier = Modifier.weight(1f),
                         onClick = {
                             activeTool = ActiveTool.LockPdf
-                            selectedSingleFilePath = uiState.allPdfFiles.firstOrNull()?.filePath ?: ""
+                            selectedSingleFilePath = ""
                             lockPassword = ""
                             lockAllowPrinting = true
                             lockAllowCopying = true
@@ -2347,7 +2619,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                         modifier = Modifier.weight(1f),
                         onClick = {
                             activeTool = ActiveTool.UnlockPdf
-                            selectedSingleFilePath = uiState.allPdfFiles.firstOrNull()?.filePath ?: ""
+                            selectedSingleFilePath = ""
                             unlockPassword = ""
                             targetFileName = "ملف_مفتوح"
                         }
@@ -2363,7 +2635,13 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
     if (activeTool != ActiveTool.None) {
         BackHandler(enabled = true) {
             if (!isProcessing) {
-                activeTool = ActiveTool.None
+                if (selectedSingleFilePath.isNotEmpty() || selectedFilePaths.isNotEmpty() || selectedImagePaths.isNotEmpty()) {
+                    selectedSingleFilePath = ""
+                    selectedFilePaths = emptySet()
+                    selectedImagePaths = emptyList()
+                } else {
+                    activeTool = ActiveTool.None
+                }
             }
         }
 
@@ -2410,6 +2688,15 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
             }
         }
 
+        val imagePickerLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetMultipleContents()
+        ) { uris ->
+            val paths = uris.mapNotNull { uri ->
+                viewModel.copyUriToCache(context, uri, "img_${System.currentTimeMillis()}_${uri.lastPathSegment}.jpg")
+            }
+            selectedImagePaths = selectedImagePaths + paths
+        }
+
         if (activeTool == ActiveTool.CameraOcr) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
@@ -2422,793 +2709,676 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                 )
             }
         } else {
-            val (toolTitle, toolSubtitle) = when (activeTool) {
-                ActiveTool.Merge -> "دمج ملفات PDF" to "اختر ملفات الـ PDF التي ترغب في دمجها بالترتيب المناسب لتصديرها في مستند واحد"
-                ActiveTool.Split -> "تقسيم ملف PDF" to "اختر الملف والصفحات المراد استخراجها وفصلها في ملف جديد منفصل"
-                ActiveTool.Compress -> "ضغط ملف PDF" to "تقليل حجم الملف مع الحفاظ على أعلى جودة قراءة ووضوح"
-                ActiveTool.Rotate -> "تدوير صفحات PDF" to "تعديل اتجاه وزاوية دوران صفحات مستند الـ PDF"
-                ActiveTool.Reorder -> "إعادة ترتيب الصفحات" to "إعادة تنظيم وترتيب تسلسل صفحات ملف الـ PDF"
-                ActiveTool.DeletePages -> "حذف صفحات من PDF" to "إزالة صفحة واحدة أو أكثر غير مرغوبة من مستندك"
-                ActiveTool.ImageToPdf -> "تحويل صور إلى PDF" to "اختر صورة أو أكثر من المعرض وتحويلها إلى ملف PDF مرتب"
-                ActiveTool.PdfToImages -> "تحويل PDF إلى صور" to "استخراج صفحات مستند الـ PDF وحفظها كصور عالية الجودة"
-                ActiveTool.LockPdf -> "تشفير وقفل ملف PDF" to "حماية مستند الـ PDF بكلمة سر وتعيين صلاحيات القراءة والطباعة"
-                ActiveTool.UnlockPdf -> "فك قفل وإزالة حماية PDF" to "إزالة كلمة السر والتشفير من مستند مشفر"
-                ActiveTool.CloudOcr -> "تحويل PDF (OCR)" to "تحويل ملفات الـ PDF المصورة إلى مستندات قابلة لتحديد ونسخ النص عبر التعرف السحابي"
-                else -> "" to ""
+            val hasSelectedFile = when (activeTool) {
+                ActiveTool.Merge -> selectedFilePaths.isNotEmpty()
+                ActiveTool.ImageToPdf -> selectedImagePaths.isNotEmpty()
+                else -> selectedSingleFilePath.isNotEmpty()
             }
 
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = MaterialTheme.colorScheme.background
-            ) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    // Top App Bar
-                    Surface(
-                        color = MaterialTheme.colorScheme.surface,
-                        tonalElevation = 2.dp,
-                        shadowElevation = 4.dp,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .statusBarsPadding()
-                                .padding(horizontal = 8.dp, vertical = 12.dp)
+            if (!hasSelectedFile) {
+                val info = when (activeTool) {
+                    ActiveTool.Merge -> ToolInfo("دمج ملفات PDF", "اختر ملفات الـ PDF التي ترغب في دمجها بالترتيب المناسب لتصديرها في مستند واحد مخصص", Icons.Default.MergeType, Color(0xFFE6E0FF))
+                    ActiveTool.Split -> ToolInfo("تقسيم ملف PDF", "اختر ملف الـ PDF والصفحات المراد استخراجها وفصلها في مستند جديد منفصل", Icons.Default.CallSplit, Color(0xFFFFF9C4))
+                    ActiveTool.Compress -> ToolInfo("ضغط ملف PDF", "تقليل حجم المستند بكفاءة عالية للحفظ والمشاركة مع الحفاظ على جودة القراءة", Icons.Default.Compress, Color(0xFFF1EEFF))
+                    ActiveTool.Rotate -> ToolInfo("تدوير صفحات PDF", "تعديل اتجاه وزاوية دوران صفحات مستند الـ PDF (90°، 180°، 270°) بكل سهولة", Icons.Default.RotateRight, Color(0xFFFFF9C4))
+                    ActiveTool.Reorder -> ToolInfo("إعادة ترتيب الصفحات", "إعادة تنظيم وترتيب تسلسل صفحات ملف الـ PDF بالطريقة التي تناسبك", Icons.Default.List, Color(0xFFE6E0FF))
+                    ActiveTool.DeletePages -> ToolInfo("حذف صفحات من PDF", "إزالة صفحة واحدة أو أكثر غير مرغوبة من مستند الـ PDF وتصديره", Icons.Default.Delete, Color(0xFFFFD1D1))
+                    ActiveTool.ImageToPdf -> ToolInfo("صورة إلى PDF", "اختر صورة أو أكثر من المعرض وتحويلها إلى ملف PDF مرتب وعالي الجودة", Icons.Default.Image, Color(0xFFE1F5FE))
+                    ActiveTool.PdfToImages -> ToolInfo("تحويل PDF إلى صور", "استخراج صفحات مستند الـ PDF وحفظها كصور عالية الجودة (PNG / JPEG)", Icons.Default.Collections, Color(0xFFE8F5E9))
+                    ActiveTool.LockPdf -> ToolInfo("تشفير وقفل ملف PDF", "حماية مستند الـ PDF بكلمة سر وتعيين صلاحيات القراءة والطباعة لمنع الفتح غير المصرح به", Icons.Default.Lock, Color(0xFFFFEBEE))
+                    ActiveTool.UnlockPdf -> ToolInfo("فك قفل وإزالة حماية PDF", "إزالة كلمة السر والتشفير من مستند مشفر لحفظ نسخة مفتوحة وقابلة للقراءة دائماً", Icons.Default.LockOpen, Color(0xFFFFF3E0))
+                    ActiveTool.CloudOcr -> ToolInfo("تحويل PDF (OCR)", "تحويل ملفات الـ PDF المصورة إلى مستندات قابلة لتحديد ونسخ النص عبر التعرف السحابي", Icons.Default.CloudSync, Color(0xFFE3F2FD))
+                    else -> ToolInfo("", "", Icons.Default.Build, Color.Gray)
+                }
+
+                ToolIntroScreen(
+                    title = info.title,
+                    description = info.subtitle,
+                    icon = info.icon,
+                    accentColor = info.color,
+                    buttonText = if (activeTool == ActiveTool.Merge) "اختيار ملفات PDF" else if (activeTool == ActiveTool.ImageToPdf) "اختيار صور من المعرض" else "اختيار ملف PDF",
+                    onSelectSaf = {
+                        when (activeTool) {
+                            ActiveTool.Merge -> toolMultiPickerLauncher.launch(arrayOf("application/pdf"))
+                            ActiveTool.ImageToPdf -> imagePickerLauncher.launch("image/*")
+                            else -> toolSinglePickerLauncher.launch(arrayOf("application/pdf"))
+                        }
+                    },
+                    onSelectFromLibrary = if (activeTool != ActiveTool.ImageToPdf) {
+                        { showLibraryPickerSheet = true }
+                    } else null,
+                    onBack = { activeTool = ActiveTool.None }
+                )
+            } else {
+                val (toolTitle, toolSubtitle) = when (activeTool) {
+                    ActiveTool.Merge -> "دمج ملفات PDF" to "اختر ترتيب الملفات والاسم لإنشاء مستند واحد"
+                    ActiveTool.Split -> "تقسيم ملف PDF" to "حدد نطاق الصفحات واسم الملف الناتج"
+                    ActiveTool.Compress -> "ضغط ملف PDF" to "حدد مستوى الضغط واسم الملف الناتج"
+                    ActiveTool.Rotate -> "تدوير صفحات PDF" to "حدد زاوية التدوير والصفحات المستهدفة"
+                    ActiveTool.Reorder -> "إعادة ترتيب الصفحات" to "أدخل التسلسل الجديد لصفحات الملف"
+                    ActiveTool.DeletePages -> "حذف صفحات من PDF" to "أدخل أرقام الصفحات المراد استبعادها"
+                    ActiveTool.ImageToPdf -> "تحويل صور إلى PDF" to "ترتيب الصور وإنشاء ملف الـ PDF"
+                    ActiveTool.PdfToImages -> "تحويل PDF إلى صور" to "حدد صيغة الصور والصفحات المراد تصديرها"
+                    ActiveTool.LockPdf -> "تشفير وقفل ملف PDF" to "تعيين كلمة السر والصلاحيات المطلوبة"
+                    ActiveTool.UnlockPdf -> "فك قفل وإزالة حماية PDF" to "أدخل كلمة السر الفعالية لفك التشفير"
+                    ActiveTool.CloudOcr -> "تحويل PDF (OCR)" to "اختر لغة التعرف والاسم لبدء المعالجة"
+                    else -> "" to ""
+                }
+
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // Top App Bar
+                        Surface(
+                            color = MaterialTheme.colorScheme.surface,
+                            tonalElevation = 2.dp,
+                            shadowElevation = 4.dp,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            IconButton(onClick = { if (!isProcessing) activeTool = ActiveTool.None }) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "رجوع",
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = toolTitle,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = toolSubtitle,
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .statusBarsPadding()
+                                    .padding(horizontal = 8.dp, vertical = 12.dp)
+                            ) {
+                                IconButton(onClick = {
+                                    if (!isProcessing) {
+                                        selectedSingleFilePath = ""
+                                        selectedFilePaths = emptySet()
+                                        selectedImagePaths = emptyList()
+                                    }
+                                }) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "رجوع",
+                                        tint = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = toolTitle,
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = toolSubtitle,
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
-                    }
 
-                    // Content Area
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        when (activeTool) {
-                            ActiveTool.Merge -> {
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("إعدادات التصدير", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        OutlinedTextField(
-                                            value = targetFileName,
-                                            onValueChange = { targetFileName = it },
-                                            label = { Text("اسم الملف الناتج") },
-                                            singleLine = true,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                    }
-                                }
-
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("حدد الملفات المراد دمجها (${selectedFilePaths.size} محددة)", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Button(
-                                            onClick = { toolMultiPickerLauncher.launch(arrayOf("application/pdf")) },
-                                            shape = RoundedCornerShape(10.dp),
-                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text("اختيار ملفات من منتقي النظام (SAF)")
-                                        }
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        if (uiState.allPdfFiles.isEmpty() && selectedFilePaths.isEmpty()) {
-                                            Text("لا يوجد ملفات PDF متوفرة حالياً.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
-                                        } else {
-                                            Text("أو حدد من مكتبة التطبيق:", fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
-                                            Spacer(modifier = Modifier.height(6.dp))
-                                            uiState.allPdfFiles.forEach { file ->
-                                                val isSelected = selectedFilePaths.contains(file.filePath)
-                                                Surface(
-                                                    onClick = {
-                                                        selectedFilePaths = if (isSelected) selectedFilePaths - file.filePath else selectedFilePaths + file.filePath
-                                                    },
-                                                    shape = RoundedCornerShape(10.dp),
-                                                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                                                ) {
-                                                    Row(
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                        modifier = Modifier.padding(12.dp)
-                                                    ) {
-                                                        Checkbox(
-                                                            checked = isSelected,
-                                                            onCheckedChange = {
-                                                                selectedFilePaths = if (it) selectedFilePaths + file.filePath else selectedFilePaths - file.filePath
-                                                            }
-                                                        )
-                                                        Spacer(modifier = Modifier.width(8.dp))
-                                                        Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-                                                        Spacer(modifier = Modifier.width(10.dp))
-                                                        Column(modifier = Modifier.weight(1f)) {
-                                                            Text(file.fileName, fontWeight = FontWeight.Medium, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                            Text(file.fileSize, fontSize = 11.sp, color = Color.Gray)
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            ActiveTool.Split -> {
-                                ToolFilePickerCard(
-                                    title = "اختر ملف الـ PDF المراد تقسيمه",
-                                    selectedFilePath = selectedSingleFilePath,
-                                    allPdfFiles = uiState.allPdfFiles,
-                                    onFileSelected = { path, name ->
-                                        selectedSingleFilePath = path
-                                        targetFileName = "${name}_مقسم"
-                                    },
-                                    onOpenSafPicker = {
-                                        toolSinglePickerLauncher.launch(arrayOf("application/pdf"))
-                                    }
-                                )
-
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("إعدادات النطاق والتسمية", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        OutlinedTextField(
-                                            value = targetFileName,
-                                            onValueChange = { targetFileName = it },
-                                            label = { Text("اسم الملف الناتج") },
-                                            singleLine = true,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            OutlinedTextField(
-                                                value = splitFromPage,
-                                                onValueChange = { splitFromPage = it },
-                                                label = { Text("من صفحة") },
-                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                                singleLine = true,
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                            OutlinedTextField(
-                                                value = splitToPage,
-                                                onValueChange = { splitToPage = it },
-                                                label = { Text("إلى صفحة") },
-                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                                singleLine = true,
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            ActiveTool.Compress -> {
-                                ToolFilePickerCard(
-                                    title = "اختر الملف المراد ضغطه",
-                                    selectedFilePath = selectedSingleFilePath,
-                                    allPdfFiles = uiState.allPdfFiles,
-                                    onFileSelected = { path, name ->
-                                        selectedSingleFilePath = path
-                                        targetFileName = "${name}_مضغوط"
-                                    },
-                                    onOpenSafPicker = {
-                                        toolSinglePickerLauncher.launch(arrayOf("application/pdf"))
-                                    }
-                                )
-
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("إعدادات الضغط والاسم", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        OutlinedTextField(
-                                            value = targetFileName,
-                                            onValueChange = { targetFileName = it },
-                                            label = { Text("اسم الملف الناتج") },
-                                            singleLine = true,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        Text("مستوى الضغط المطلوب", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        
-                                        val levels = listOf(
-                                            "low" to "منخفض (جودة عالية)",
-                                            "medium" to "متوسط (أفضل توازن - موصى به)",
-                                            "high" to "عالي (أصغر حجم ملف)"
-                                        )
-
-                                        levels.forEach { (levelKey, levelLabel) ->
-                                            Surface(
-                                                onClick = { compressionLevel = levelKey },
+                        // Content Area
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            when (activeTool) {
+                                ActiveTool.Merge -> {
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                        shape = RoundedCornerShape(16.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Text("الملفات المحددة للدمج (${selectedFilePaths.size})", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            Spacer(modifier = Modifier.height(10.dp))
+                                            Button(
+                                                onClick = { toolMultiPickerLauncher.launch(arrayOf("application/pdf")) },
                                                 shape = RoundedCornerShape(10.dp),
-                                                color = if (compressionLevel == levelKey) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                                            ) {
-                                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(12.dp)) {
-                                                    RadioButton(selected = compressionLevel == levelKey, onClick = { compressionLevel = levelKey })
-                                                    Spacer(modifier = Modifier.width(8.dp))
-                                                    Text(levelLabel, fontSize = 13.sp, fontWeight = if (compressionLevel == levelKey) FontWeight.Bold else FontWeight.Normal)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            ActiveTool.Rotate -> {
-                                ToolFilePickerCard(
-                                    title = "اختر ملف الـ PDF المراد تدويره",
-                                    selectedFilePath = selectedSingleFilePath,
-                                    allPdfFiles = uiState.allPdfFiles,
-                                    onFileSelected = { path, name ->
-                                        selectedSingleFilePath = path
-                                        targetFileName = "${name}_مدور"
-                                    },
-                                    onOpenSafPicker = {
-                                        toolSinglePickerLauncher.launch(arrayOf("application/pdf"))
-                                    }
-                                )
-
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("إعدادات التدوير", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        OutlinedTextField(
-                                            value = targetFileName,
-                                            onValueChange = { targetFileName = it },
-                                            label = { Text("اسم الملف الناتج") },
-                                            singleLine = true,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        Text("درجة التدوير المطلوبة", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            listOf(90 to "90° مع العقارب", 180 to "180° رأساً", 270 to "270° عكس العقارب").forEach { (deg, label) ->
-                                                FilterChip(
-                                                    selected = rotateDegrees == deg,
-                                                    onClick = { rotateDegrees = deg },
-                                                    label = { Text(label, fontSize = 11.sp) },
-                                                    modifier = Modifier.weight(1f)
-                                                )
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        OutlinedTextField(
-                                            value = rotateTargetPage,
-                                            onValueChange = { rotateTargetPage = it },
-                                            label = { Text("الصفحة المستهدفة (-1 لجميع الصفحات)") },
-                                            singleLine = true,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                    }
-                                }
-                            }
-
-                            ActiveTool.Reorder -> {
-                                ToolFilePickerCard(
-                                    title = "اختر ملف الـ PDF المراد إعادة ترتيبه",
-                                    selectedFilePath = selectedSingleFilePath,
-                                    allPdfFiles = uiState.allPdfFiles,
-                                    onFileSelected = { path, name ->
-                                        selectedSingleFilePath = path
-                                        targetFileName = "${name}_مرتب"
-                                    },
-                                    onOpenSafPicker = {
-                                        toolSinglePickerLauncher.launch(arrayOf("application/pdf"))
-                                    }
-                                )
-
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("إعدادات الترتيب والاسم", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        OutlinedTextField(
-                                            value = targetFileName,
-                                            onValueChange = { targetFileName = it },
-                                            label = { Text("اسم الملف الناتج") },
-                                            singleLine = true,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        Text("ترتيب الصفحات الجديد", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                        Text("أدخل أرقام الصفحات بالترتيب الجديد مفصولة بفواصل:", fontSize = 11.sp, color = Color.Gray)
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        OutlinedTextField(
-                                            value = reorderSequence,
-                                            onValueChange = { reorderSequence = it },
-                                            placeholder = { Text("مثال: 3, 1, 2, 4") },
-                                            singleLine = true,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                    }
-                                }
-                            }
-
-                            ActiveTool.DeletePages -> {
-                                ToolFilePickerCard(
-                                    title = "اختر ملف الـ PDF لحذف صفحات منه",
-                                    selectedFilePath = selectedSingleFilePath,
-                                    allPdfFiles = uiState.allPdfFiles,
-                                    onFileSelected = { path, name ->
-                                        selectedSingleFilePath = path
-                                        targetFileName = "${name}_معدل"
-                                    },
-                                    onOpenSafPicker = {
-                                        toolSinglePickerLauncher.launch(arrayOf("application/pdf"))
-                                    }
-                                )
-
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("إعدادات الحذف والاسم", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        OutlinedTextField(
-                                            value = targetFileName,
-                                            onValueChange = { targetFileName = it },
-                                            label = { Text("اسم الملف الناتج") },
-                                            singleLine = true,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        Text("أرقام الصفحات المراد حذفها", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                        Text("أدخل الصفحات المراد حذفها مفصولة بفواصل:", fontSize = 11.sp, color = Color.Gray)
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        OutlinedTextField(
-                                            value = deletePagesSetInput,
-                                            onValueChange = { deletePagesSetInput = it },
-                                            placeholder = { Text("مثال: 2, 4") },
-                                            singleLine = true,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                    }
-                                }
-                            }
-
-                            ActiveTool.ImageToPdf -> {
-                                val imagePickerLauncher = rememberLauncherForActivityResult(
-                                    contract = ActivityResultContracts.GetMultipleContents()
-                                ) { uris ->
-                                    val paths = uris.mapNotNull { uri ->
-                                        viewModel.copyUriToCache(context, uri, "img_${System.currentTimeMillis()}_${uri.lastPathSegment}.jpg")
-                                    }
-                                    selectedImagePaths = selectedImagePaths + paths
-                                }
-
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("إعدادات الملف الناتج", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        OutlinedTextField(
-                                            value = targetFileName,
-                                            onValueChange = { targetFileName = it },
-                                            label = { Text("اسم ملف الـ PDF الناتج") },
-                                            singleLine = true,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                    }
-                                }
-
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("الصور المحددة (${selectedImagePaths.size})", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Button(
-                                            onClick = { imagePickerLauncher.launch("image/*") },
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Icon(Icons.Default.Add, contentDescription = null)
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text("إضافة صور من المعرض")
-                                        }
-
-                                        if (selectedImagePaths.isNotEmpty()) {
-                                            Spacer(modifier = Modifier.height(12.dp))
-                                            selectedImagePaths.forEachIndexed { index, path ->
-                                                val file = File(path)
-                                                Surface(
-                                                    shape = RoundedCornerShape(8.dp),
-                                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                                                ) {
-                                                    Row(
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                        modifier = Modifier.padding(8.dp)
-                                                    ) {
-                                                        Text("${index + 1}. ${file.name}", fontSize = 12.sp, modifier = Modifier.weight(1f), maxLines = 1)
-                                                        IconButton(
-                                                            onClick = {
-                                                                selectedImagePaths = selectedImagePaths.toMutableList().apply { removeAt(index) }
-                                                            },
-                                                            modifier = Modifier.size(28.dp)
-                                                        ) {
-                                                            Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color.Red, modifier = Modifier.size(18.dp))
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            ActiveTool.PdfToImages -> {
-                                ToolFilePickerCard(
-                                    title = "اختر ملف الـ PDF لتحويله لصور",
-                                    selectedFilePath = selectedSingleFilePath,
-                                    allPdfFiles = uiState.allPdfFiles,
-                                    onFileSelected = { path, name ->
-                                        selectedSingleFilePath = path
-                                    },
-                                    onOpenSafPicker = {
-                                        toolSinglePickerLauncher.launch(arrayOf("application/pdf"))
-                                    }
-                                )
-
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("صيغة الصور الناتجة:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { pdfToImagesFormat = "PNG" }) {
-                                                RadioButton(selected = pdfToImagesFormat == "PNG", onClick = { pdfToImagesFormat = "PNG" })
-                                                Text("PNG (جودة عالية)", fontSize = 13.sp)
-                                            }
-                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { pdfToImagesFormat = "JPG" }) {
-                                                RadioButton(selected = pdfToImagesFormat == "JPG", onClick = { pdfToImagesFormat = "JPG" })
-                                                Text("JPG (حجم مدمج)", fontSize = 13.sp)
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        OutlinedTextField(
-                                            value = pdfToImagesPages,
-                                            onValueChange = { pdfToImagesPages = it },
-                                            label = { Text("تصدير صفحات معينة (اختياري)") },
-                                            placeholder = { Text("مثال: 1, 2, 5-8 (اتركه فارغاً للكل)") },
-                                            singleLine = true,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                    }
-                                }
-                            }
-
-                            ActiveTool.LockPdf -> {
-                                ToolFilePickerCard(
-                                    title = "اختر ملف الـ PDF المراد تشفيره",
-                                    selectedFilePath = selectedSingleFilePath,
-                                    allPdfFiles = uiState.allPdfFiles,
-                                    onFileSelected = { path, name ->
-                                        selectedSingleFilePath = path
-                                        targetFileName = "${name}_محمي"
-                                    },
-                                    onOpenSafPicker = {
-                                        toolSinglePickerLauncher.launch(arrayOf("application/pdf"))
-                                    }
-                                )
-
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("إعدادات التشفير والكلمة السرية", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        OutlinedTextField(
-                                            value = targetFileName,
-                                            onValueChange = { targetFileName = it },
-                                            label = { Text("اسم الملف الناتج") },
-                                            singleLine = true,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        OutlinedTextField(
-                                            value = lockPassword,
-                                            onValueChange = { lockPassword = it },
-                                            label = { Text("كلمة سر فتح الملف") },
-                                            singleLine = true,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                    }
-                                }
-
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("خيارات الصلاحيات", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { lockAllowPrinting = !lockAllowPrinting }) {
-                                            Checkbox(checked = lockAllowPrinting, onCheckedChange = { lockAllowPrinting = it })
-                                            Text("السماح بطباعة الملف", fontSize = 13.sp)
-                                        }
-                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { lockAllowCopying = !lockAllowCopying }) {
-                                            Checkbox(checked = lockAllowCopying, onCheckedChange = { lockAllowCopying = it })
-                                            Text("السماح بنسخ النصوص والمحتوى", fontSize = 13.sp)
-                                        }
-                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { lockAllowModifying = !lockAllowModifying }) {
-                                            Checkbox(checked = lockAllowModifying, onCheckedChange = { lockAllowModifying = it })
-                                            Text("السماح بتعديل صفحات الملف", fontSize = 13.sp)
-                                        }
-                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { lockAllowAnnotations = !lockAllowAnnotations }) {
-                                            Checkbox(checked = lockAllowAnnotations, onCheckedChange = { lockAllowAnnotations = it })
-                                            Text("السماح بإضافة تعليقات وشروح", fontSize = 13.sp)
-                                        }
-                                    }
-                                }
-                            }
-
-                            ActiveTool.UnlockPdf -> {
-                                ToolFilePickerCard(
-                                    title = "اختر ملف الـ PDF المشفر",
-                                    selectedFilePath = selectedSingleFilePath,
-                                    allPdfFiles = uiState.allPdfFiles,
-                                    onFileSelected = { path, name ->
-                                        selectedSingleFilePath = path
-                                        targetFileName = "${name}_مفتوح"
-                                    },
-                                    onOpenSafPicker = {
-                                        toolSinglePickerLauncher.launch(arrayOf("application/pdf"))
-                                    }
-                                )
-
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("إعدادات فك التشفير", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        OutlinedTextField(
-                                            value = targetFileName,
-                                            onValueChange = { targetFileName = it },
-                                            label = { Text("اسم الملف الناتج") },
-                                            singleLine = true,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        OutlinedTextField(
-                                            value = unlockPassword,
-                                            onValueChange = { unlockPassword = it },
-                                            label = { Text("كلمة السر الحالية لفتح الملف") },
-                                            singleLine = true,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                    }
-                                }
-                            }
-
-                            ActiveTool.CloudOcr -> {
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("إعدادات التصدير واللغة", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.height(10.dp))
-                                        OutlinedTextField(
-                                            value = targetFileName,
-                                            onValueChange = { targetFileName = it },
-                                            label = { Text("اسم الملف الناتج") },
-                                            singleLine = true,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                        Spacer(modifier = Modifier.height(14.dp))
-                                        Text("لغة التعرف الضوئي (OCR):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            listOf("ara" to "العربية 🇸🇦", "eng" to "الإنجليزي 🇬🇧", "deu" to "الألماني 🇩🇪").forEach { (code, name) ->
-                                                val isSelected = ocrLanguage == code
-                                                FilterChip(
-                                                    selected = isSelected,
-                                                    onClick = { ocrLanguage = code },
-                                                    label = { Text(name, fontSize = 12.sp) },
-                                                    leadingIcon = if (isSelected) {
-                                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                                                    } else null,
-                                                    modifier = Modifier.weight(1f)
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-
-                                Card(
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                    shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
-                                        Text("تحديد الملف المراد معالجته", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.height(10.dp))
-                                        
-                                        Button(
-                                            onClick = { toolSinglePickerLauncher.launch(arrayOf("application/pdf")) },
-                                            shape = RoundedCornerShape(10.dp),
-                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text("اختيار ملف من منتقي النظام (SAF)")
-                                        }
-
-                                        Spacer(modifier = Modifier.height(12.dp))
-
-                                        if (selectedSingleFilePath.isNotEmpty()) {
-                                            val selectedFile = File(selectedSingleFilePath)
-                                            Surface(
-                                                shape = RoundedCornerShape(12.dp),
-                                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-                                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                                 modifier = Modifier.fillMaxWidth()
                                             ) {
-                                                Row(
-                                                    modifier = Modifier.padding(12.dp),
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.PictureAsPdf,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.size(28.dp)
-                                                    )
-                                                    Spacer(modifier = Modifier.width(10.dp))
-                                                    Column(modifier = Modifier.weight(1f)) {
-                                                        Text(
-                                                            text = selectedFile.name,
-                                                            fontWeight = FontWeight.Bold,
-                                                            fontSize = 13.sp,
-                                                            maxLines = 1,
-                                                            overflow = TextOverflow.Ellipsis
-                                                        )
-                                                        Text(
-                                                            text = "حجم الملف: ${android.text.format.Formatter.formatShortFileSize(context, selectedFile.length())}",
-                                                            fontSize = 11.sp,
-                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                        )
-                                                    }
-                                                    Icon(
-                                                        imageVector = Icons.Default.CheckCircle,
-                                                        contentDescription = "تم الاختيار",
-                                                        tint = MaterialTheme.colorScheme.primary
-                                                    )
-                                                }
+                                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text("إضافة المزيد من الملفات")
                                             }
                                             Spacer(modifier = Modifier.height(12.dp))
-                                        }
-
-                                        if (uiState.allPdfFiles.isNotEmpty()) {
-                                            Text("أو حدد من مكتبة التطبيق:", fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Medium)
-                                            Spacer(modifier = Modifier.height(6.dp))
-                                            uiState.allPdfFiles.forEach { file ->
-                                                val isSelected = selectedSingleFilePath == file.filePath
+                                            selectedFilePaths.forEachIndexed { idx, path ->
+                                                val file = File(path)
                                                 Surface(
-                                                    onClick = {
-                                                        selectedSingleFilePath = file.filePath
-                                                        val cleanName = file.fileName.replace(".pdf", "", ignoreCase = true).replace("_", " ")
-                                                        targetFileName = "${cleanName}_OCR"
-                                                    },
                                                     shape = RoundedCornerShape(10.dp),
-                                                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                                                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                                                 ) {
                                                     Row(
                                                         verticalAlignment = Alignment.CenterVertically,
                                                         modifier = Modifier.padding(12.dp)
                                                     ) {
-                                                        RadioButton(
-                                                            selected = isSelected,
-                                                            onClick = {
-                                                                selectedSingleFilePath = file.filePath
-                                                                val cleanName = file.fileName.replace(".pdf", "", ignoreCase = true).replace("_", " ")
-                                                                targetFileName = "${cleanName}_OCR"
-                                                            }
-                                                        )
+                                                        Text("${idx + 1}.", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                                         Spacer(modifier = Modifier.width(8.dp))
-                                                        Column {
-                                                            Text(file.fileName, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                                                            Text(file.fileSize, fontSize = 11.sp, color = Color.Gray)
+                                                        Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text(file.name, fontWeight = FontWeight.Medium, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                        IconButton(
+                                                            onClick = { selectedFilePaths = selectedFilePaths - path },
+                                                            modifier = Modifier.size(28.dp)
+                                                        ) {
+                                                            Icon(Icons.Default.Close, contentDescription = "إزالة", tint = Color.Red, modifier = Modifier.size(18.dp))
                                                         }
                                                     }
                                                 }
                                             }
                                         }
                                     }
-                                }
-                            }
 
-                            else -> {}
-                        }
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                        shape = RoundedCornerShape(16.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Text("إعدادات التصدير والاسم", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            OutlinedTextField(
+                                                value = targetFileName,
+                                                onValueChange = { targetFileName = it },
+                                                label = { Text("اسم الملف الناتج") },
+                                                singleLine = true,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                    }
+                                }
+
+                                ActiveTool.Split -> {
+                                    ToolSelectedFileCard(
+                                        filePath = selectedSingleFilePath,
+                                        allPdfFiles = uiState.allPdfFiles,
+                                        onChangeFile = { showLibraryPickerSheet = true },
+                                        onPreviewFile = { path, name -> viewModel.selectPdf(path, name) }
+                                    )
+
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                        shape = RoundedCornerShape(16.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Text("إعدادات التقسيم والنطاق", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            OutlinedTextField(
+                                                value = targetFileName,
+                                                onValueChange = { targetFileName = it },
+                                                label = { Text("اسم الملف الناتج") },
+                                                singleLine = true,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                OutlinedTextField(
+                                                    value = splitFromPage,
+                                                    onValueChange = { splitFromPage = it },
+                                                    label = { Text("من صفحة") },
+                                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                    singleLine = true,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                                OutlinedTextField(
+                                                    value = splitToPage,
+                                                    onValueChange = { splitToPage = it },
+                                                    label = { Text("إلى صفحة") },
+                                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                                    singleLine = true,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                ActiveTool.Compress -> {
+                                    ToolSelectedFileCard(
+                                        filePath = selectedSingleFilePath,
+                                        allPdfFiles = uiState.allPdfFiles,
+                                        onChangeFile = { showLibraryPickerSheet = true },
+                                        onPreviewFile = { path, name -> viewModel.selectPdf(path, name) }
+                                    )
+
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                        shape = RoundedCornerShape(16.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Text("إعدادات الضغط والاسم", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            OutlinedTextField(
+                                                value = targetFileName,
+                                                onValueChange = { targetFileName = it },
+                                                label = { Text("اسم الملف الناتج") },
+                                                singleLine = true,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Text("مستوى الضغط المطلوب", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            
+                                            val levels = listOf(
+                                                "low" to "منخفض (جودة عالية)",
+                                                "medium" to "متوسط (أفضل توازن - موصى به)",
+                                                "high" to "عالي (أصغر حجم ملف)"
+                                            )
+
+                                            levels.forEach { (levelKey, levelLabel) ->
+                                                Surface(
+                                                    onClick = { compressionLevel = levelKey },
+                                                    shape = RoundedCornerShape(10.dp),
+                                                    color = if (compressionLevel == levelKey) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(12.dp)) {
+                                                        RadioButton(selected = compressionLevel == levelKey, onClick = { compressionLevel = levelKey })
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text(levelLabel, fontSize = 13.sp, fontWeight = if (compressionLevel == levelKey) FontWeight.Bold else FontWeight.Normal)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                ActiveTool.Rotate -> {
+                                    ToolSelectedFileCard(
+                                        filePath = selectedSingleFilePath,
+                                        allPdfFiles = uiState.allPdfFiles,
+                                        onChangeFile = { showLibraryPickerSheet = true },
+                                        onPreviewFile = { path, name -> viewModel.selectPdf(path, name) }
+                                    )
+
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                        shape = RoundedCornerShape(16.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Text("إعدادات التدوير", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            OutlinedTextField(
+                                                value = targetFileName,
+                                                onValueChange = { targetFileName = it },
+                                                label = { Text("اسم الملف الناتج") },
+                                                singleLine = true,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Text("درجة التدوير المطلوبة", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                listOf(90 to "90° مع العقارب", 180 to "180° رأساً", 270 to "270° عكس العقارب").forEach { (deg, label) ->
+                                                    FilterChip(
+                                                        selected = rotateDegrees == deg,
+                                                        onClick = { rotateDegrees = deg },
+                                                        label = { Text(label, fontSize = 11.sp) },
+                                                        modifier = Modifier.weight(1f)
+                                                    )
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            OutlinedTextField(
+                                                value = rotateTargetPage,
+                                                onValueChange = { rotateTargetPage = it },
+                                                label = { Text("الصفحة المستهدفة (-1 لجميع الصفحات)") },
+                                                singleLine = true,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                    }
+                                }
+
+                                ActiveTool.Reorder -> {
+                                    ToolSelectedFileCard(
+                                        filePath = selectedSingleFilePath,
+                                        allPdfFiles = uiState.allPdfFiles,
+                                        onChangeFile = { showLibraryPickerSheet = true },
+                                        onPreviewFile = { path, name -> viewModel.selectPdf(path, name) }
+                                    )
+
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                        shape = RoundedCornerShape(16.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Text("إعدادات الترتيب والاسم", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            OutlinedTextField(
+                                                value = targetFileName,
+                                                onValueChange = { targetFileName = it },
+                                                label = { Text("اسم الملف الناتج") },
+                                                singleLine = true,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Text("ترتيب الصفحات الجديد", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                            Text("أدخل أرقام الصفحات بالترتيب الجديد مفصولة بفواصل:", fontSize = 11.sp, color = Color.Gray)
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            OutlinedTextField(
+                                                value = reorderSequence,
+                                                onValueChange = { reorderSequence = it },
+                                                placeholder = { Text("مثال: 3, 1, 2, 4") },
+                                                singleLine = true,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                    }
+                                }
+
+                                ActiveTool.DeletePages -> {
+                                    ToolSelectedFileCard(
+                                        filePath = selectedSingleFilePath,
+                                        allPdfFiles = uiState.allPdfFiles,
+                                        onChangeFile = { showLibraryPickerSheet = true },
+                                        onPreviewFile = { path, name -> viewModel.selectPdf(path, name) }
+                                    )
+
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                        shape = RoundedCornerShape(16.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Text("إعدادات الحذف والاسم", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            OutlinedTextField(
+                                                value = targetFileName,
+                                                onValueChange = { targetFileName = it },
+                                                label = { Text("اسم الملف الناتج") },
+                                                singleLine = true,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Text("أرقام الصفحات المراد حذفها", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                            Text("أدخل الصفحات المراد حذفها مفصولة بفواصل:", fontSize = 11.sp, color = Color.Gray)
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            OutlinedTextField(
+                                                value = deletePagesSetInput,
+                                                onValueChange = { deletePagesSetInput = it },
+                                                placeholder = { Text("مثال: 2, 4") },
+                                                singleLine = true,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                    }
+                                }
+
+                                ActiveTool.ImageToPdf -> {
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                        shape = RoundedCornerShape(16.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Text("الصور المحددة (${selectedImagePaths.size})", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Button(
+                                                onClick = { imagePickerLauncher.launch("image/*") },
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Icon(Icons.Default.Add, contentDescription = null)
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text("إضافة صور من المعرض")
+                                            }
+
+                                            if (selectedImagePaths.isNotEmpty()) {
+                                                Spacer(modifier = Modifier.height(12.dp))
+                                                selectedImagePaths.forEachIndexed { index, path ->
+                                                    val file = File(path)
+                                                    Surface(
+                                                        shape = RoundedCornerShape(8.dp),
+                                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                                                    ) {
+                                                        Row(
+                                                            verticalAlignment = Alignment.CenterVertically,
+                                                            modifier = Modifier.padding(8.dp)
+                                                        ) {
+                                                            Text("${index + 1}. ${file.name}", fontSize = 12.sp, modifier = Modifier.weight(1f), maxLines = 1)
+                                                            IconButton(
+                                                                onClick = {
+                                                                    selectedImagePaths = selectedImagePaths.toMutableList().apply { removeAt(index) }
+                                                                },
+                                                                modifier = Modifier.size(28.dp)
+                                                            ) {
+                                                                Icon(Icons.Default.Delete, contentDescription = "حذف", tint = Color.Red, modifier = Modifier.size(18.dp))
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                        shape = RoundedCornerShape(16.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Text("إعدادات الملف الناتج", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            OutlinedTextField(
+                                                value = targetFileName,
+                                                onValueChange = { targetFileName = it },
+                                                label = { Text("اسم ملف الـ PDF الناتج") },
+                                                singleLine = true,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                    }
+                                }
+
+                                ActiveTool.PdfToImages -> {
+                                    ToolSelectedFileCard(
+                                        filePath = selectedSingleFilePath,
+                                        allPdfFiles = uiState.allPdfFiles,
+                                        onChangeFile = { showLibraryPickerSheet = true },
+                                        onPreviewFile = { path, name -> viewModel.selectPdf(path, name) }
+                                    )
+
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                        shape = RoundedCornerShape(16.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Text("صيغة الصور الناتجة:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { pdfToImagesFormat = "PNG" }) {
+                                                    RadioButton(selected = pdfToImagesFormat == "PNG", onClick = { pdfToImagesFormat = "PNG" })
+                                                    Text("PNG (جودة عالية)", fontSize = 13.sp)
+                                                }
+                                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { pdfToImagesFormat = "JPG" }) {
+                                                    RadioButton(selected = pdfToImagesFormat == "JPG", onClick = { pdfToImagesFormat = "JPG" })
+                                                    Text("JPG (حجم مدمج)", fontSize = 13.sp)
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            OutlinedTextField(
+                                                value = pdfToImagesPages,
+                                                onValueChange = { pdfToImagesPages = it },
+                                                label = { Text("تصدير صفحات معينة (اختياري)") },
+                                                placeholder = { Text("مثال: 1, 2, 5-8 (اتركه فارغاً للكل)") },
+                                                singleLine = true,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                    }
+                                }
+
+                                ActiveTool.LockPdf -> {
+                                    ToolSelectedFileCard(
+                                        filePath = selectedSingleFilePath,
+                                        allPdfFiles = uiState.allPdfFiles,
+                                        onChangeFile = { showLibraryPickerSheet = true },
+                                        onPreviewFile = { path, name -> viewModel.selectPdf(path, name) }
+                                    )
+
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                        shape = RoundedCornerShape(16.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Text("إعدادات التشفير والكلمة السرية", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            OutlinedTextField(
+                                                value = targetFileName,
+                                                onValueChange = { targetFileName = it },
+                                                label = { Text("اسم الملف الناتج") },
+                                                singleLine = true,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            OutlinedTextField(
+                                                value = lockPassword,
+                                                onValueChange = { lockPassword = it },
+                                                label = { Text("كلمة سر فتح الملف") },
+                                                singleLine = true,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                    }
+
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                        shape = RoundedCornerShape(16.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Text("خيارات الصلاحيات", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { lockAllowPrinting = !lockAllowPrinting }) {
+                                                Checkbox(checked = lockAllowPrinting, onCheckedChange = { lockAllowPrinting = it })
+                                                Text("السماح بطباعة الملف", fontSize = 13.sp)
+                                            }
+                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { lockAllowCopying = !lockAllowCopying }) {
+                                                Checkbox(checked = lockAllowCopying, onCheckedChange = { lockAllowCopying = it })
+                                                Text("السماح بنسخ النصوص والمحتوى", fontSize = 13.sp)
+                                            }
+                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { lockAllowModifying = !lockAllowModifying }) {
+                                                Checkbox(checked = lockAllowModifying, onCheckedChange = { lockAllowModifying = it })
+                                                Text("السماح بتعديل صفحات الملف", fontSize = 13.sp)
+                                            }
+                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { lockAllowAnnotations = !lockAllowAnnotations }) {
+                                                Checkbox(checked = lockAllowAnnotations, onCheckedChange = { lockAllowAnnotations = it })
+                                                Text("السماح بإضافة تعليقات وشروح", fontSize = 13.sp)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                ActiveTool.UnlockPdf -> {
+                                    ToolSelectedFileCard(
+                                        filePath = selectedSingleFilePath,
+                                        allPdfFiles = uiState.allPdfFiles,
+                                        onChangeFile = { showLibraryPickerSheet = true },
+                                        onPreviewFile = { path, name -> viewModel.selectPdf(path, name) }
+                                    )
+
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                        shape = RoundedCornerShape(16.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Text("إعدادات فك التشفير", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            OutlinedTextField(
+                                                value = targetFileName,
+                                                onValueChange = { targetFileName = it },
+                                                label = { Text("اسم الملف الناتج") },
+                                                singleLine = true,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            OutlinedTextField(
+                                                value = unlockPassword,
+                                                onValueChange = { unlockPassword = it },
+                                                label = { Text("كلمة السر الحالية لفتح الملف") },
+                                                singleLine = true,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                    }
+                                }
+
+                                ActiveTool.CloudOcr -> {
+                                    ToolSelectedFileCard(
+                                        filePath = selectedSingleFilePath,
+                                        allPdfFiles = uiState.allPdfFiles,
+                                        onChangeFile = { showLibraryPickerSheet = true },
+                                        onPreviewFile = { path, name -> viewModel.selectPdf(path, name) }
+                                    )
+
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                        shape = RoundedCornerShape(16.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp)) {
+                                            Text("إعدادات التصدير واللغة", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            Spacer(modifier = Modifier.height(10.dp))
+                                            OutlinedTextField(
+                                                value = targetFileName,
+                                                onValueChange = { targetFileName = it },
+                                                label = { Text("اسم الملف الناتج") },
+                                                singleLine = true,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                            Spacer(modifier = Modifier.height(14.dp))
+                                            Text("لغة التعرف الضوئي (OCR):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                listOf("ara" to "العربية 🇸🇦", "eng" to "الإنجليزي 🇬🇧", "deu" to "الألماني 🇩🇪").forEach { (code, name) ->
+                                                    val isSelected = ocrLanguage == code
+                                                    FilterChip(
+                                                        selected = isSelected,
+                                                        onClick = { ocrLanguage = code },
+                                                        label = { Text(name, fontSize = 12.sp) },
+                                                        leadingIcon = if (isSelected) {
+                                                            { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                                        } else null,
+                                                        modifier = Modifier.weight(1f)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                else -> {}
+                            }
 
                         if (isProcessing) {
                             Card(
@@ -3615,6 +3785,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
             }
         }
     }
+}
 
     if (completedResultFilePath != null) {
         ToolResultDialog(
@@ -3627,6 +3798,61 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
             onShare = { path ->
                 sharePdfFile(context, path)
             }
+        )
+    }
+
+    if (showLibraryPickerSheet) {
+        LibraryPdfPickerSheet(
+            allPdfFiles = uiState.allPdfFiles,
+            onFileSelected = { path, name ->
+                showLibraryPickerSheet = false
+                val cleanName = name.replace(".pdf", "", ignoreCase = true).replace("_", " ")
+                when (activeTool) {
+                    ActiveTool.Merge -> {
+                        selectedFilePaths = selectedFilePaths + path
+                    }
+                    ActiveTool.Split -> {
+                        selectedSingleFilePath = path
+                        targetFileName = "${cleanName}_مقسم"
+                    }
+                    ActiveTool.Compress -> {
+                        selectedSingleFilePath = path
+                        targetFileName = "${cleanName}_مضغوط"
+                    }
+                    ActiveTool.Rotate -> {
+                        selectedSingleFilePath = path
+                        targetFileName = "${cleanName}_مدور"
+                    }
+                    ActiveTool.Reorder -> {
+                        selectedSingleFilePath = path
+                        targetFileName = "${cleanName}_مرتب"
+                    }
+                    ActiveTool.DeletePages -> {
+                        selectedSingleFilePath = path
+                        targetFileName = "${cleanName}_بعد_الحذف"
+                    }
+                    ActiveTool.PdfToImages -> {
+                        selectedSingleFilePath = path
+                        targetFileName = cleanName
+                    }
+                    ActiveTool.LockPdf -> {
+                        selectedSingleFilePath = path
+                        targetFileName = "${cleanName}_محمي"
+                    }
+                    ActiveTool.UnlockPdf -> {
+                        selectedSingleFilePath = path
+                        targetFileName = "${cleanName}_مفتوح"
+                    }
+                    ActiveTool.CloudOcr -> {
+                        selectedSingleFilePath = path
+                        targetFileName = "${cleanName}_OCR"
+                    }
+                    else -> {
+                        selectedSingleFilePath = path
+                    }
+                }
+            },
+            onDismiss = { showLibraryPickerSheet = false }
         )
     }
 }
@@ -4239,16 +4465,6 @@ fun SettingsTabScreen(
             }
         }
     }
-}
-
-enum class SettingSheetType {
-    APP_THEME,
-    SCROLL_MODE,
-    DEFAULT_ZOOM,
-    DOUBLE_TAP_ZOOM,
-    READING_THEME,
-    BRIGHTNESS,
-    SCREEN_ORIENTATION
 }
 
 @Composable

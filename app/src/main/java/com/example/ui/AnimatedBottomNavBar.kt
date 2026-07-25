@@ -29,14 +29,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Construction
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.outlined.Construction
+import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -262,7 +266,7 @@ fun DashboardAnimatedBottomNavBar(
             add(
                 BottomNavItem(
                     route = DashboardTab.Home.name,
-                    label = "الرئيسية",
+                    label = "الصفحة الرئيسية",
                     icon = Icons.Outlined.Home,
                     selectedIcon = Icons.Filled.Home
                 )
@@ -270,18 +274,18 @@ fun DashboardAnimatedBottomNavBar(
             add(
                 BottomNavItem(
                     route = DashboardTab.Folders.name,
-                    label = "المجلدات",
-                    icon = Icons.Outlined.Folder,
-                    selectedIcon = Icons.Filled.Folder
+                    label = "ملف",
+                    icon = Icons.Outlined.Description,
+                    selectedIcon = Icons.Filled.Description
                 )
             )
             if (showTools) {
                 add(
                     BottomNavItem(
                         route = DashboardTab.Tools.name,
-                        label = "الأدوات",
-                        icon = Icons.Outlined.Construction,
-                        selectedIcon = Icons.Filled.Construction
+                        label = "أدوات",
+                        icon = Icons.Outlined.Widgets,
+                        selectedIcon = Icons.Filled.Widgets
                     )
                 )
             }
