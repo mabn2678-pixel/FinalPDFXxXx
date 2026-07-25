@@ -52,7 +52,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import com.example.BuildConfig
 import com.example.data.SecureKeyManager
@@ -252,624 +255,522 @@ fun CameraOcrSheet(
         }
     }
 
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { fileUri ->
+            coroutineScope.launch {
+                try {
+                    isScanning = true
+                    scanStatusMessage = "جاري فتح وتمحيص المستند المستورد..."
+                    val inputStream = context.contentResolver.openInputStream(fileUri)
+                    val loadedBitmap = BitmapFactory.decodeStream(inputStream)
+                    inputStream?.close()
+                    if (loadedBitmap != null) {
+                        capturedBitmap = loadedBitmap
+                        val res = processMultiLanguageCameraOcr(context, loadedBitmap, preferOnlineAi)
+                        ocrResult = res
+                        if (res.isApiKeyError) {
+                            showApiKeyDialog = true
+                        }
+                    } else {
+                        Toast.makeText(context, "تم استيراد الملف: ${fileUri.lastPathSegment}", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(context, "خطأ أثناء فتح الملف: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                } finally {
+                    isScanning = false
+                }
+            }
+        }
+    }
+
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
     var camera by remember { mutableStateOf<Camera?>(null) }
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     var previewViewRef by remember { mutableStateOf<PreviewView?>(null) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = 16.dp)
-            .padding(bottom = 20.dp)
+    var isBatchMode by remember { mutableStateOf(false) }
+    var selectedScannerMode by remember { mutableStateOf("المسح الضوئي") }
+    var isHdMode by remember { mutableStateOf(true) }
+    var showMoreOptionsMenu by remember { mutableStateOf(false) }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
     ) {
-        // Header
-        Row(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .fillMaxSize()
+                .background(Color.Black)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = CircleShape,
-                    modifier = Modifier.size(38.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+            ) {
+                // Top CamScanner Header Bar
+                CamScannerTopBar(
+                    flashEnabled = flashEnabled,
+                    onToggleFlash = {
+                        flashEnabled = !flashEnabled
+                        camera?.cameraControl?.enableTorch(flashEnabled)
+                    },
+                    hdEnabled = isHdMode,
+                    onToggleHd = {
+                        isHdMode = !isHdMode
+                        Toast.makeText(context, if (isHdMode) "وضع دقة HD مفعل" else "الوضع العادي", Toast.LENGTH_SHORT).show()
+                    },
+                    magicEnabled = preferOnlineAi,
+                    onToggleMagic = {
+                        preferOnlineAi = !preferOnlineAi
+                        if (preferOnlineAi && !SecureKeyManager.hasSavedKey(context)) {
+                            showApiKeyDialog = true
+                        } else {
+                            Toast.makeText(context, if (preferOnlineAi) "محسن الذكاء السحابي مفعل" else "المحرك المحلي أوفلاين", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    onMoreClick = { showMoreOptionsMenu = true },
+                    onClose = onDismiss
+                )
+
+                // Main Camera View Container
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .background(Color.Black)
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Outlined.DocumentScanner,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
+                    if (!hasCameraPermission) {
+                        // Permission View inside full screen
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.PhotoCamera,
+                                contentDescription = null,
+                                tint = Color(0xFF00E5A3),
+                                modifier = Modifier.size(64.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "إذن الكاميرا مطلوب",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp,
+                                color = Color.White
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "يتطلب الماسح الضوئي الوصول إلى كاميرا الجهاز لتصوير المستندات والأوراق وقراءتها.",
+                                fontSize = 13.sp,
+                                color = Color.White.copy(alpha = 0.7f),
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Button(
+                                onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5A3)),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(imageVector = Icons.Default.CameraAlt, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("منح إذن الكاميرا", fontWeight = FontWeight.Bold, color = Color.Black)
+                            }
+                        }
+                    } else if (capturedBitmap != null) {
+                        Image(
+                            bitmap = capturedBitmap!!.asImageBitmap(),
+                            contentDescription = "الصورة المصورة",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        val lifecycleOwner = LocalLifecycleOwner.current
+
+                        DisposableEffect(lifecycleOwner) {
+                            onDispose {
+                                try {
+                                    if (cameraProviderFuture.isDone) {
+                                        cameraProviderFuture.get().unbindAll()
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("CameraOcr", "Error unbinding camera on dispose", e)
+                                }
+                            }
+                        }
+
+                        androidx.compose.ui.viewinterop.AndroidView(
+                            factory = { ctx ->
+                                val previewView = PreviewView(ctx).apply {
+                                    scaleType = PreviewView.ScaleType.FILL_CENTER
+                                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                                }
+                                previewViewRef = previewView
+
+                                cameraProviderFuture.addListener({
+                                    try {
+                                        val cameraProvider = cameraProviderFuture.get()
+                                        val preview = Preview.Builder().build().also {
+                                            it.setSurfaceProvider(previewView.surfaceProvider)
+                                        }
+
+                                        val capture = ImageCapture.Builder()
+                                            .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                                            .build()
+                                        imageCapture = capture
+
+                                        val cameraSelector = CameraSelector.Builder()
+                                            .requireLensFacing(lensFacing)
+                                            .build()
+
+                                        cameraProvider.unbindAll()
+                                        camera = cameraProvider.bindToLifecycle(
+                                            lifecycleOwner,
+                                            cameraSelector,
+                                            preview,
+                                            capture
+                                        )
+                                    } catch (exc: Exception) {
+                                        Log.e("CameraOcr", "Use case binding failed", exc)
+                                    }
+                                }, ContextCompat.getMainExecutor(ctx))
+
+                                previewView
+                            },
+                            onRelease = {
+                                try {
+                                    if (cameraProviderFuture.isDone) {
+                                        cameraProviderFuture.get().unbindAll()
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("CameraOcr", "Error releasing camera in AndroidView", e)
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize()
                         )
                     }
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                Column {
-                    Text(
-                        text = "ماسح الكاميرا الضوئي (Camera OCR)",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "استخراج النصوص العربية والألمانية والإنجليزية بثوانٍ",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
 
-            IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "إغلاق",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
+                    // Framing guidelines
+                    DocumentFrameOverlay(isScanning = isScanning)
 
-        // Language Pills & Engine Toggle
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            LanguageBadge("العربية")
-            LanguageBadge("الألمانية")
-            LanguageBadge("الإنجليزية")
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            FilterChip(
-                selected = preferOnlineAi,
-                onClick = {
-                    preferOnlineAi = !preferOnlineAi
-                    if (preferOnlineAi && !SecureKeyManager.hasSavedKey(context)) {
-                        showApiKeyDialog = true
+                    // Single vs Batch Pill Selector overlay near bottom of camera preview
+                    if (hasCameraPermission && ocrResult == null) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 16.dp)
+                        ) {
+                            SingleBatchPillSelector(
+                                isBatch = isBatchMode,
+                                onModeSelected = { isBatchMode = it }
+                            )
+                        }
                     }
-                },
-                label = {
-                    Text(
-                        text = if (preferOnlineAi) "ذكاء أونلاين" else "أوفلاين محلي",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = if (preferOnlineAi) Icons.Default.CloudSync else Icons.Default.CloudOff,
-                        contentDescription = null,
-                        modifier = Modifier.size(12.dp)
-                    )
-                },
-                shape = RoundedCornerShape(20.dp),
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.primary
-                )
-            )
 
-            IconButton(
-                onClick = { showApiKeyDialog = true },
-                modifier = Modifier.size(28.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.VpnKey,
-                    contentDescription = "مفتاح Gemini API",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
+                    // Progress Loader when scanning
+                    if (isScanning) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.5f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xEE1C182B)),
+                                shape = RoundedCornerShape(20.dp),
+                                modifier = Modifier.padding(24.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    CircularProgressIndicator(
+                                        color = Color(0xFF00E5A3),
+                                        strokeWidth = 3.dp,
+                                        modifier = Modifier.size(40.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = scanStatusMessage.ifEmpty { "جاري معالجة المستند والمحاذاة الذكية..." },
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = if (preferOnlineAi) "مستخرج النصوص بالذكاء الاصطناعي السحابي" else "محرك ML Kit المحلي",
+                                        color = Color(0xFF00E5A3),
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Modes Scroll Bar
+                CamScannerModesBar(
+                    selectedMode = selectedScannerMode,
+                    onModeSelected = { selectedScannerMode = it }
+                )
+
+                // Bottom Control Bar
+                CamScannerBottomBar(
+                    onImportFiles = { filePickerLauncher.launch("*/*") },
+                    onImportImages = { galleryLauncher.launch("image/*") },
+                    onCapture = {
+                        isScanning = true
+                        scanStatusMessage = if (preferOnlineAi) {
+                            "جاري التقاط المستند واستخراج النصوص بالسحابة..."
+                        } else {
+                            "جاري تحليل الصورة بالمحرك المحلي..."
+                        }
+
+                        val capture = imageCapture
+                        if (capture != null) {
+                            val executor = Executors.newSingleThreadExecutor()
+                            capture.takePicture(
+                                executor,
+                                object : ImageCapture.OnImageCapturedCallback() {
+                                    override fun onCaptureSuccess(image: ImageProxy) {
+                                        val rotationDegrees = image.imageInfo.rotationDegrees
+                                        val buffer = image.planes[0].buffer
+                                        val bytes = ByteArray(buffer.capacity())
+                                        buffer.get(bytes)
+                                        val originalBmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                                        image.close()
+
+                                        val rotatedBmp = if (rotationDegrees != 0 && originalBmp != null) {
+                                            val matrix = Matrix()
+                                            matrix.postRotate(rotationDegrees.toFloat())
+                                            Bitmap.createBitmap(
+                                                originalBmp,
+                                                0,
+                                                0,
+                                                originalBmp.width,
+                                                originalBmp.height,
+                                                matrix,
+                                                true
+                                            )
+                                        } else {
+                                            originalBmp
+                                        }
+
+                                        coroutineScope.launch {
+                                            capturedBitmap = rotatedBmp
+                                            if (rotatedBmp != null) {
+                                                val res = processMultiLanguageCameraOcr(context, rotatedBmp, preferOnlineAi)
+                                                ocrResult = res
+                                                if (res.isApiKeyError) {
+                                                    showApiKeyDialog = true
+                                                }
+                                                isScanning = false
+                                            } else {
+                                                isScanning = false
+                                                Toast.makeText(context, "فشل التقاط الصورة", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    }
+
+                                    override fun onError(exception: ImageCaptureException) {
+                                        Log.e("CameraOcr", "Capture failed: ${exception.message}", exception)
+                                        coroutineScope.launch {
+                                            val previewBmp = previewViewRef?.bitmap
+                                            if (previewBmp != null) {
+                                                capturedBitmap = previewBmp
+                                                val res = processMultiLanguageCameraOcr(context, previewBmp, preferOnlineAi)
+                                                ocrResult = res
+                                                if (res.isApiKeyError) {
+                                                    showApiKeyDialog = true
+                                                }
+                                                isScanning = false
+                                            } else {
+                                                isScanning = false
+                                                Toast.makeText(context, "خطأ في التقاط الصورة: ${exception.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    }
+                                }
+                            )
+                        } else {
+                            val bmp = previewViewRef?.bitmap
+                            if (bmp != null) {
+                                capturedBitmap = bmp
+                                coroutineScope.launch {
+                                    val res = processMultiLanguageCameraOcr(context, bmp, preferOnlineAi)
+                                    ocrResult = res
+                                    isScanning = false
+                                }
+                            } else {
+                                isScanning = false
+                                Toast.makeText(context, "الكاميرا غير جاهزة بعد، يمكنك استيراد صور أو ملفات", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
+                    onAllFeatures = { showApiKeyDialog = true }
                 )
             }
-        }
 
-        if (!hasCameraPermission) {
-            // Permission request UI
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(280.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-            ) {
-                Column(
+            // OCR Result Bottom Sheet overlay when text is recognized
+            if (ocrResult != null) {
+                val res = ocrResult!!
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                        .background(Color.Black.copy(alpha = 0.7f))
+                        .padding(16.dp),
+                    contentAlignment = Alignment.BottomCenter
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.PhotoCamera,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(56.dp)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "إذن الكاميرا مطلوب",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "يتطلب الماسح الضوئي الوصول إلى كاميرا الجهاز لتصوير المستندات والأوراق وقراءتها.",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(20.dp))
-                    Button(
-                        onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(imageVector = Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("منح إذن الكاميرا", fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        } else if (ocrResult != null) {
-            // Display Results Screen
-            val res = ocrResult!!
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 380.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
-                                color = if (res.isOnline) Color(0xFFE3F2FD) else Color(0xFFE8F5E9),
-                                shape = CircleShape,
-                                modifier = Modifier.size(26.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = if (res.isOnline) Icons.Default.Language else Icons.Default.Check,
-                                        contentDescription = null,
-                                        tint = if (res.isOnline) Color(0xFF1565C0) else Color(0xFF2E7D32),
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = res.engineName,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (res.isOnline) Color(0xFF1565C0) else Color(0xFF2E7D32)
-                            )
-                        }
-
-                        Text(
-                            text = "${res.text.length} حرف",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.outline
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    val scrollState = rememberScrollState()
-                    Box(
+                    Card(
                         modifier = Modifier
-                            .weight(1f)
                             .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
-                            .padding(12.dp)
-                            .verticalScroll(scrollState)
+                            .heightIn(max = 500.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                     ) {
-                        Text(
-                            text = res.text.ifBlank { "(لم يتم اكتشاف نصوص في الصورة المصورة)" },
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            lineHeight = 22.sp
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Action Buttons
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                copyTextToClipboardLocal(context, res.text)
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Icon(imageVector = Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("نسخ النص", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        OutlinedButton(
-                            onClick = {
-                                shareTextLocal(context, res.text, "النص المصور بالكاميرا")
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Icon(imageVector = Icons.Outlined.Share, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("مشاركة", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        IconButton(
-                            onClick = {
-                                ocrResult = null
-                                capturedBitmap = null
-                                isScanning = false
-                            },
+                        Column(
                             modifier = Modifier
-                                .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
-                                .size(40.dp)
+                                .fillMaxWidth()
+                                .padding(20.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Replay,
-                                contentDescription = "تصوير آخر",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
-            }
-        } else {
-            // Camera Live Feed or Captured Image Scanning View
-            val lifecycleOwner = LocalLifecycleOwner.current
-
-            DisposableEffect(lifecycleOwner) {
-                onDispose {
-                    try {
-                        if (cameraProviderFuture.isDone) {
-                            cameraProviderFuture.get().unbindAll()
-                        }
-                    } catch (e: Exception) {
-                        Log.e("CameraOcr", "Error unbinding camera on dispose", e)
-                    }
-                }
-            }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(340.dp)
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color.Black)
-            ) {
-                if (capturedBitmap != null) {
-                    // Show captured image
-                    Image(
-                        bitmap = capturedBitmap!!.asImageBitmap(),
-                        contentDescription = "الصورة المصورة",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    // CameraX View
-                    AndroidView(
-                        factory = { ctx ->
-                            val previewView = PreviewView(ctx).apply {
-                                scaleType = PreviewView.ScaleType.FILL_CENTER
-                                implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-                            }
-                            previewViewRef = previewView
-
-                            cameraProviderFuture.addListener({
-                                try {
-                                    val cameraProvider = cameraProviderFuture.get()
-                                    val preview = Preview.Builder().build().also {
-                                        it.setSurfaceProvider(previewView.surfaceProvider)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Surface(
+                                        color = if (res.isOnline) Color(0xFFE3F2FD) else Color(0xFFE8F5E9),
+                                        shape = CircleShape,
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = if (res.isOnline) Icons.Default.Language else Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = if (res.isOnline) Color(0xFF1565C0) else Color(0xFF2E7D32),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
                                     }
-
-                                    val capture = ImageCapture.Builder()
-                                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                                        .build()
-                                    imageCapture = capture
-
-                                    val cameraSelector = CameraSelector.Builder()
-                                        .requireLensFacing(lensFacing)
-                                        .build()
-
-                                    cameraProvider.unbindAll()
-                                    camera = cameraProvider.bindToLifecycle(
-                                        lifecycleOwner,
-                                        cameraSelector,
-                                        preview,
-                                        capture
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = res.engineName,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (res.isOnline) Color(0xFF1565C0) else Color(0xFF2E7D32)
                                     )
-                                } catch (exc: Exception) {
-                                    Log.e("CameraOcr", "Use case binding failed", exc)
                                 }
-                            }, ContextCompat.getMainExecutor(ctx))
 
-                            previewView
-                        },
-                        onRelease = {
-                            try {
-                                if (cameraProviderFuture.isDone) {
-                                    cameraProviderFuture.get().unbindAll()
-                                }
-                            } catch (e: Exception) {
-                                Log.e("CameraOcr", "Error releasing camera in AndroidView", e)
+                                Text(
+                                    text = "${res.text.length} حرف",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
                             }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
 
-                // Document Frame Guidelines & Corner Highlights
-                DocumentFrameOverlay(
-                    isScanning = isScanning
-                )
+                            Spacer(modifier = Modifier.height(12.dp))
 
-                // Flash & Switch Controls Overlay (Top)
-                if (capturedBitmap == null && !isScanning) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp)
-                            .align(Alignment.TopCenter),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        IconButton(
-                            onClick = {
-                                flashEnabled = !flashEnabled
-                                camera?.cameraControl?.enableTorch(flashEnabled)
-                            },
-                            modifier = Modifier
-                                .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                                .size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (flashEnabled) Icons.Default.FlashOn else Icons.Default.FlashOff,
-                                contentDescription = "الكشاف",
-                                tint = if (flashEnabled) Color.Yellow else Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        IconButton(
-                            onClick = {
-                                lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) {
-                                    CameraSelector.LENS_FACING_FRONT
-                                } else {
-                                    CameraSelector.LENS_FACING_BACK
-                                }
-                            },
-                            modifier = Modifier
-                                .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                                .size(36.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Cameraswitch,
-                                contentDescription = "تبديل الكاميرا",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                }
-
-                // Scanning Progress / Shutter Button (Bottom Overlay)
-                if (isScanning) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.35f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xDD1C182B)),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.padding(24.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(20.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                            val scrollState = rememberScrollState()
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                                    .padding(14.dp)
+                                    .verticalScroll(scrollState)
                             ) {
-                                CircularProgressIndicator(
-                                    color = Color(0xFF00FFCC),
-                                    strokeWidth = 3.dp,
-                                    modifier = Modifier.size(36.dp)
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
                                 Text(
-                                    text = scanStatusMessage.ifEmpty { "جاري قراءة الحروف العربية والألمانية والإنجليزية..." },
-                                    color = Color.White,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = if (preferOnlineAi) "الاتصال بالسحابة الذكية (Gemini Vision AI)" else "محرك ML Kit المحلي (أوفلاين)",
-                                    color = Color(0xFF00FFCC),
-                                    fontSize = 10.sp
+                                    text = res.text.ifBlank { "(لم يتم اكتشاف نصوص في المستند المصور)" },
+                                    fontSize = 14.sp,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    lineHeight = 22.sp
                                 )
                             }
-                        }
-                    }
-                } else if (capturedBitmap == null) {
-                    // Control Bar with Gallery Picker, Shutter Button, and Camera Flip
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 14.dp)
-                            .align(Alignment.BottomCenter),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Gallery Picker Button
-                        Surface(
-                            onClick = { galleryLauncher.launch("image/*") },
-                            shape = CircleShape,
-                            color = Color.Black.copy(alpha = 0.6f),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.4f)),
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Outlined.PhotoLibrary,
-                                    contentDescription = "معرض الصور",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        }
 
-                        // Main Shutter Button
-                        Surface(
-                            onClick = {
-                                isScanning = true
-                                scanStatusMessage = if (preferOnlineAi) {
-                                    "جاري الاتصال عبر الإنترنت لتحليل النص العربي والألماني والإنجليزي..."
-                                } else {
-                                    "جاري تحليل الصورة بالمحرك المحلي..."
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Button(
+                                    onClick = { copyTextToClipboardLocal(context, res.text) },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(imageVector = Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("نسخ النص", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                 }
 
-                                val capture = imageCapture
-                                if (capture != null) {
-                                    val executor = Executors.newSingleThreadExecutor()
-                                    capture.takePicture(
-                                        executor,
-                                        object : ImageCapture.OnImageCapturedCallback() {
-                                            override fun onCaptureSuccess(image: ImageProxy) {
-                                                val rotationDegrees = image.imageInfo.rotationDegrees
-                                                val buffer = image.planes[0].buffer
-                                                val bytes = ByteArray(buffer.capacity())
-                                                buffer.get(bytes)
-                                                val originalBmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                                                image.close()
+                                OutlinedButton(
+                                    onClick = { shareTextLocal(context, res.text, "النص المصور بالماسح") },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(imageVector = Icons.Outlined.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("مشاركة", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                }
 
-                                                val rotatedBmp = if (rotationDegrees != 0 && originalBmp != null) {
-                                                    val matrix = Matrix()
-                                                    matrix.postRotate(rotationDegrees.toFloat())
-                                                    Bitmap.createBitmap(
-                                                        originalBmp,
-                                                        0,
-                                                        0,
-                                                        originalBmp.width,
-                                                        originalBmp.height,
-                                                        matrix,
-                                                        true
-                                                    )
-                                                } else {
-                                                    originalBmp
-                                                }
-
-                                                coroutineScope.launch {
-                                                    capturedBitmap = rotatedBmp
-                                                    if (rotatedBmp != null) {
-                                                        val res = processMultiLanguageCameraOcr(context, rotatedBmp, preferOnlineAi)
-                                                        ocrResult = res
-                                                        if (res.isApiKeyError) {
-                                                            showApiKeyDialog = true
-                                                        }
-                                                        isScanning = false
-                                                    } else {
-                                                        isScanning = false
-                                                        Toast.makeText(context, "فشل التقاط الصورة", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                }
-                                            }
-
-                                            override fun onError(exception: ImageCaptureException) {
-                                                Log.e("CameraOcr", "Capture failed: ${exception.message}", exception)
-                                                coroutineScope.launch {
-                                                    val previewBmp = previewViewRef?.bitmap
-                                                    if (previewBmp != null) {
-                                                        capturedBitmap = previewBmp
-                                                        val res = processMultiLanguageCameraOcr(context, previewBmp, preferOnlineAi)
-                                                        ocrResult = res
-                                                        if (res.isApiKeyError) {
-                                                            showApiKeyDialog = true
-                                                        }
-                                                        isScanning = false
-                                                    } else {
-                                                        isScanning = false
-                                                        Toast.makeText(context, "خطأ في التقاط الصورة: ${exception.localizedMessage}", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    )
-                                } else {
-                                    val bmp = previewViewRef?.bitmap
-                                    if (bmp != null) {
-                                        capturedBitmap = bmp
-                                        coroutineScope.launch {
-                                            val res = processMultiLanguageCameraOcr(context, bmp, preferOnlineAi)
-                                            ocrResult = res
-                                            isScanning = false
-                                        }
-                                    } else {
+                                IconButton(
+                                    onClick = {
+                                        ocrResult = null
+                                        capturedBitmap = null
                                         isScanning = false
-                                        Toast.makeText(context, "الكاميرا غير جاهزة بعد، جرب التقاط صورة من المعرض", Toast.LENGTH_SHORT).show()
-                                    }
+                                    },
+                                    modifier = Modifier
+                                        .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                                        .size(44.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Replay,
+                                        contentDescription = "تصوير جديد",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
                                 }
-                            },
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(64.dp),
-                            border = BorderStroke(3.dp, Color.White)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Camera,
-                                    contentDescription = "مسح ضوئي",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(32.dp)
-                                )
-                            }
-                        }
-
-                        // Switch Lens Button
-                        Surface(
-                            onClick = {
-                                lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) {
-                                    CameraSelector.LENS_FACING_FRONT
-                                } else {
-                                    CameraSelector.LENS_FACING_BACK
-                                }
-                            },
-                            shape = CircleShape,
-                            color = Color.Black.copy(alpha = 0.6f),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.4f)),
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Cameraswitch,
-                                    contentDescription = "تبديل الكاميرا",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
-                                )
                             }
                         }
                     }
+                }
+            }
+
+            // More Options Dropdown Menu
+            if (showMoreOptionsMenu) {
+                DropdownMenu(
+                    expanded = showMoreOptionsMenu,
+                    onDismissRequest = { showMoreOptionsMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("إعدادات Gemini API Key") },
+                        leadingIcon = { Icon(Icons.Default.VpnKey, contentDescription = null) },
+                        onClick = {
+                            showMoreOptionsMenu = false
+                            showApiKeyDialog = true
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("تبديل عدسة الكاميرا") },
+                        leadingIcon = { Icon(Icons.Default.Cameraswitch, contentDescription = null) },
+                        onClick = {
+                            showMoreOptionsMenu = false
+                            lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) {
+                                CameraSelector.LENS_FACING_FRONT
+                            } else {
+                                CameraSelector.LENS_FACING_BACK
+                            }
+                        }
+                    )
                 }
             }
         }
@@ -1008,8 +909,15 @@ suspend fun processMultiLanguageCameraOcr(
 ): CameraOcrResult = withContext(Dispatchers.IO) {
     var base64Image = ""
     try {
+        val maxDim = 2048
+        val scaledBmp = if (bitmap.width > maxDim || bitmap.height > maxDim) {
+            val scale = maxDim.toFloat() / Math.max(bitmap.width, bitmap.height)
+            Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
+        } else {
+            bitmap
+        }
         val outputStream = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 92, outputStream)
+        scaledBmp.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
         base64Image = Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
     } catch (e: Exception) {
         e.printStackTrace()
@@ -1036,11 +944,9 @@ suspend fun processMultiLanguageCameraOcr(
                 val imagePart = JSONObject().apply {
                     val inlineData = JSONObject().apply {
                         put("mimeType", "image/jpeg")
-                        put("mime_type", "image/jpeg")
                         put("data", base64Image)
                     }
                     put("inlineData", inlineData)
-                    put("inline_data", inlineData)
                 }
 
                 partsArray.put(textPart)
@@ -1050,17 +956,16 @@ suspend fun processMultiLanguageCameraOcr(
                 put("contents", contentsArray)
             }
 
+            Log.d("GeminiApiDebug", "Sending Gemini Request Payload (first 300 chars): ${jsonPayload.toString().take(300)}...")
+
             val client = OkHttpClient.Builder()
                 .connectTimeout(35, java.util.concurrent.TimeUnit.SECONDS)
                 .readTimeout(35, java.util.concurrent.TimeUnit.SECONDS)
                 .build()
 
             val candidateModels = listOf(
-                "gemini-flash-latest",
-                "gemini-2.5-flash",
-                "gemini-2.0-flash",
-                "gemini-1.5-flash",
-                "gemini-1.5-pro"
+                "gemini-3.5-flash",
+                "gemini-flash-latest"
             )
 
             val mediaType = "application/json; charset=utf-8".toMediaType()
@@ -1171,4 +1076,284 @@ fun shareTextLocal(context: Context, text: String, title: String) {
     }
     val shareIntent = Intent.createChooser(sendIntent, title)
     context.startActivity(shareIntent)
+}
+
+@Composable
+fun CamScannerTopBar(
+    flashEnabled: Boolean,
+    onToggleFlash: () -> Unit,
+    hdEnabled: Boolean,
+    onToggleHd: () -> Unit,
+    magicEnabled: Boolean,
+    onToggleMagic: () -> Unit,
+    onMoreClick: () -> Unit,
+    onClose: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .background(Color.Black)
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        IconButton(onClick = onMoreClick, modifier = Modifier.size(36.dp)) {
+            Icon(
+                imageVector = Icons.Default.MoreVert,
+                contentDescription = "المزيد",
+                tint = Color.White,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            Surface(
+                onClick = onToggleHd,
+                shape = RoundedCornerShape(4.dp),
+                color = if (hdEnabled) Color(0xFF00E5A3) else Color.Transparent,
+                border = BorderStroke(1.dp, if (hdEnabled) Color(0xFF00E5A3) else Color.White)
+            ) {
+                Text(
+                    text = "HD",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (hdEnabled) Color.Black else Color.White,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                )
+            }
+
+            IconButton(onClick = onToggleMagic, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = "تحسين ذكي",
+                    tint = if (magicEnabled) Color(0xFF00E5A3) else Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
+            IconButton(onClick = onToggleFlash, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    imageVector = if (flashEnabled) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                    contentDescription = "الفلاش",
+                    tint = if (flashEnabled) Color(0xFFFFD54F) else Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+
+            IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "إغلاق",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SingleBatchPillSelector(
+    isBatch: Boolean,
+    onModeSelected: (Boolean) -> Unit
+) {
+    Surface(
+        color = Color(0xFF2B2B2B).copy(alpha = 0.85f),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+    ) {
+        Row(
+            modifier = Modifier.padding(3.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                color = if (!isBatch) Color(0xFF666677) else Color.Transparent,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable { onModeSelected(false) }
+            ) {
+                Text(
+                    text = "فردي",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = if (!isBatch) FontWeight.Bold else FontWeight.Normal,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                )
+            }
+
+            Surface(
+                color = if (isBatch) Color(0xFF666677) else Color.Transparent,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable { onModeSelected(true) }
+            ) {
+                Text(
+                    text = "دفعة",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = if (isBatch) FontWeight.Bold else FontWeight.Normal,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CamScannerModesBar(
+    selectedMode: String,
+    onModeSelected: (String) -> Unit
+) {
+    val modes = listOf(
+        "إلى Word",
+        "التوقيع",
+        "المسح الضوئي",
+        "المحو الذكي",
+        "الهوية",
+        "إلى Excel",
+        "ترجمة",
+        "OCR نصوص"
+    )
+
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.Black)
+            .padding(vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(22.dp),
+        contentPadding = PaddingValues(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        items(modes) { mode ->
+            val isSelected = mode == selectedMode
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.clickable { onModeSelected(mode) }
+            ) {
+                Text(
+                    text = mode,
+                    fontSize = 13.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isSelected) Color(0xFF00E5A3) else Color.White.copy(alpha = 0.7f)
+                )
+                if (isSelected) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(16.dp, 3.dp)
+                            .background(Color(0xFF00E5A3), RoundedCornerShape(2.dp))
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CamScannerBottomBar(
+    onImportFiles: () -> Unit,
+    onImportImages: () -> Unit,
+    onCapture: () -> Unit,
+    onAllFeatures: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.Black)
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Import Files
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .clip(CircleShape)
+                .clickable { onImportFiles() }
+                .padding(8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.InsertDriveFile,
+                contentDescription = "استيراد ملفات",
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "استيراد ملفات",
+                fontSize = 10.sp,
+                color = Color.White,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        // Import Images
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .clip(CircleShape)
+                .clickable { onImportImages() }
+                .padding(8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Collections,
+                contentDescription = "استيراد صور",
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "استيراد صور",
+                fontSize = 10.sp,
+                color = Color.White,
+                fontWeight = FontWeight.Medium
+            )
+        }
+
+        // Shutter Button
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(72.dp)
+                .clip(CircleShape)
+                .border(4.dp, Color(0xFF00E5A3), CircleShape)
+                .clickable { onCapture() }
+                .padding(6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.White, CircleShape)
+            )
+        }
+
+        // All Features
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .clip(CircleShape)
+                .clickable { onAllFeatures() }
+                .padding(8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.GridView,
+                contentDescription = "كل المميزات",
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "كل المميزات",
+                fontSize = 10.sp,
+                color = Color.White,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
 }

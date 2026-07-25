@@ -151,7 +151,25 @@ data class PdfUiState(
     val freeTextSize: Float = 14f,
     val freeTextOpacity: Float = 100f,
     val isElementSelected: Boolean = false,
-    val hasUnsavedChanges: Boolean = false
+    val hasUnsavedChanges: Boolean = false,
+
+    // Text Selection & Sticky Notes State
+    val selectedPdfText: String? = null,
+    val showTextSelectionToolbar: Boolean = false,
+    val selectionPageNumber: Int = 1,
+    val stickyNotesList: List<PdfStickyNote> = emptyList(),
+    val showAddStickyNoteDialog: Boolean = false,
+    val textSelectionHighlightColor: String = "#FFEB3B"
+)
+
+data class PdfStickyNote(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val pageNumber: Int,
+    val selectedText: String = "",
+    val noteText: String = "",
+    val colorHex: String = "#FFF59D", // Soft yellow default
+    val timestamp: Long = System.currentTimeMillis(),
+    val isHighlightOnly: Boolean = false
 )
 
 class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
@@ -517,6 +535,130 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
 
     fun markHasUnsavedChanges(hasChanges: Boolean = true) {
         _uiState.update { it.copy(hasUnsavedChanges = hasChanges) }
+    }
+
+    // Text Selection & Sticky Notes Methods
+    fun onTextSelected(text: String, pageNumber: Int) {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) {
+            _uiState.update { it.copy(selectedPdfText = null, showTextSelectionToolbar = false) }
+        } else {
+            _uiState.update {
+                it.copy(
+                    selectedPdfText = trimmed,
+                    selectionPageNumber = if (pageNumber > 0) pageNumber else it.currentPage,
+                    showTextSelectionToolbar = true
+                )
+            }
+        }
+    }
+
+    fun clearTextSelection() {
+        _uiState.update {
+            it.copy(
+                selectedPdfText = null,
+                showTextSelectionToolbar = false
+            )
+        }
+        sendJsCommand("if (window.getSelection) { window.getSelection().removeAllRanges(); }")
+    }
+
+    fun highlightSelectedText(context: Context, colorHex: String = "#FFEB3B") {
+        val selectedText = _uiState.value.selectedPdfText ?: return
+        val page = _uiState.value.selectionPageNumber
+
+        val highlightNote = PdfStickyNote(
+            pageNumber = page,
+            selectedText = selectedText,
+            noteText = "تظليل: $selectedText",
+            colorHex = colorHex,
+            isHighlightOnly = true
+        )
+
+        _uiState.update { curr ->
+            curr.copy(
+                stickyNotesList = curr.stickyNotesList + highlightNote,
+                hasUnsavedChanges = true,
+                textSelectionHighlightColor = colorHex,
+                showTextSelectionToolbar = false
+            )
+        }
+
+        sendJsCommand("""
+            (function() {
+                if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
+                    PDFViewerApplication.pdfViewer.annotationEditorMode = { mode: 9 };
+                    if (PDFViewerApplication.eventBus) {
+                        PDFViewerApplication.eventBus.dispatch('switchannotationeditorparams', {
+                            source: window,
+                            type: 7,
+                            value: '$colorHex'
+                        });
+                    }
+                }
+            })();
+        """.trimIndent())
+
+        clearTextSelection()
+        android.widget.Toast.makeText(context, "تم تظليل النص بنجاح", android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    fun openAddStickyNoteDialog() {
+        _uiState.update { it.copy(showAddStickyNoteDialog = true) }
+    }
+
+    fun closeAddStickyNoteDialog() {
+        _uiState.update { it.copy(showAddStickyNoteDialog = false) }
+    }
+
+    fun addStickyNote(context: Context, noteText: String, colorHex: String = "#FFF59D") {
+        if (noteText.isBlank()) return
+        val selectedText = _uiState.value.selectedPdfText ?: ""
+        val page = if (_uiState.value.selectionPageNumber > 0) _uiState.value.selectionPageNumber else _uiState.value.currentPage
+
+        val newNote = PdfStickyNote(
+            pageNumber = page,
+            selectedText = selectedText,
+            noteText = noteText.trim(),
+            colorHex = colorHex,
+            isHighlightOnly = false
+        )
+
+        _uiState.update { curr ->
+            curr.copy(
+                stickyNotesList = curr.stickyNotesList + newNote,
+                hasUnsavedChanges = true,
+                showAddStickyNoteDialog = false,
+                showTextSelectionToolbar = false
+            )
+        }
+
+        sendJsCommand("""
+            (function() {
+                if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
+                    PDFViewerApplication.pdfViewer.annotationEditorMode = { mode: 3 };
+                    if (PDFViewerApplication.eventBus) {
+                        PDFViewerApplication.eventBus.dispatch('switchannotationeditorparams', {
+                            source: window,
+                            type: 2,
+                            value: '$colorHex'
+                        });
+                    }
+                }
+            })();
+        """.trimIndent())
+
+        clearTextSelection()
+        android.widget.Toast.makeText(context, "تمت إضافة الملاحظة اللاصقة بنجاح", android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    fun deleteStickyNote(noteId: String) {
+        _uiState.update { curr ->
+            curr.copy(
+                stickyNotesList = curr.stickyNotesList.filterNot { it.id == noteId },
+                hasUnsavedChanges = true
+            )
+        }
     }
 
     fun requestSaveAndExit() {
@@ -2211,13 +2353,15 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                                 put("contents", org.json.JSONArray().put(
                                     org.json.JSONObject().put("parts", org.json.JSONArray().apply {
                                         put(org.json.JSONObject().put("text", prompt))
-                                        put(org.json.JSONObject().put("inline_data", org.json.JSONObject().apply {
-                                            put("mime_type", "image/jpeg")
+                                        put(org.json.JSONObject().put("inlineData", org.json.JSONObject().apply {
+                                            put("mimeType", "image/jpeg")
                                             put("data", base64Image)
                                         }))
                                     })
                                 ))
                             }
+
+                            android.util.Log.d("GeminiApiDebug", "PdfViewModel Gemini Request Payload (first 300 chars): ${jsonPayload.toString().take(300)}...")
 
                             val client = okhttp3.OkHttpClient.Builder()
                                 .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
@@ -2225,11 +2369,8 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                                 .build()
 
                             val candidateModels = listOf(
-                                "gemini-flash-latest",
-                                "gemini-2.5-flash",
-                                "gemini-2.0-flash",
-                                "gemini-1.5-flash",
-                                "gemini-1.5-pro"
+                                "gemini-3.5-flash",
+                                "gemini-flash-latest"
                             )
 
                             for (model in candidateModels) {

@@ -134,7 +134,8 @@ enum class BottomSheetType {
     DocumentNavigation,
     OcrText,
     CameraOcr,
-    AnnotationTools
+    AnnotationTools,
+    NotesAndHighlights
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -505,6 +506,27 @@ fun ViewerScreen(
                             .fillMaxSize()
                             .then(if (isBrowsing) Modifier.statusBarsPadding() else Modifier)
                     )
+
+                    // FLOATING CONTEXTUAL TEXT SELECTION TOOLBAR
+                    if (state.showTextSelectionToolbar && !state.selectedPdfText.isNullOrBlank()) {
+                        TextSelectionToolbar(
+                            viewModel = viewModel,
+                            state = state,
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .statusBarsPadding()
+                                .padding(top = 76.dp)
+                        )
+                    }
+
+                    // ADD STICKY NOTE DIALOG
+                    if (state.showAddStickyNoteDialog) {
+                        AddStickyNoteDialog(
+                            viewModel = viewModel,
+                            state = state,
+                            onDismiss = { viewModel.closeAddStickyNoteDialog() }
+                        )
+                    }
                 }
             } else {
                 Box(
@@ -1038,6 +1060,11 @@ fun ViewerScreen(
                                             state = state,
                                             onDismiss = { activeSheet = BottomSheetType.None }
                                         )
+                                        BottomSheetType.NotesAndHighlights -> NotesAndHighlightsSheet(
+                                            viewModel = viewModel,
+                                            state = state,
+                                            onDismiss = { activeSheet = BottomSheetType.None }
+                                        )
                                         else -> {}
                                     }
                                 }
@@ -1108,6 +1135,11 @@ fun ViewerScreen(
                                     onDismiss = { activeSheet = BottomSheetType.None }
                                 )
                                 BottomSheetType.AnnotationTools -> AnnotationToolsSheet(
+                                    viewModel = viewModel,
+                                    state = state,
+                                    onDismiss = { activeSheet = BottomSheetType.None }
+                                )
+                                BottomSheetType.NotesAndHighlights -> NotesAndHighlightsSheet(
                                     viewModel = viewModel,
                                     state = state,
                                     onDismiss = { activeSheet = BottomSheetType.None }
@@ -2232,6 +2264,36 @@ fun PdfWebView(
                             })();
                         """.trimIndent()
                         view?.evaluateJavascript(setupScript, null)
+                        
+                        val selectionScript = """
+                            (function() {
+                                var selDebounce = null;
+                                function notifySelection() {
+                                    if (selDebounce) clearTimeout(selDebounce);
+                                    selDebounce = setTimeout(function() {
+                                        var sel = window.getSelection();
+                                        if (sel && !sel.isCollapsed) {
+                                            var text = sel.toString().trim();
+                                            if (text.length > 0) {
+                                                var pageNum = 1;
+                                                try {
+                                                    if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
+                                                        pageNum = PDFViewerApplication.pdfViewer.currentPageNumber || 1;
+                                                    }
+                                                } catch(e) {}
+                                                if (typeof AndroidBridge !== 'undefined' && AndroidBridge.onTextSelected) {
+                                                    AndroidBridge.onTextSelected(text, pageNum);
+                                                }
+                                            }
+                                        }
+                                    }, 200);
+                                }
+                                document.addEventListener('selectionchange', notifySelection);
+                                document.addEventListener('mouseup', notifySelection);
+                                document.addEventListener('touchend', notifySelection);
+                            })();
+                        """.trimIndent()
+                        view?.evaluateJavascript(selectionScript, null)
                     }
                 }
 
@@ -2331,6 +2393,13 @@ fun PdfWebView(
                     fun onPdfSaveFailed(error: String) {
                         coroutineScope.launch {
                             viewModel.onPdfSaveFailed(context, error)
+                        }
+                    }
+
+                    @android.webkit.JavascriptInterface
+                    fun onTextSelected(text: String, pageNumber: Int) {
+                        coroutineScope.launch {
+                            viewModel.onTextSelected(text, pageNumber)
                         }
                     }
                 }, "AndroidBridge")
@@ -2494,6 +2563,13 @@ fun MoreOptionsSheet(
         ) {
             // Grid columns
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                MoreOptionGridItem(
+                    icon = Icons.Outlined.StickyNote2,
+                    label = "الملاحظات والتظليلات",
+                    onClick = {
+                        onNavigate(BottomSheetType.NotesAndHighlights)
+                    }
+                )
                 MoreOptionGridItem(
                     icon = Icons.Outlined.PhotoCamera,
                     label = "ماسح الكاميرا الضوئي",
@@ -5273,11 +5349,9 @@ suspend fun extractTextFromPdfPageOnline(
                 val imagePart = JSONObject().apply {
                     val inlineData = JSONObject().apply {
                         put("mimeType", "image/jpeg")
-                        put("mime_type", "image/jpeg")
                         put("data", base64Image)
                     }
                     put("inlineData", inlineData)
-                    put("inline_data", inlineData)
                 }
 
                 partsArray.put(textPart)
@@ -5287,6 +5361,8 @@ suspend fun extractTextFromPdfPageOnline(
                 put("contents", contentsArray)
             }
 
+            android.util.Log.d("GeminiApiDebug", "ViewerScreen Gemini Request Payload (first 300 chars): ${jsonPayload.toString().take(300)}...")
+
             val client = OkHttpClient.Builder()
                 .connectTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
                 .readTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
@@ -5294,11 +5370,8 @@ suspend fun extractTextFromPdfPageOnline(
 
             // Try valid Gemini model endpoints
             val candidateModels = listOf(
-                "gemini-flash-latest",
-                "gemini-2.5-flash",
-                "gemini-2.0-flash",
-                "gemini-1.5-flash",
-                "gemini-1.5-pro"
+                "gemini-3.5-flash",
+                "gemini-flash-latest"
             )
 
             val mediaType = "application/json; charset=utf-8".toMediaType()
@@ -6283,4 +6356,636 @@ private fun parseAnnotationColor(hex: String): Color {
 private fun isColorDark(color: Color): Boolean {
     val luminance = 0.299f * color.red + 0.587f * color.green + 0.114f * color.blue
     return luminance < 0.5f
+}
+
+// ----------------- TEXT SELECTION & STICKY NOTES COMPONENTS -----------------
+
+fun speakText(context: Context, text: String) {
+    try {
+        val ttsHolder = arrayOfNulls<android.speech.tts.TextToSpeech>(1)
+        ttsHolder[0] = android.speech.tts.TextToSpeech(context) { status ->
+            if (status == android.speech.tts.TextToSpeech.SUCCESS) {
+                ttsHolder[0]?.language = Locale.getDefault()
+                ttsHolder[0]?.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "SELECTED_TEXT_TTS")
+            }
+        }
+    } catch (e: Exception) {
+        Toast.makeText(context, "تعذر تشغيل القراءة الصوتية", Toast.LENGTH_SHORT).show()
+    }
+}
+
+@Composable
+fun TextSelectionToolbar(
+    viewModel: PdfViewModel,
+    state: PdfUiState,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val selectedText = state.selectedPdfText ?: return
+    var showColorPicker by remember { mutableStateOf(false) }
+
+    AnimatedVisibility(
+        visible = state.showTextSelectionToolbar && selectedText.isNotBlank(),
+        enter = slideInVertically(initialOffsetY = { -it / 2 }) + fadeIn() + scaleIn(initialScale = 0.9f),
+        exit = slideOutVertically(targetOffsetY = { -it / 2 }) + fadeOut() + scaleOut(targetScale = 0.9f),
+        modifier = modifier
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .widthIn(max = 480.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = Color(0xF21C1B20),
+            tonalElevation = 8.dp,
+            shadowElevation = 12.dp,
+            border = BorderStroke(1.dp, Color(0x407C5CFF))
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+            ) {
+                // Header Row: Quote icon, selected text snippet, close button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color(0xFF7C5CFF).copy(alpha = 0.2f),
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.FormatQuote,
+                                contentDescription = null,
+                                tint = Color(0xFFB39DDB),
+                                modifier = Modifier
+                                    .padding(4.dp)
+                                    .size(16.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "\"${if (selectedText.length > 35) selectedText.take(35) + "..." else selectedText}\"",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    IconButton(
+                        onClick = { viewModel.clearTextSelection() },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "إلغاء التحديد",
+                            tint = Color.White.copy(alpha = 0.7f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    color = Color.White.copy(alpha = 0.12f)
+                )
+
+                // Quick Highlight Color Picker Bar (if toggled)
+                if (showColorPicker) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        val highlightColors = listOf(
+                            "#FFEB3B" to Color(0xFFFFEB3B), // Yellow
+                            "#4CAF50" to Color(0xFF4CAF50), // Green
+                            "#2196F3" to Color(0xFF2196F3), // Blue
+                            "#E91E63" to Color(0xFFE91E63), // Pink
+                            "#FF9800" to Color(0xFFFF9800)  // Orange
+                        )
+                        highlightColors.forEach { (hex, color) ->
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .border(BorderStroke(2.dp, Color.White), CircleShape)
+                                    .clickable {
+                                        viewModel.highlightSelectedText(context, hex)
+                                        showColorPicker = false
+                                    }
+                            )
+                        }
+                    }
+                }
+
+                // Action Buttons Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SelectionActionButton(
+                        icon = Icons.Default.BorderColor,
+                        label = "تظليل",
+                        tint = Color(0xFFFFEB3B),
+                        onClick = {
+                            if (showColorPicker) {
+                                viewModel.highlightSelectedText(context, state.textSelectionHighlightColor)
+                                showColorPicker = false
+                            } else {
+                                showColorPicker = true
+                            }
+                        }
+                    )
+
+                    SelectionActionButton(
+                        icon = Icons.Outlined.StickyNote2,
+                        label = "ملاحظة",
+                        tint = Color(0xFF81D4FA),
+                        onClick = {
+                            viewModel.openAddStickyNoteDialog()
+                        }
+                    )
+
+                    SelectionActionButton(
+                        icon = Icons.Outlined.ContentCopy,
+                        label = "نسخ",
+                        tint = Color(0xFFA5D6A7),
+                        onClick = {
+                            copyTextToClipboard(context, selectedText)
+                            viewModel.clearTextSelection()
+                        }
+                    )
+
+                    SelectionActionButton(
+                        icon = Icons.Outlined.VolumeUp,
+                        label = "قراءة",
+                        tint = Color(0xFFFFCC80),
+                        onClick = {
+                            speakText(context, selectedText)
+                        }
+                    )
+
+                    SelectionActionButton(
+                        icon = Icons.Outlined.Share,
+                        label = "مشاركة",
+                        tint = Color(0xFFCE93D8),
+                        onClick = {
+                            shareText(context, selectedText, state.currentPdfName ?: "نص مستخرج")
+                            viewModel.clearTextSelection()
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SelectionActionButton(
+    icon: ImageVector,
+    label: String,
+    tint: Color,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = tint,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            color = Color.White.copy(alpha = 0.9f),
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+@Composable
+fun AddStickyNoteDialog(
+    viewModel: PdfViewModel,
+    state: PdfUiState,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var noteText by remember { mutableStateOf("") }
+    var selectedColorHex by remember { mutableStateOf("#FFF59D") }
+
+    val colorOptions = listOf(
+        "#FFF59D" to Color(0xFFFFF59D), // Yellow
+        "#C8E6C9" to Color(0xFFC8E6C9), // Green
+        "#BBDEFB" to Color(0xFFBBDEFB), // Blue
+        "#E1BEE7" to Color(0xFFE1BEE7), // Purple
+        "#F8BBD0" to Color(0xFFF8BBD0)  // Pink
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (noteText.isNotBlank()) {
+                        viewModel.addStickyNote(context, noteText, selectedColorHex)
+                    } else {
+                        Toast.makeText(context, "الرجاء كتابة الملاحظة أولاً", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("حفظ الملاحظة", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("إلغاء")
+            }
+        },
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.StickyNote2,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
+                Column {
+                    Text(
+                        text = "إضافة ملاحظة لاصقة",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "صفحة ${if (state.selectionPageNumber > 0) state.selectionPageNumber else state.currentPage}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (!state.selectedPdfText.isNullOrBlank()) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(
+                                text = "النص المرجعي المباشر:",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "\"${state.selectedPdfText}\"",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = noteText,
+                    onValueChange = { noteText = it },
+                    placeholder = { Text("اكتب ملاحظتك الخاصة هنا...") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 100.dp, max = 160.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    maxLines = 5
+                )
+
+                Text(
+                    text = "لون الملاحظة اللاصقة:",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    colorOptions.forEach { (hex, color) ->
+                        val isSelected = selectedColorHex == hex
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                                .border(
+                                    border = if (isSelected) BorderStroke(3.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, Color.Gray.copy(alpha = 0.4f)),
+                                    shape = CircleShape
+                                )
+                                .clickable { selectedColorHex = hex },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = Color.Black.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        shape = RoundedCornerShape(24.dp),
+        containerColor = MaterialTheme.colorScheme.surface
+    )
+}
+
+@Composable
+fun NotesAndHighlightsSheet(
+    viewModel: PdfViewModel,
+    state: PdfUiState,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val stickyNotes = state.stickyNotesList
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.StickyNote2,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "الملاحظات والتظليلات",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Text(
+                        text = "${stickyNotes.size}",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "إغلاق"
+                )
+            }
+        }
+
+        if (stickyNotes.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(240.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.StickyNote2,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                        modifier = Modifier.size(56.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "لا توجد ملاحظات أو تظليلات محفوظة بعد",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "حدد أي نص داخل المستند لإظهار شريط التظليل المباشر وإضافة ملاحظات لاصقة!",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                items(stickyNotes, key = { it.id }) { note ->
+                    val noteBgColor = try {
+                        Color(android.graphics.Color.parseColor(note.colorHex))
+                    } catch (e: Exception) {
+                        Color(0xFFFFF59D)
+                    }
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = noteBgColor.copy(alpha = 0.85f)),
+                        border = BorderStroke(1.dp, Color.Black.copy(alpha = 0.1f))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = Color.Black.copy(alpha = 0.12f)
+                                ) {
+                                    Text(
+                                        text = if (note.isHighlightOnly) "تظليل نص" else "ملاحظة لاصقة",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Black.copy(alpha = 0.8f),
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = Color.White.copy(alpha = 0.7f)
+                                ) {
+                                    Text(
+                                        text = "صفحة ${note.pageNumber}",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Black.copy(alpha = 0.8f),
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            if (note.selectedText.isNotBlank()) {
+                                Text(
+                                    text = "\"${note.selectedText}\"",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color.Black.copy(alpha = 0.75f),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .background(
+                                            color = Color.White.copy(alpha = 0.5f),
+                                            shape = RoundedCornerShape(6.dp)
+                                        )
+                                        .padding(6.dp)
+                                        .fillMaxWidth()
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                            }
+
+                            if (!note.isHighlightOnly && note.noteText.isNotBlank()) {
+                                Text(
+                                    text = note.noteText,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black.copy(alpha = 0.9f)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                TextButton(
+                                    onClick = {
+                                        viewModel.sendJsCommand("PDFViewerApplication.pdfViewer.currentPageNumber = ${note.pageNumber}")
+                                        onDismiss()
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Navigation,
+                                        contentDescription = null,
+                                        tint = Color.Black.copy(alpha = 0.8f),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "الانتقال للصفحة",
+                                        fontSize = 11.sp,
+                                        color = Color.Black.copy(alpha = 0.8f),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                Row {
+                                    IconButton(
+                                        onClick = {
+                                            copyTextToClipboard(context, note.noteText.ifBlank { note.selectedText })
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.ContentCopy,
+                                            contentDescription = "نسخ",
+                                            tint = Color.Black.copy(alpha = 0.7f),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = {
+                                            viewModel.deleteStickyNote(note.id)
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "حذف",
+                                            tint = Color(0xFFD32F2F),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
