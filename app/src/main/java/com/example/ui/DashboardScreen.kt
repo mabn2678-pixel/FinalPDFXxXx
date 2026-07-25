@@ -3360,7 +3360,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                                 modifier = Modifier.fillMaxWidth(),
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                                             ) {
-                                                listOf("ara" to "العربية 🇸🇦", "eng" to "الإنجليزي 🇬🇧", "deu" to "الألماني 🇩🇪").forEach { (code, name) ->
+                                                listOf("ara" to "العربية", "eng" to "الإنجليزي", "deu" to "الألماني").forEach { (code, name) ->
                                                     val isSelected = ocrLanguage == code
                                                     FilterChip(
                                                         selected = isSelected,

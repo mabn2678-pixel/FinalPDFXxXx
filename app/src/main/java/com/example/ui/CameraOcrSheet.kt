@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.example.BuildConfig
+import com.example.data.SecureKeyManager
 import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
@@ -74,7 +75,8 @@ import java.util.concurrent.Executors
 data class CameraOcrResult(
     val text: String,
     val isOnline: Boolean,
-    val engineName: String
+    val engineName: String,
+    val isApiKeyError: Boolean = false
 )
 
 @Composable
@@ -113,10 +115,7 @@ fun CameraOcrSheet(
     var preferOnlineAi by remember { mutableStateOf(true) }
     var showApiKeyDialog by remember { mutableStateOf(false) }
     var userApiKeyInput by remember {
-        mutableStateOf(
-            context.getSharedPreferences("pdf_reader_prefs", Context.MODE_PRIVATE)
-                .getString("user_gemini_api_key", "") ?: ""
-        )
+        mutableStateOf(SecureKeyManager.getGeminiApiKey(context))
     }
 
     if (showApiKeyDialog) {
@@ -153,25 +152,50 @@ fun CameraOcrSheet(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
+                    if (SecureKeyManager.hasSavedKey(context)) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF4CAF50).copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = Color(0xFF4CAF50),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "✓ مفتاح محفوظ ومفعّل",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF4CAF50)
+                            )
+                        }
+                    }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        context.getSharedPreferences("pdf_reader_prefs", Context.MODE_PRIVATE)
-                            .edit()
-                            .putString("user_gemini_api_key", userApiKeyInput.trim())
-                            .apply()
-                        showApiKeyDialog = false
-                        Toast.makeText(context, "تم حفظ مفتاح Gemini API بنجاح", Toast.LENGTH_SHORT).show()
-                        if (capturedBitmap != null) {
-                            coroutineScope.launch {
-                                isScanning = true
-                                scanStatusMessage = "جاري إعادة التحليل باستخدام مفتاح Gemini API الجديد..."
-                                preferOnlineAi = true
-                                ocrResult = processMultiLanguageCameraOcr(context, capturedBitmap!!, true)
-                                isScanning = false
+                        if (userApiKeyInput.trim().isNotBlank()) {
+                            SecureKeyManager.saveGeminiApiKey(context, userApiKeyInput.trim())
+                            showApiKeyDialog = false
+                            Toast.makeText(context, "تم حفظ ومزامنة مفتاح Gemini API بنجاح", Toast.LENGTH_SHORT).show()
+                            if (capturedBitmap != null) {
+                                coroutineScope.launch {
+                                    isScanning = true
+                                    scanStatusMessage = "جاري إعادة التحليل باستخدام مفتاح Gemini API الجديد..."
+                                    preferOnlineAi = true
+                                    ocrResult = processMultiLanguageCameraOcr(context, capturedBitmap!!, true)
+                                    isScanning = false
+                                }
                             }
+                        } else {
+                            Toast.makeText(context, "يرجى كتابة المفتاح أولاً", Toast.LENGTH_SHORT).show()
                         }
                     },
                     shape = RoundedCornerShape(10.dp)
@@ -183,10 +207,7 @@ fun CameraOcrSheet(
                 TextButton(
                     onClick = {
                         userApiKeyInput = ""
-                        context.getSharedPreferences("pdf_reader_prefs", Context.MODE_PRIVATE)
-                            .edit()
-                            .remove("user_gemini_api_key")
-                            .apply()
+                        SecureKeyManager.clearGeminiApiKey(context)
                         showApiKeyDialog = false
                         Toast.makeText(context, "تم مسح المفتاح", Toast.LENGTH_SHORT).show()
                     }
@@ -216,6 +237,9 @@ fun CameraOcrSheet(
                         capturedBitmap = loadedBitmap
                         val res = processMultiLanguageCameraOcr(context, loadedBitmap, preferOnlineAi)
                         ocrResult = res
+                        if (res.isApiKeyError) {
+                            showApiKeyDialog = true
+                        }
                     } else {
                         Toast.makeText(context, "تعذر فتح الصورة المحفوطة", Toast.LENGTH_SHORT).show()
                     }
@@ -296,18 +320,23 @@ fun CameraOcrSheet(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            LanguageBadge("🇸🇦 العربية")
-            LanguageBadge("🇩🇪 الألمانية")
-            LanguageBadge("🇬🇧 الإنجليزية")
+            LanguageBadge("العربية")
+            LanguageBadge("الألمانية")
+            LanguageBadge("الإنجليزية")
 
             Spacer(modifier = Modifier.weight(1f))
 
             FilterChip(
                 selected = preferOnlineAi,
-                onClick = { preferOnlineAi = !preferOnlineAi },
+                onClick = {
+                    preferOnlineAi = !preferOnlineAi
+                    if (preferOnlineAi && !SecureKeyManager.hasSavedKey(context)) {
+                        showApiKeyDialog = true
+                    }
+                },
                 label = {
                     Text(
-                        text = if (preferOnlineAi) "ذكاء أونلاين 🌐" else "أوفلاين محلي 📱",
+                        text = if (preferOnlineAi) "ذكاء أونلاين" else "أوفلاين محلي",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -676,7 +705,7 @@ fun CameraOcrSheet(
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
-                                    text = if (preferOnlineAi) "الاتصال بالسحابة الذكية (Gemini Vision AI 🌐)" else "محرك ML Kit المحلي (أوفلاين 📱)",
+                                    text = if (preferOnlineAi) "الاتصال بالسحابة الذكية (Gemini Vision AI)" else "محرك ML Kit المحلي (أوفلاين)",
                                     color = Color(0xFF00FFCC),
                                     fontSize = 10.sp
                                 )
@@ -756,6 +785,9 @@ fun CameraOcrSheet(
                                                     if (rotatedBmp != null) {
                                                         val res = processMultiLanguageCameraOcr(context, rotatedBmp, preferOnlineAi)
                                                         ocrResult = res
+                                                        if (res.isApiKeyError) {
+                                                            showApiKeyDialog = true
+                                                        }
                                                         isScanning = false
                                                     } else {
                                                         isScanning = false
@@ -772,6 +804,9 @@ fun CameraOcrSheet(
                                                         capturedBitmap = previewBmp
                                                         val res = processMultiLanguageCameraOcr(context, previewBmp, preferOnlineAi)
                                                         ocrResult = res
+                                                        if (res.isApiKeyError) {
+                                                            showApiKeyDialog = true
+                                                        }
                                                         isScanning = false
                                                     } else {
                                                         isScanning = false
@@ -980,12 +1015,10 @@ suspend fun processMultiLanguageCameraOcr(
         e.printStackTrace()
     }
 
-    val prefs = context.getSharedPreferences("pdf_reader_prefs", Context.MODE_PRIVATE)
-    val userCustomKey = prefs.getString("user_gemini_api_key", "")?.trim() ?: ""
-    val defaultKey = try { BuildConfig.GEMINI_API_KEY } catch (e: Exception) { "" }
-    val apiKey = if (userCustomKey.isNotBlank()) userCustomKey else defaultKey
+    val apiKey = SecureKeyManager.getGeminiApiKey(context)
 
     var lastApiError = ""
+    var isKeyError = false
 
     // Try Gemini AI Online OCR if requested or available
     if (preferOnline && apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY" && base64Image.isNotBlank()) {
@@ -1054,16 +1087,23 @@ suspend fun processMultiLanguageCameraOcr(
                                     return@withContext CameraOcrResult(
                                         text = extractedText.trim(),
                                         isOnline = true,
-                                        engineName = "Gemini AI 🌐 (عربي / ألماني / إنجليزي)"
+                                        engineName = "Gemini AI (عربي / ألماني / إنجليزي)"
                                     )
                                 }
                             }
                         }
-                    } else if (responseStr.isNotBlank()) {
-                        lastApiError = "رمز الاستجابة ${response.code}"
+                    } else {
+                        if (response.code == 429) {
+                            lastApiError = "وصلت للحد اليومي المجاني (1500 طلب). هيتجدد تلقائيًا الساعة 10:00 صباحاً بتوقيت القاهرة. تقدر تستخدم OCR المحلي (بدون إنترنت) لحد ما يتجدد."
+                        } else if (response.code == 401 || response.code == 403) {
+                            lastApiError = "مفتاح Gemini API لم يعد صالحًا. من فضلك أدخل مفتاح جديد."
+                            isKeyError = true
+                        } else if (responseStr.isNotBlank()) {
+                            lastApiError = "رمز الاستجابة ${response.code}"
+                        }
                     }
                 } catch (e: Exception) {
-                    lastApiError = e.localizedMessage ?: "خطأ اتشبكة"
+                    lastApiError = e.localizedMessage ?: "خطأ بالشبكة"
                     e.printStackTrace()
                 }
             }
@@ -1071,6 +1111,9 @@ suspend fun processMultiLanguageCameraOcr(
             lastApiError = e.localizedMessage ?: "خطأ غير متوقع"
             e.printStackTrace()
         }
+    } else if (preferOnline && apiKey.isBlank()) {
+        lastApiError = "مفتاح Gemini API غير متوفر. يرجى إدخال المفتاح لاستخدام الذكاء الاصطناعي الأونلاين."
+        isKeyError = true
     }
 
     // Fallback: ML Kit Local OCR
@@ -1082,9 +1125,9 @@ suspend fun processMultiLanguageCameraOcr(
         val resultText = visionText.text.trim()
 
         val noticeHeader = if (preferOnline) {
-            "⚠️ [ملاحظة]: تعذر الاتصال بذكاء Gemini السحابي (${if (lastApiError.isNotBlank()) lastApiError else "مفتاح API غير متوفر أو خطأ بالشبكة"}). تم استخدام المحرك المحلي ML Kit (مخصص للألمانية والإنجليزية والرموز).\n\n💡 لاستخراج النصوص والكتب العربية المصورة بدقة 100%، اضغط على زر [🔑 مفتاح API] وأدخل مفتاح Gemini المجاني الخاص بك.\n\n--------------------------------------\n\n"
+            "[ملاحظة]: تعذر الاتصال بذكاء Gemini السحابي (${if (lastApiError.isNotBlank()) lastApiError else "مفتاح API غير متوفر أو خطأ بالشبكة"}). تم استخدام المحرك المحلي ML Kit (مخصص للألمانية والإنجليزية والرموز).\n\nلاستخراج النصوص والكتب العربية المصورة بدقة 100%، اضغط على زر [مفتاح API] وأدخل مفتاح Gemini المجاني الخاص بك.\n\n--------------------------------------\n\n"
         } else {
-            "📱 [المحرك المحلي ML Kit]: مخصص للكلمات اللاتينية والألمانية والإنجليزية والأرقام.\n\n💡 للحصول على استخراج كامل للكتب والنصوص العربية، يرجى تفعيل [ذكاء أونلاين 🌐].\n\n--------------------------------------\n\n"
+            "[المحرك المحلي ML Kit]: مخصص للكلمات اللاتينية والألمانية والإنجليزية والأرقام.\n\nللحصول على استخراج كامل للكتب والنصوص العربية، يرجى تفعيل [ذكاء أونلاين].\n\n--------------------------------------\n\n"
         }
 
         val finalText = if (resultText.isNotBlank()) {
@@ -1096,7 +1139,8 @@ suspend fun processMultiLanguageCameraOcr(
         return@withContext CameraOcrResult(
             text = finalText,
             isOnline = false,
-            engineName = "ML Kit محلي 📱 (ألماني / إنجليزي)"
+            engineName = "ML Kit محلي (ألماني / إنجليزي)",
+            isApiKeyError = isKeyError
         )
     } catch (e: Exception) {
         e.printStackTrace()

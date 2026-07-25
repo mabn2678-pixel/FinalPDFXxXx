@@ -5256,10 +5256,7 @@ suspend fun extractTextFromPdfPageOnline(
         return@withContext OcrExtractionResult(localText, false, "القارئ المحلي أوفلاين")
     }
 
-    val prefs = context.getSharedPreferences("pdf_reader_prefs", Context.MODE_PRIVATE)
-    val userCustomKey = prefs.getString("user_gemini_api_key", "")?.trim() ?: ""
-    val defaultKey = try { BuildConfig.GEMINI_API_KEY } catch (e: Exception) { "" }
-    val apiKey = if (userCustomKey.isNotBlank()) userCustomKey else defaultKey
+    val apiKey = com.example.data.SecureKeyManager.getGeminiApiKey(context)
 
     if (apiKey.isNotBlank() && apiKey != "MY_GEMINI_API_KEY") {
         val promptText = "أنت نظام استخراج النصوص الضوئية (OCR) الأكثر دقة للكتب والمستندات المصورة. هذه صفحة كتاب تحتوي على صور أو أوراق مصورة. يرجى قراءة هذه الصورة بالكامل واستخراج كافة النصوص العربية والألمانية والإنجليزية والرموز المكتوبة داخل أي صورة أو فقرة بالصفحة بدقة متناهية. حافظ على نفس ترتيب السطور والمحتوى بدون حذف أي كلمة. اكتب النص المستخرج فقط بدون أي تعليق أو مقدمات."
@@ -5328,7 +5325,7 @@ suspend fun extractTextFromPdfPageOnline(
                                     return@withContext OcrExtractionResult(
                                         text = extractedText.trim(),
                                         isOnlineSuccess = true,
-                                        engineName = "Google Gemini AI 🌐 (سحب نصوص الصور والكتب)"
+                                        engineName = "Google Gemini AI (سحب نصوص الصور والكتب)"
                                     )
                                 }
                             }
@@ -5633,7 +5630,7 @@ fun OcrTextSheet(
                         ) {}
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (isOnlineAi) "🌐 نشاط الإنترنت: جاري الاتصال بخوادم Google Gemini AI..." else "📱 بدون إنترنت: جاري التحليل المحلي أوفلاين...",
+                            text = if (isOnlineAi) "نشاط الإنترنت: جاري الاتصال بخوادم Google Gemini AI..." else "بدون إنترنت: جاري التحليل المحلي أوفلاين...",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.outline
                         )
@@ -5666,9 +5663,9 @@ fun OcrTextSheet(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = if (res?.isOnlineSuccess == true) {
-                                "🌐 الإنترنت شغال: تم الاستخراج أونلاين بنجاح بواسطة ${res.engineName} ✨"
+                                "الإنترنت شغال: تم الاستخراج أونلاين بنجاح بواسطة ${res.engineName}"
                             } else {
-                                "ℹ️ ${res?.engineName ?: "تم الاستخراج بواسطة القارئ المحلي"}"
+                                "${res?.engineName ?: "تم الاستخراج بواسطة القارئ المحلي"}"
                             },
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,

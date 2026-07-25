@@ -2136,101 +2136,158 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                     return@launch
                 }
 
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    onStatusChange("جاري رفع الملف...")
-                }
-
-                val client = okhttp3.OkHttpClient.Builder()
-                    .connectTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
-                    .readTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
-                    .writeTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
-                    .build()
-
-                val mediaType = "application/pdf".toMediaType()
-                val requestFile = file.asRequestBody(mediaType)
-                val filePart = okhttp3.MultipartBody.Part.createFormData("file", file.name, requestFile)
-
-                val requestBody = okhttp3.MultipartBody.Builder()
-                    .setType(okhttp3.MultipartBody.FORM)
-                    .addFormDataPart("apikey", "K88448789188957")
-                    .addFormDataPart("language", if (language.isEmpty()) "ara" else language)
-                    .addFormDataPart("isCreateSearchablePdf", "true")
-                    .addFormDataPart("isSearchablePdfHideTextLayer", "true")
-                    .addFormDataPart("filetype", "PDF")
-                    .addPart(filePart)
-                    .build()
-
-                val request = okhttp3.Request.Builder()
-                    .url("https://api.ocr.space/parse/image")
-                    .post(requestBody)
-                    .build()
-
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    onStatusChange("جاري المعالجة...")
-                }
-
-                val response = client.newCall(request).execute()
-                val responseBody = response.body?.string()
-
-                if (!response.isSuccessful || responseBody == null) {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        onError("فشلت الاستجابة من خادم OCR (رمز الخطأ: ${response.code})")
-                    }
-                    return@launch
-                }
-
-                val json = org.json.JSONObject(responseBody)
-                val isErrored = json.optBoolean("IsErroredOnProcessing", false)
-                val errorMessage = json.optString("ErrorMessage", "")
-                val errorDetails = json.optString("ErrorDetails", "")
-
-                var searchablePdfUrl = json.optString("SearchablePDFURL", "")
-                if (searchablePdfUrl.isEmpty() && json.has("ParsedResults")) {
-                    val results = json.getJSONArray("ParsedResults")
-                    if (results.length() > 0) {
-                        val item = results.getJSONObject(0)
-                        searchablePdfUrl = item.optString("SearchablePDFURL", "")
-                    }
-                }
-
-                if (isErrored || searchablePdfUrl.isEmpty()) {
-                    val errText = when {
-                        errorMessage.isNotEmpty() -> errorMessage
-                        errorDetails.isNotEmpty() -> errorDetails
-                        else -> "تعذر استخراج رابط ملف PDF الناتج من خدمة OCR"
-                    }
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        onError("خطأ المعالجة: $errText")
-                    }
-                    return@launch
-                }
-
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    onStatusChange("جاري تحميل الملف الجديد...")
-                }
-
-                val downloadRequest = okhttp3.Request.Builder()
-                    .url(searchablePdfUrl)
-                    .get()
-                    .build()
-
-                val downloadResponse = client.newCall(downloadRequest).execute()
-                val downloadBody = downloadResponse.body
-                if (!downloadResponse.isSuccessful || downloadBody == null) {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        onError("فشل تحميل ملف الـ PDF المعالج من الرابط السحابي")
-                    }
-                    return@launch
-                }
-
                 val finalName = if (targetName.lowercase().endsWith(".pdf")) targetName else "$targetName.pdf"
                 val outputDir = getFinalPdfOutputDir(context)
                 val outputFile = File(outputDir, finalName)
 
-                downloadBody.byteStream().use { input ->
-                    outputFile.outputStream().use { output ->
-                        input.copyTo(output)
+                var cloudSuccess = false
+
+                // 1) Try Cloud OCR Space only if file size <= 1MB (1,048,576 bytes) to prevent HTTP 413
+                if (file.length() <= 1024 * 1024) {
+                    try {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            onStatusChange("جاري معالجة الملف سحابياً...")
+                        }
+
+                        val client = okhttp3.OkHttpClient.Builder()
+                            .connectTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
+                            .readTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
+                            .writeTimeout(45, java.util.concurrent.TimeUnit.SECONDS)
+                            .build()
+
+                        val mediaType = "application/pdf".toMediaType()
+                        val requestFile = file.asRequestBody(mediaType)
+                        val filePart = okhttp3.MultipartBody.Part.createFormData("file", file.name, requestFile)
+
+                        val requestBody = okhttp3.MultipartBody.Builder()
+                            .setType(okhttp3.MultipartBody.FORM)
+                            .addFormDataPart("apikey", "K88448789188957")
+                            .addFormDataPart("language", if (language.isEmpty()) "ara" else language)
+                            .addFormDataPart("isCreateSearchablePdf", "true")
+                            .addFormDataPart("isSearchablePdfHideTextLayer", "true")
+                            .addFormDataPart("filetype", "PDF")
+                            .addPart(filePart)
+                            .build()
+
+                        val request = okhttp3.Request.Builder()
+                            .url("https://api.ocr.space/parse/image")
+                            .post(requestBody)
+                            .build()
+
+                        val response = client.newCall(request).execute()
+                        val responseBody = response.body?.string()
+
+                        if (response.isSuccessful && responseBody != null) {
+                            val json = org.json.JSONObject(responseBody)
+                            val isErrored = json.optBoolean("IsErroredOnProcessing", false)
+                            var searchablePdfUrl = json.optString("SearchablePDFURL", "")
+                            if (searchablePdfUrl.isEmpty() && json.has("ParsedResults")) {
+                                val results = json.getJSONArray("ParsedResults")
+                                if (results.length() > 0) {
+                                    searchablePdfUrl = results.getJSONObject(0).optString("SearchablePDFURL", "")
+                                }
+                            }
+
+                            if (!isErrored && searchablePdfUrl.isNotEmpty()) {
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                    onStatusChange("جاري تحميل الملف الناتج...")
+                                }
+                                val downloadRequest = okhttp3.Request.Builder().url(searchablePdfUrl).get().build()
+                                val downloadResponse = client.newCall(downloadRequest).execute()
+                                val downloadBody = downloadResponse.body
+                                if (downloadResponse.isSuccessful && downloadBody != null) {
+                                    downloadBody.byteStream().use { input ->
+                                        outputFile.outputStream().use { output ->
+                                            input.copyTo(output)
+                                        }
+                                    }
+                                    cloudSuccess = true
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
                     }
+                }
+
+                // 2) Fallback or large file (>1MB): High-performance Page-by-Page OCR PDF Builder
+                if (!cloudSuccess) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        onStatusChange("جاري معالجة صفحات المستند وتوليد طبقة النصوص...")
+                    }
+
+                    val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+                    val renderer = PdfRenderer(pfd)
+                    val pageCount = renderer.pageCount
+
+                    val pdfDocument = android.graphics.pdf.PdfDocument()
+                    val recognizer = com.google.mlkit.vision.text.TextRecognition.getClient(
+                        com.google.mlkit.vision.text.latin.TextRecognizerOptions.DEFAULT_OPTIONS
+                    )
+
+                    for (i in 0 until pageCount) {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            onStatusChange("جاري معالجة الصفحة ${i + 1} من $pageCount...")
+                        }
+
+                        val rendererPage = renderer.openPage(i)
+                        val origWidth = rendererPage.width
+                        val origHeight = rendererPage.height
+                        val scale = 2f
+                        val renderWidth = (origWidth * scale).toInt()
+                        val renderHeight = (origHeight * scale).toInt()
+                        val pageBitmap = Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.ARGB_8888)
+                        rendererPage.render(pageBitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                        rendererPage.close()
+
+                        var visionText: com.google.mlkit.vision.text.Text? = null
+                        try {
+                            val inputImage = com.google.mlkit.vision.common.InputImage.fromBitmap(pageBitmap, 0)
+                            visionText = com.google.android.gms.tasks.Tasks.await(recognizer.process(inputImage))
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+
+                        val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(origWidth, origHeight, i + 1).create()
+                        val newPdfPage = pdfDocument.startPage(pageInfo)
+                        val canvas = newPdfPage.canvas
+
+                        val destRect = Rect(0, 0, origWidth, origHeight)
+                        canvas.drawBitmap(pageBitmap, null, destRect, null)
+                        pageBitmap.recycle()
+
+                        if (visionText != null && visionText.textBlocks.isNotEmpty()) {
+                            val transparentPaint = android.graphics.Paint().apply {
+                                color = android.graphics.Color.TRANSPARENT
+                                isAntiAlias = true
+                            }
+                            for (block in visionText.textBlocks) {
+                                for (line in block.lines) {
+                                    val box = line.boundingBox
+                                    if (box != null && line.text.isNotBlank()) {
+                                        val x = box.left.toFloat() / scale
+                                        val y = box.bottom.toFloat() / scale
+                                        val boxHeight = box.height().toFloat() / scale
+                                        if (boxHeight > 2f) {
+                                            transparentPaint.textSize = boxHeight * 0.85f
+                                        } else {
+                                            transparentPaint.textSize = 12f
+                                        }
+                                        canvas.drawText(line.text, x, y, transparentPaint)
+                                    }
+                                }
+                            }
+                        }
+
+                        pdfDocument.finishPage(newPdfPage)
+                    }
+
+                    outputFile.outputStream().use { out ->
+                        pdfDocument.writeTo(out)
+                    }
+                    pdfDocument.close()
+                    renderer.close()
+                    pfd.close()
                 }
 
                 try {
@@ -2253,7 +2310,7 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
             } catch (e: Exception) {
                 e.printStackTrace()
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    onError(e.message ?: "حدث خطأ أثناء معالجة المستند عبر الإنترنت")
+                    onError(e.message ?: "حدث خطأ أثناء معالجة المستند")
                 }
             }
         }
