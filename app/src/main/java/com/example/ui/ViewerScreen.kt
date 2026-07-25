@@ -137,25 +137,6 @@ enum class BottomSheetType {
     AnnotationTools
 }
 
-private val glassLavenderColorScheme = lightColorScheme(
-    surface = Color(0xFFECE6F8),
-    onSurface = Color(0xFF1C182B),
-    surfaceVariant = Color(0xFFE2DBF0),
-    onSurfaceVariant = Color(0xFF4C4566),
-    primary = Color(0xFF7C5CFF),
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFE2DBF0),
-    onPrimaryContainer = Color(0xFF2C1480),
-    secondary = Color(0xFF625B71),
-    onSecondary = Color.White,
-    secondaryContainer = Color(0xFFE8E0F5),
-    onSecondaryContainer = Color(0xFF1E192B),
-    background = Color(0xFFECE6F8),
-    onBackground = Color(0xFF1C182B),
-    outline = Color(0xFF8C869C),
-    outlineVariant = Color(0xFFC7BFE6)
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ViewerScreen(
@@ -375,8 +356,9 @@ fun ViewerScreen(
         }
     }
 
-    // Back button handler
-    BackHandler {
+    var showExitConfirmDialog by remember { mutableStateOf(false) }
+
+    val attemptExit = {
         val overlayWebView = overlayWebViewRef
         val webView = webViewRef
         if (isBrowsing && overlayWebView != null) {
@@ -387,6 +369,8 @@ fun ViewerScreen(
                 isBrowsing = false
                 overlayWebViewRef = null
             }
+        } else if (state.hasUnsavedChanges) {
+            showExitConfirmDialog = true
         } else if (state.isEditMode) {
             viewModel.toggleEditMode(false)
         } else if (webView != null && webView.canGoBack()) {
@@ -394,6 +378,11 @@ fun ViewerScreen(
         } else {
             viewModel.goBackToDashboard()
         }
+    }
+
+    // Back button handler
+    BackHandler {
+        attemptExit()
     }
 
     // Programmatic screen keep-awake
@@ -810,7 +799,7 @@ fun ViewerScreen(
                                 GlowingIconButton(
                                     icon = Icons.AutoMirrored.Filled.ArrowBack,
                                     contentDescription = "رجوع",
-                                    onClick = { viewModel.goBackToDashboard() },
+                                    onClick = { attemptExit() },
                                     tint = Color(0xFF9C27B0),
                                     iconSize = 20.dp,
                                     modifier = Modifier.testTag("viewer_back_btn")
@@ -1057,79 +1046,73 @@ fun ViewerScreen(
                     }
                 } else {
                     // Portrait bottom sheet
-                    ModalBottomSheet(
-                        onDismissRequest = { activeSheet = BottomSheetType.None },
-                        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-                        containerColor = Color(0xF2ECE6F8),
-                        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-                        dragHandle = { BottomSheetDefaults.DragHandle() }
+                    AppBottomSheet(
+                        onDismiss = { activeSheet = BottomSheetType.None }
                     ) {
-                        MaterialTheme(colorScheme = glassLavenderColorScheme) {
-                            Box(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-                                when (activeSheet) {
-                                    BottomSheetType.MoreOptions -> MoreOptionsSheet(
-                                        viewModel = viewModel,
-                                        state = state,
-                                        onNavigate = { activeSheet = it },
-                                        onDismiss = { activeSheet = BottomSheetType.None }
-                                    )
-                                    BottomSheetType.ViewOptions -> ViewOptionsSheet(
-                                        viewModel = viewModel,
-                                        state = state,
-                                        onDismiss = { activeSheet = BottomSheetType.None }
-                                    )
-                                    BottomSheetType.DisplaySettings -> DisplaySettingsSheet(
-                                        viewModel = viewModel,
-                                        state = state,
-                                        onDismiss = { activeSheet = BottomSheetType.None }
-                                    )
-                                    BottomSheetType.ZoomSettings -> ZoomSettingsSheet(
-                                        viewModel = viewModel,
-                                        state = state,
-                                        onDismiss = { activeSheet = BottomSheetType.None }
-                                    )
-                                    BottomSheetType.JumpToPage -> JumpToPageSheet(
-                                        viewModel = viewModel,
-                                        state = state,
-                                        onDismiss = { activeSheet = BottomSheetType.None }
-                                    )
-                                    BottomSheetType.DocumentInfo -> DocumentInfoSheet(
-                                        viewModel = viewModel,
-                                        state = state,
-                                        onDismiss = { activeSheet = BottomSheetType.None }
-                                    )
-                                    BottomSheetType.Bookmarks -> BookmarksSheet(
-                                        viewModel = viewModel,
-                                        state = state,
-                                        onDismiss = { activeSheet = BottomSheetType.None }
-                                    )
-                                    BottomSheetType.DocumentNavigation -> DocumentNavigationSheet(
-                                        viewModel = viewModel,
-                                        state = state,
-                                        onDismiss = { activeSheet = BottomSheetType.None }
-                                    )
-                                    BottomSheetType.AutoScroll -> AutoScrollSheet(
-                                        viewModel = viewModel,
-                                        state = state,
-                                        onDismiss = { activeSheet = BottomSheetType.None }
-                                    )
-                                    BottomSheetType.OcrText -> OcrTextSheet(
-                                        viewModel = viewModel,
-                                        state = state,
-                                        onDismiss = { activeSheet = BottomSheetType.None }
-                                    )
-                                    BottomSheetType.CameraOcr -> CameraOcrSheet(
-                                        viewModel = viewModel,
-                                        state = state,
-                                        onDismiss = { activeSheet = BottomSheetType.None }
-                                    )
-                                    BottomSheetType.AnnotationTools -> AnnotationToolsSheet(
-                                        viewModel = viewModel,
-                                        state = state,
-                                        onDismiss = { activeSheet = BottomSheetType.None }
-                                    )
-                                    else -> {}
-                                }
+                        Box(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                            when (activeSheet) {
+                                BottomSheetType.MoreOptions -> MoreOptionsSheet(
+                                    viewModel = viewModel,
+                                    state = state,
+                                    onNavigate = { activeSheet = it },
+                                    onDismiss = { activeSheet = BottomSheetType.None }
+                                )
+                                BottomSheetType.ViewOptions -> ViewOptionsSheet(
+                                    viewModel = viewModel,
+                                    state = state,
+                                    onDismiss = { activeSheet = BottomSheetType.None }
+                                )
+                                BottomSheetType.DisplaySettings -> DisplaySettingsSheet(
+                                    viewModel = viewModel,
+                                    state = state,
+                                    onDismiss = { activeSheet = BottomSheetType.None }
+                                )
+                                BottomSheetType.ZoomSettings -> ZoomSettingsSheet(
+                                    viewModel = viewModel,
+                                    state = state,
+                                    onDismiss = { activeSheet = BottomSheetType.None }
+                                )
+                                BottomSheetType.JumpToPage -> JumpToPageSheet(
+                                    viewModel = viewModel,
+                                    state = state,
+                                    onDismiss = { activeSheet = BottomSheetType.None }
+                                )
+                                BottomSheetType.DocumentInfo -> DocumentInfoSheet(
+                                    viewModel = viewModel,
+                                    state = state,
+                                    onDismiss = { activeSheet = BottomSheetType.None }
+                                )
+                                BottomSheetType.Bookmarks -> BookmarksSheet(
+                                    viewModel = viewModel,
+                                    state = state,
+                                    onDismiss = { activeSheet = BottomSheetType.None }
+                                )
+                                BottomSheetType.DocumentNavigation -> DocumentNavigationSheet(
+                                    viewModel = viewModel,
+                                    state = state,
+                                    onDismiss = { activeSheet = BottomSheetType.None }
+                                )
+                                BottomSheetType.AutoScroll -> AutoScrollSheet(
+                                    viewModel = viewModel,
+                                    state = state,
+                                    onDismiss = { activeSheet = BottomSheetType.None }
+                                )
+                                BottomSheetType.OcrText -> OcrTextSheet(
+                                    viewModel = viewModel,
+                                    state = state,
+                                    onDismiss = { activeSheet = BottomSheetType.None }
+                                )
+                                BottomSheetType.CameraOcr -> CameraOcrSheet(
+                                    viewModel = viewModel,
+                                    state = state,
+                                    onDismiss = { activeSheet = BottomSheetType.None }
+                                )
+                                BottomSheetType.AnnotationTools -> AnnotationToolsSheet(
+                                    viewModel = viewModel,
+                                    state = state,
+                                    onDismiss = { activeSheet = BottomSheetType.None }
+                                )
+                                else -> {}
                             }
                         }
                     }
@@ -1154,6 +1137,148 @@ fun ViewerScreen(
                             }
                         )
                 )
+            }
+
+            if (showExitConfirmDialog) {
+                UnsavedChangesDialog(
+                    onSaveAndExit = {
+                        showExitConfirmDialog = false
+                        viewModel.requestSaveAndExit()
+                    },
+                    onDiscardAndExit = {
+                        showExitConfirmDialog = false
+                        viewModel.discardAndExit()
+                    },
+                    onCancel = {
+                        showExitConfirmDialog = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun UnsavedChangesDialog(
+    onSaveAndExit: () -> Unit,
+    onDiscardAndExit: () -> Unit,
+    onCancel: () -> Unit
+) {
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onCancel,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.88f)
+                .padding(16.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = Color(0xFFECE6F8),
+            tonalElevation = 6.dp,
+            shadowElevation = 12.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .background(Color(0xFF7C5CFF).copy(alpha = 0.15f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Save,
+                        contentDescription = null,
+                        tint = Color(0xFF7C5CFF),
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
+
+                Text(
+                    text = "هل تريد تطبيق التعديلات؟",
+                    style = TextStyle(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        color = Color(0xFF1C182B),
+                        textAlign = TextAlign.Center
+                    )
+                )
+
+                Text(
+                    text = "هناك تعديلات غير محفوظة على هذا المستند. يمكنك حفظ التعديلات الآن أو الخروج بدون حفظ.",
+                    style = TextStyle(
+                        fontSize = 14.sp,
+                        color = Color(0xFF4C4566),
+                        textAlign = TextAlign.Center,
+                        lineHeight = 20.sp
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Button(
+                    onClick = onSaveAndExit,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("dialog_save_btn"),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF7C5CFF),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Save,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "حفظ والتطبيق",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = onDiscardAndExit,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("dialog_discard_btn"),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.5.dp, Color(0xFF9C8EB9)),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFF4C4566)
+                    )
+                ) {
+                    Text(
+                        text = "خروج بدون حفظ",
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp
+                    )
+                }
+
+                TextButton(
+                    onClick = onCancel,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(40.dp)
+                        .testTag("dialog_cancel_btn"),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = "إلغاء",
+                        color = Color(0xFF625B71),
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp
+                    )
+                }
             }
         }
     }
@@ -1593,6 +1718,12 @@ fun PdfWebView(
                                                 }
                                             });
 
+                                            PDFViewerApplication.eventBus.on('annotationeditorstateschanged', () => {
+                                                if (window.AndroidBridge && window.AndroidBridge.onAnnotationChanged) {
+                                                    window.AndroidBridge.onAnnotationChanged();
+                                                }
+                                            });
+
                                             // 3. Complete hide/vanish of PDF.js official viewer toolbar elements
                                             var style = document.createElement('style');
                                             style.type = 'text/css';
@@ -1689,6 +1820,46 @@ fun PdfWebView(
                                                 }
                                                 body.scrolling .custom-page-number-indicator {
                                                     opacity: 1 !important;
+                                                }
+                                                .annotationEditorLayer .freeTextEditor {
+                                                    position: absolute !important;
+                                                    padding: 6px 12px !important;
+                                                    border: 1.5px dashed #7C5CFF !important;
+                                                    border-radius: 8px !important;
+                                                    background-color: rgba(236, 230, 248, 0.45) !important;
+                                                    box-sizing: border-box !important;
+                                                    min-width: 60px !important;
+                                                    min-height: 36px !important;
+                                                    width: auto !important;
+                                                    height: auto !important;
+                                                    touch-action: none !important;
+                                                    margin: 0 !important;
+                                                    transform-origin: 0 0 !important;
+                                                    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+                                                }
+                                                .annotationEditorLayer .freeTextEditor.selectedEditor,
+                                                .annotationEditorLayer .freeTextEditor:focus-within {
+                                                    border: 2px solid #7C5CFF !important;
+                                                    box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.25) !important;
+                                                    background-color: #FFFFFF !important;
+                                                }
+                                                .annotationEditorLayer .freeTextEditor .internal {
+                                                    background: transparent !important;
+                                                    border: none !important;
+                                                    outline: none !important;
+                                                    padding: 0 !important;
+                                                    margin: 0 !important;
+                                                    font-family: system-ui, -apple-system, sans-serif !important;
+                                                    font-size: 16px !important;
+                                                    line-height: 1.4 !important;
+                                                    color: #1C182B !important;
+                                                    white-space: pre-wrap !important;
+                                                    word-break: break-word !important;
+                                                    overflow: visible !important;
+                                                    min-width: 40px !important;
+                                                    width: auto !important;
+                                                    height: auto !important;
+                                                    display: inline-block !important;
                                                 }
                                                 .fast-scrubber-track {
                                                     position: fixed !important;
@@ -1854,8 +2025,8 @@ fun PdfWebView(
                                             var singleTapTimer = null;
 
                                             document.addEventListener('click', function(e) {
-                                                var interactive = e.target.closest('a, button, input, select, textarea, .internalLink, #fastScrubberTrack');
-                                                if (interactive) {
+                                                var interactive = e.target.closest('a, button, input, select, textarea, .internalLink, #fastScrubberTrack, .annotationEditorLayer, .freeTextEditor, .internal, [contenteditable="true"]');
+                                                if (interactive || document.body.classList.contains('edit-mode-active')) {
                                                     return;
                                                 }
                                                 if (window.getSelection && window.getSelection().toString().trim() !== "") {
@@ -1884,7 +2055,8 @@ fun PdfWebView(
                                                     var baseScale = window.defaultScale || 1.0;
                                                     var curScale = (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentScale) ? PDFViewerApplication.pdfViewer.currentScale : baseScale;
 
-                                                    var targetScale = (curScale < baseScale * 1.3) ? (baseScale * 2.0) : baseScale;
+                                                    var factor = ${state.doubleTapZoomFactor};
+                                                    var targetScale = (curScale < baseScale * 1.3) ? (baseScale * factor) : baseScale;
 
                                                     window.setScale(targetScale);
                                                     if (window.AndroidBridge && window.AndroidBridge.onScaleChanged) {
@@ -2114,6 +2286,13 @@ fun PdfWebView(
                     }
 
                     @android.webkit.JavascriptInterface
+                    fun onAnnotationChanged() {
+                        coroutineScope.launch {
+                            viewModel.markHasUnsavedChanges(true)
+                        }
+                    }
+
+                    @android.webkit.JavascriptInterface
                     fun onEditorModeChanged(mode: Int) {
                         coroutineScope.launch {
                             viewModel.onEditorModeChanged(mode)
@@ -2159,7 +2338,7 @@ fun PdfWebView(
                 // Encode file URL properly
                 val encodedFileUrl = Uri.encode("file://$pdfPath")
                 val currentPage = state.currentPage
-                val viewerUrl = "file:///android_asset/pdfjs/web/viewer.html?file=$encodedFileUrl#page=$currentPage&zoom=page-width&scrollMode=0"
+                val viewerUrl = "file:///android_asset/pdfjs/web/viewer.html?file=$encodedFileUrl#page=$currentPage&zoom=${state.defaultZoom}&scrollMode=${if (state.snapToPage) 3 else if (state.scrollMode == "horizontal") 1 else 0}"
                 loadUrl(viewerUrl)
                 onWebViewCreated(this)
             }

@@ -1,7 +1,9 @@
 package com.example.ui
 
 import android.content.Context
+import android.content.pm.ActivityInfo
 import android.net.Uri
+import androidx.compose.ui.graphics.vector.ImageVector
 import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -71,25 +73,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
-
-private val glassLavenderColorScheme = lightColorScheme(
-    surface = Color(0xFFECE6F8),
-    onSurface = Color(0xFF1C182B),
-    surfaceVariant = Color(0xFFE2DBF0),
-    onSurfaceVariant = Color(0xFF4C4566),
-    primary = Color(0xFF7C5CFF),
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFFE2DBF0),
-    onPrimaryContainer = Color(0xFF2C1480),
-    secondary = Color(0xFF625B71),
-    onSecondary = Color.White,
-    secondaryContainer = Color(0xFFE8E0F5),
-    onSecondaryContainer = Color(0xFF1E192B),
-    background = Color(0xFFECE6F8),
-    onBackground = Color(0xFF1C182B),
-    outline = Color(0xFF8C869C),
-    outlineVariant = Color(0xFFC7BFE6)
-)
 
 data class BottomBarColorPreset(
     val name: String,
@@ -1488,20 +1471,9 @@ fun SortFilesSheet(
     onSortSelected: (SortOption) -> Unit,
     onDismiss: () -> Unit
 ) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = Color(0xF2ECE6F8),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        dragHandle = { BottomSheetDefaults.DragHandle() }
+    AppBottomSheet(
+        onDismiss = onDismiss
     ) {
-        MaterialTheme(colorScheme = glassLavenderColorScheme) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 8.dp)
-                    .padding(bottom = 24.dp)
-            ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1608,8 +1580,6 @@ fun SortFilesSheet(
                     modifier = Modifier.weight(1f)
                 )
             }
-        }
-    }
     }
 }
 
@@ -1676,20 +1646,9 @@ fun LibraryStatsSheet(
     val deletedCount = recentPdfs.count { !File(it.filePath).exists() }
     val formattedReadingTime = formatReadingTime(uiState.totalReadingTimeSeconds)
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = Color(0xF2ECE6F8),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        dragHandle = { BottomSheetDefaults.DragHandle() }
+    AppBottomSheet(
+        onDismiss = onDismiss
     ) {
-        MaterialTheme(colorScheme = glassLavenderColorScheme) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 8.dp)
-                    .padding(bottom = 32.dp)
-            ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1780,8 +1739,6 @@ fun LibraryStatsSheet(
                     )
                 }
             }
-        }
-    }
     }
 }
 
@@ -3768,12 +3725,18 @@ fun ToolGridCard(
 // ==========================================
 // SETTINGS TAB SCREEN (Image 2)
 // ==========================================
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsTabScreen(
     viewModel: PdfViewModel,
     uiState: PdfUiState
 ) {
     val context = LocalContext.current
+    var activeSheet by remember { mutableStateOf<SettingSheetType?>(null) }
+
+    // Surface colors for PDF Reader Pro dark aesthetic
+    val cardBg = MaterialTheme.colorScheme.surface
+    val headerColor = Color(0xFF9E86FF)
 
     Column(
         modifier = Modifier
@@ -3783,28 +3746,28 @@ fun SettingsTabScreen(
         // App Header Branding Card
         Card(
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            colors = CardDefaults.cardColors(containerColor = cardBg),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 20.dp)
+                .padding(bottom = 16.dp)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
+                    .padding(18.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
-                        .size(52.dp)
-                        .background(Color(0xFFF1EEFF), RoundedCornerShape(14.dp)),
+                        .size(50.dp)
+                        .background(Color(0xFF7C5CFF).copy(alpha = 0.15f), RoundedCornerShape(14.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.PictureAsPdf,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = Color(0xFF7C5CFF),
                         modifier = Modifier.size(28.dp)
                     )
                 }
@@ -3814,30 +3777,30 @@ fun SettingsTabScreen(
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "تطبيق FinalPDF",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.ExtraBold,
+                            text = "تطبيق FinalPDF Pro",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Box(
                             modifier = Modifier
-                                .background(Color(0xFFFFF9C4), RoundedCornerShape(6.dp))
+                                .background(Color(0xFF7C5CFF), RoundedCornerShape(6.dp))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                text = "GPL 3.0",
-                                fontSize = 8.sp,
+                                text = "PRO",
+                                fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF5D4037)
+                                color = Color.White
                             )
                         }
                     }
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "الإصدار 2.2.0 - تصفح بلا حدود",
+                        text = "الإصدار 2.2.0 - محرك قراءة متكامل",
                         fontSize = 12.sp,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -3849,40 +3812,37 @@ fun SettingsTabScreen(
         ) {
             // APPEARANCE SECTION
             item {
-                SettingsSectionHeader(title = "تخصيص المظهر")
+                SettingsSectionHeader(title = "تخصيص المظهر (APPEARANCE)", headerColor = headerColor)
             }
             item {
                 Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardBg),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column {
                         // App Theme Row
-                        SettingsSelectionRow(
+                        SettingsItemRow(
                             icon = Icons.Default.Brightness4,
+                            iconBgColor = Color(0xFF9C27B0),
                             title = "مظهر التطبيق",
                             value = when (uiState.appTheme) {
                                 "dark" -> "الوضع الداكن"
                                 "light" -> "الوضع الفاتح"
                                 else -> "تلقائي (حسب النظام)"
                             },
-                            onClick = {
-                                val themes = listOf("system", "light", "dark")
-                                val currentIdx = themes.indexOf(uiState.appTheme)
-                                val nextTheme = themes[(currentIdx + 1) % themes.size]
-                                viewModel.setAppTheme(context, nextTheme)
-                            }
+                            onClick = { activeSheet = SettingSheetType.APP_THEME }
                         )
-                        
-                        Divider(color = Color.LightGray.copy(alpha = 0.3f), thickness = 0.5.dp)
 
-                        // Show Tools Tab Toggle Option
+                        Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), thickness = 0.5.dp)
+
+                        // Show Tools Tab Switch
                         SettingsSwitchRow(
                             icon = Icons.Default.Grid3x3,
+                            iconBgColor = Color(0xFF4CAF50),
                             title = "إظهار تبويب الأدوات",
-                            subtitle = "إظهار أو إخفاء تبويب التعديل المتقدم في الشريط السفلي",
+                            subtitle = "إظهار أو إخفاء تبويب الأدوات في الشريط السفلي",
                             checked = uiState.showToolsTab,
                             onCheckedChange = { viewModel.setShowToolsTab(context, it) }
                         )
@@ -3890,21 +3850,125 @@ fun SettingsTabScreen(
                 }
             }
 
-            // BOTTOM BAR CUSTOMIZATION SECTION
+            // READER & DISPLAY SECTION
             item {
-                SettingsSectionHeader(title = "تخصيص لون الشريط السفلي")
+                SettingsSectionHeader(title = "إعدادات القارئ والشاشة (READER & DISPLAY)", headerColor = headerColor)
             }
             item {
                 Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardBg),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column {
+                        // Scroll Mode Row
+                        SettingsItemRow(
+                            icon = Icons.Default.SwapVert,
+                            iconBgColor = Color(0xFF2196F3),
+                            title = "اتجاه التمرير",
+                            value = if (uiState.scrollMode == "horizontal") "أفقي (Horizontal)" else "عمودي (Vertical)",
+                            onClick = { activeSheet = SettingSheetType.SCROLL_MODE }
+                        )
+
+                        Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), thickness = 0.5.dp)
+
+                        // Default Zoom Row
+                        SettingsItemRow(
+                            icon = Icons.Default.ZoomIn,
+                            iconBgColor = Color(0xFF00BCD4),
+                            title = "مستوى الزووم الافتراضي",
+                            value = when (uiState.defaultZoom) {
+                                "page-fit" -> "ملائمة الصفحة الكاملة (Fit Page)"
+                                "1.0" -> "الحجم الأصلي 100% (Actual Size)"
+                                else -> "ملائمة عرض الشاشة (Fit Width)"
+                            },
+                            onClick = { activeSheet = SettingSheetType.DEFAULT_ZOOM }
+                        )
+
+                        Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), thickness = 0.5.dp)
+
+                        // Double Tap Zoom Row
+                        SettingsItemRow(
+                            icon = Icons.Default.TouchApp,
+                            iconBgColor = Color(0xFF009688),
+                            title = "تكبير النقر المزدوج (Double Tap)",
+                            value = String.format("%.1fx", uiState.doubleTapZoomFactor),
+                            onClick = { activeSheet = SettingSheetType.DOUBLE_TAP_ZOOM }
+                        )
+
+                        Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), thickness = 0.5.dp)
+
+                        // Reading Theme Row
+                        SettingsItemRow(
+                            icon = Icons.Default.ColorLens,
+                            iconBgColor = Color(0xFF3F51B5),
+                            title = "مظهر خلفية القراءة",
+                            value = when (uiState.readingTheme) {
+                                "dark" -> "داكن (Dark Gray)"
+                                "black" -> "أسود عميق (AMOLED Black)"
+                                "sepia" -> "دافئ (Sepia)"
+                                else -> "فاتح (Light)"
+                            },
+                            onClick = { activeSheet = SettingSheetType.READING_THEME }
+                        )
+
+                        Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), thickness = 0.5.dp)
+
+                        // Brightness Row
+                        SettingsItemRow(
+                            icon = Icons.Default.Brightness6,
+                            iconBgColor = Color(0xFFFF9800),
+                            title = "سطوع الشاشة أثناء القراءة",
+                            value = if (uiState.isSystemBrightness) "تلقائي (سطوع النظام)" else "${(uiState.customBrightness * 100).toInt()}%",
+                            onClick = { activeSheet = SettingSheetType.BRIGHTNESS }
+                        )
+
+                        Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), thickness = 0.5.dp)
+
+                        // Screen Orientation Row
+                        SettingsItemRow(
+                            icon = Icons.Default.ScreenRotation,
+                            iconBgColor = Color(0xFFE91E63),
+                            title = "اتجاه الشاشة",
+                            value = when (uiState.screenOrientation) {
+                                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT -> "عمودي (Portrait)"
+                                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE -> "أفقي (Landscape)"
+                                else -> "تلقائي (Auto)"
+                            },
+                            onClick = { activeSheet = SettingSheetType.SCREEN_ORIENTATION }
+                        )
+
+                        Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), thickness = 0.5.dp)
+
+                        // Snap to Page Switch
+                        SettingsSwitchRow(
+                            icon = Icons.Default.LibraryAddCheck,
+                            iconBgColor = Color(0xFFFF5722),
+                            title = "محاذاة التمرير للصفحات (Snap)",
+                            subtitle = "قفل التمرير تلقائياً عند حدود كل صفحة",
+                            checked = uiState.snapToPage,
+                            onCheckedChange = { viewModel.setSnapToPage(it) }
+                        )
+                    }
+                }
+            }
+
+            // BOTTOM BAR CUSTOMIZATION SECTION
+            item {
+                SettingsSectionHeader(title = "تخصيص لون الشريط السفلي (BOTTOM BAR)", headerColor = headerColor)
+            }
+            item {
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardBg),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
                             text = "اختر لوناً لشريط التنقل السفلي للتطبيق (11 خياراً):",
-                            fontSize = 12.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.padding(bottom = 12.dp)
@@ -3923,19 +3987,19 @@ fun SettingsTabScreen(
                                     if (isDarkTheme) preset.darkBg else preset.lightBg
                                 }
                                 val previewAccent = if (index == 0) {
-                                    Color(0xFF7C5CFF) // LavenderPrimary
+                                    Color(0xFF7C5CFF)
                                 } else {
                                     if (isDarkTheme) preset.darkOnSelected else preset.lightOnSelected
                                 }
                                 
                                 Box(
                                     modifier = Modifier
-                                        .size(44.dp)
+                                        .size(46.dp)
                                         .clip(CircleShape)
                                         .background(previewBg)
                                         .border(
                                             width = if (isSelected) 3.dp else 1.dp,
-                                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.5f),
+                                            color = if (isSelected) Color(0xFF7C5CFF) else Color.Gray.copy(alpha = 0.4f),
                                             shape = CircleShape
                                         )
                                         .clickable { viewModel.setBottomBarColorIndex(context, index) },
@@ -3946,12 +4010,12 @@ fun SettingsTabScreen(
                                             imageVector = Icons.Default.Palette,
                                             contentDescription = null,
                                             tint = previewAccent,
-                                            modifier = Modifier.size(18.dp)
+                                            modifier = Modifier.size(20.dp)
                                         )
                                     } else {
                                         Box(
                                             modifier = Modifier
-                                                .size(14.dp)
+                                                .size(16.dp)
                                                 .clip(CircleShape)
                                                 .background(previewAccent)
                                         )
@@ -3963,68 +4027,211 @@ fun SettingsTabScreen(
                 }
             }
 
-            // READER SETTINGS SECTION
+            // GENERAL UTILITIES
             item {
-                SettingsSectionHeader(title = "إعدادات القارئ والتمرير")
+                SettingsSectionHeader(title = "الدعم والنظام (SYSTEM)", headerColor = headerColor)
             }
             item {
                 Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardBg),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column {
-                        SettingsSelectionRow(
-                            icon = Icons.Default.SwapVert,
-                            title = "اتجاه التمرير الافتراضي",
-                            value = if (uiState.scrollMode == "horizontal") "أفقي" else "عمودي",
+                        SettingsItemRow(
+                            icon = Icons.Default.DeleteSweep,
+                            iconBgColor = Color(0xFF607D8B),
+                            title = "مسح ذاكرة التخزين المؤقت",
+                            value = "تنظيف سجل القراءة والملفات المؤقتة",
                             onClick = {
-                                val nextMode = if (uiState.scrollMode == "horizontal") "vertical" else "horizontal"
-                                viewModel.setScrollMode(nextMode)
-                                Toast.makeText(context, "تم تغيير اتجاه القراءة!", Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                        Divider(color = Color.LightGray.copy(alpha = 0.3f), thickness = 0.5.dp)
-                        SettingsSelectionRow(
-                            icon = Icons.Default.Palette,
-                            title = "مظهر صفحات القراءة",
-                            value = when (uiState.readingTheme) {
-                                "dark" -> "داكن"
-                                "black" -> "أسود بالكامل"
-                                "sepia" -> "دافئ (Sepia)"
-                                else -> "فاتح"
-                            },
-                            onClick = {
-                                val themes = listOf("light", "dark", "sepia", "black")
-                                val currentIdx = themes.indexOf(uiState.readingTheme)
-                                val nextTheme = themes[(currentIdx + 1) % themes.size]
-                                viewModel.setReadingTheme(nextTheme)
+                                viewModel.clearHistory()
+                                Toast.makeText(context, "تم تنظيف السجل وذاكرة الكاش بنجاح!", Toast.LENGTH_LONG).show()
                             }
                         )
                     }
                 }
             }
-
-            // GENERAL UTILITIES
+            
             item {
-                SettingsSectionHeader(title = "الدعم والنظام")
+                Spacer(modifier = Modifier.height(24.dp))
             }
-            item {
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column {
-                        SettingsSelectionRow(
-                            icon = Icons.Default.DeleteSweep,
-                            title = "مسح ذاكرة التخزين المؤقت",
-                            value = "تنظيف الذاكرة",
+        }
+    }
+
+    // Active Bottom Sheet Dialog Handler
+    activeSheet?.let { sheet ->
+        AppBottomSheet(
+            onDismiss = { activeSheet = null },
+            title = when (sheet) {
+                SettingSheetType.APP_THEME -> "اختر مظهر التطبيق"
+                SettingSheetType.SCROLL_MODE -> "اتجاه التمرير الافتراضي"
+                SettingSheetType.DEFAULT_ZOOM -> "الزووم الافتراضي عند الفتح"
+                SettingSheetType.DOUBLE_TAP_ZOOM -> "تكبير النقر المزدوج"
+                SettingSheetType.READING_THEME -> "مظهر خلفية صفحة القراءة"
+                SettingSheetType.BRIGHTNESS -> "ضبط سطوع الشاشة"
+                SettingSheetType.SCREEN_ORIENTATION -> "اتجاه دوران الشاشة"
+            }
+        ) {
+            when (sheet) {
+                SettingSheetType.APP_THEME -> {
+                    val themes = listOf(
+                        "system" to "تلقائي (حسب النظام)",
+                        "light" to "الوضع الفاتح (Light Mode)",
+                        "dark" to "الوضع الداكن (Dark Mode)"
+                    )
+                    themes.forEach { (key, label) ->
+                        SettingRadioOptionRow(
+                            label = label,
+                            isSelected = uiState.appTheme == key,
                             onClick = {
-                                viewModel.clearHistory()
-                                Toast.makeText(context, "تم تنظيف السجل وذاكرة الكاش بنجاح!", Toast.LENGTH_LONG).show()
+                                viewModel.setAppTheme(context, key)
+                                activeSheet = null
+                            }
+                        )
+                    }
+                }
+
+                SettingSheetType.SCROLL_MODE -> {
+                    val modes = listOf(
+                        "vertical" to "التمرير العمودي (Vertical)",
+                        "horizontal" to "التمرير الأفقي (Horizontal)"
+                    )
+                    modes.forEach { (key, label) ->
+                        SettingRadioOptionRow(
+                            label = label,
+                            isSelected = uiState.scrollMode == key,
+                            onClick = {
+                                viewModel.setScrollMode(key)
+                                activeSheet = null
+                            }
+                        )
+                    }
+                }
+
+                SettingSheetType.DEFAULT_ZOOM -> {
+                    val zooms = listOf(
+                        "page-width" to "ملائمة عرض الشاشة (Fit Width)",
+                        "page-fit" to "ملائمة الصفحة الكاملة (Fit Page)",
+                        "1.0" to "الحجم الأصلي 100% (Actual Size)"
+                    )
+                    zooms.forEach { (key, label) ->
+                        SettingRadioOptionRow(
+                            label = label,
+                            isSelected = uiState.defaultZoom == key,
+                            onClick = {
+                                viewModel.setDefaultZoom(key)
+                                activeSheet = null
+                            }
+                        )
+                    }
+                }
+
+                SettingSheetType.DOUBLE_TAP_ZOOM -> {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        Text(
+                            text = "معامل التكبير عند الضغط المزدوج: ${String.format("%.1fx", uiState.doubleTapZoomFactor)}",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                        
+                        Slider(
+                            value = uiState.doubleTapZoomFactor,
+                            onValueChange = { viewModel.setDoubleTapZoomFactor(it) },
+                            valueRange = 1.1f..5.0f,
+                            steps = 38
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            listOf(1.5f, 2.0f, 3.0f, 4.0f).forEach { factor ->
+                                FilterChip(
+                                    selected = (uiState.doubleTapZoomFactor - factor).let { Math.abs(it) < 0.05f },
+                                    onClick = { viewModel.setDoubleTapZoomFactor(factor) },
+                                    label = { Text(text = "${factor}x") }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                SettingSheetType.READING_THEME -> {
+                    val themes = listOf(
+                        "light" to "فاتح (Light - أبيض)",
+                        "sepia" to "دافئ (Sepia - بني دافئ مريح للعين)",
+                        "dark" to "داكن (Dark - رمادي غامق)",
+                        "black" to "أسود عميق (AMOLED Black - حماية العين والتوفير)"
+                    )
+                    themes.forEach { (key, label) ->
+                        SettingRadioOptionRow(
+                            label = label,
+                            isSelected = uiState.readingTheme == key,
+                            onClick = {
+                                viewModel.setReadingTheme(key)
+                                activeSheet = null
+                            }
+                        )
+                    }
+                }
+
+                SettingSheetType.BRIGHTNESS -> {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.setSystemBrightness(!uiState.isSystemBrightness)
+                                },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "استخدام سطوع النظام التلقائي",
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Switch(
+                                checked = uiState.isSystemBrightness,
+                                onCheckedChange = { viewModel.setSystemBrightness(it) }
+                            )
+                        }
+
+                        if (!uiState.isSystemBrightness) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "مستوى السطوع المخصص: ${(uiState.customBrightness * 100).toInt()}%",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Slider(
+                                value = uiState.customBrightness,
+                                onValueChange = { viewModel.setCustomBrightness(it) },
+                                valueRange = 0.05f..1.0f
+                            )
+                        }
+                    }
+                }
+
+                SettingSheetType.SCREEN_ORIENTATION -> {
+                    val orientations = listOf(
+                        ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED to "تلقائي (حسب دوران الجهاز)",
+                        ActivityInfo.SCREEN_ORIENTATION_PORTRAIT to "عمودي ثابت (Portrait)",
+                        ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE to "أفقي ثابت (Landscape)"
+                    )
+                    orientations.forEach { (orientationVal, label) ->
+                        SettingRadioOptionRow(
+                            label = label,
+                            isSelected = uiState.screenOrientation == orientationVal,
+                            onClick = {
+                                viewModel.setScreenOrientation(orientationVal)
+                                activeSheet = null
                             }
                         )
                     }
@@ -4034,20 +4241,86 @@ fun SettingsTabScreen(
     }
 }
 
+enum class SettingSheetType {
+    APP_THEME,
+    SCROLL_MODE,
+    DEFAULT_ZOOM,
+    DOUBLE_TAP_ZOOM,
+    READING_THEME,
+    BRIGHTNESS,
+    SCREEN_ORIENTATION
+}
+
 @Composable
-fun SettingsSectionHeader(title: String) {
+fun SettingsSectionHeader(title: String, headerColor: Color = Color.Gray) {
     Text(
         text = title,
-        fontSize = 12.sp,
+        fontSize = 11.sp,
         fontWeight = FontWeight.Bold,
-        color = Color.Gray,
+        color = headerColor,
         modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
     )
 }
 
 @Composable
+fun SettingsItemRow(
+    icon: ImageVector,
+    iconBgColor: Color,
+    title: String,
+    value: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .background(iconBgColor.copy(alpha = 0.18f), RoundedCornerShape(10.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconBgColor,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(14.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = value,
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Icon(
+            imageVector = Icons.Default.ChevronLeft,
+            contentDescription = null,
+            tint = Color.Gray,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+@Composable
 fun SettingsSwitchRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
+    iconBgColor: Color,
     title: String,
     subtitle: String,
     checked: Boolean,
@@ -4056,38 +4329,76 @@ fun SettingsSwitchRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f)
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .background(iconBgColor.copy(alpha = 0.18f), RoundedCornerShape(10.dp)),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-            }
-            Spacer(modifier = Modifier.width(14.dp))
-            Column {
-                Text(text = title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(text = subtitle, fontSize = 10.sp, color = Color.Gray, lineHeight = 13.sp)
-            }
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconBgColor,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(14.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
         Switch(
             checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = MaterialTheme.colorScheme.primary
-            )
+            onCheckedChange = onCheckedChange
         )
+    }
+}
+
+@Composable
+fun SettingRadioOptionRow(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp, horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = label,
+            fontSize = 15.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+        )
+
+        if (isSelected) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = "مُختار",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp)
+            )
+        }
     }
 }
 
@@ -4206,124 +4517,12 @@ fun CustomBottomBar(
     bottomBarColorIndex: Int,
     onTabSelected: (DashboardTab) -> Unit
 ) {
-    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val preset = BottomBarPresets.getOrElse(bottomBarColorIndex) { BottomBarPresets[0] }
-    
-    val barColor = if (bottomBarColorIndex == 0) {
-        MaterialTheme.colorScheme.surface
-    } else {
-        if (isDark) preset.darkBg else preset.lightBg
-    }
-    
-    val onSelectedColor = if (bottomBarColorIndex == 0) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        if (isDark) preset.darkOnSelected else preset.lightOnSelected
-    }
-    
-    val unselectedColor = if (bottomBarColorIndex == 0) {
-        Color(0xFF767482)
-    } else {
-        if (isDark) preset.darkUnselected else preset.lightUnselected
-    }
-    
-    val selectedContainerColor = if (bottomBarColorIndex == 0) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        if (isDark) preset.darkSelectedContainer else preset.lightSelectedContainer
-    }
-
-    Surface(
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        color = barColor,
-        shadowElevation = 12.dp,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(vertical = 12.dp, horizontal = 16.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Note: Order from Left to Right is: Settings, Tools, Folders, Home
-            
-            // Settings Tab
-            BottomTabItem(
-                selected = selectedTab == DashboardTab.Settings,
-                onSelectedColor = onSelectedColor,
-                unselectedColor = unselectedColor,
-                selectedContainerColor = selectedContainerColor,
-                onClick = { onTabSelected(DashboardTab.Settings) },
-                label = "الإعدادات",
-                icon = { tint ->
-                    Icon(
-                        imageVector = if (selectedTab == DashboardTab.Settings) Icons.Filled.Settings else Icons.Outlined.Settings,
-                        contentDescription = "الإعدادات",
-                        tint = tint,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            )
-
-            // Tools Tab (only display if showTools is active)
-            if (showTools) {
-                BottomTabItem(
-                    selected = selectedTab == DashboardTab.Tools,
-                    onSelectedColor = onSelectedColor,
-                    unselectedColor = unselectedColor,
-                    selectedContainerColor = selectedContainerColor,
-                    onClick = { onTabSelected(DashboardTab.Tools) },
-                    label = "الأدوات",
-                    icon = { tint ->
-                        Icon(
-                            imageVector = if (selectedTab == DashboardTab.Tools) Icons.Filled.Construction else Icons.Outlined.Construction,
-                            contentDescription = "الأدوات",
-                            tint = tint,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                )
-            }
-
-            // Folders Tab
-            BottomTabItem(
-                selected = selectedTab == DashboardTab.Folders,
-                onSelectedColor = onSelectedColor,
-                unselectedColor = unselectedColor,
-                selectedContainerColor = selectedContainerColor,
-                onClick = { onTabSelected(DashboardTab.Folders) },
-                label = "المجلدات",
-                icon = { tint ->
-                    Icon(
-                        imageVector = if (selectedTab == DashboardTab.Folders) Icons.Filled.Folder else Icons.Outlined.Folder,
-                        contentDescription = "المجلدات",
-                        tint = tint,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            )
-
-            // Home Tab
-            BottomTabItem(
-                selected = selectedTab == DashboardTab.Home,
-                onSelectedColor = onSelectedColor,
-                unselectedColor = unselectedColor,
-                selectedContainerColor = selectedContainerColor,
-                onClick = { onTabSelected(DashboardTab.Home) },
-                label = "الرئيسية",
-                icon = { tint ->
-                    Icon(
-                        imageVector = if (selectedTab == DashboardTab.Home) Icons.Filled.Home else Icons.Outlined.Home,
-                        contentDescription = "الرئيسية",
-                        tint = tint,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            )
-        }
-    }
+    DashboardAnimatedBottomNavBar(
+        selectedTab = selectedTab,
+        showTools = showTools,
+        bottomBarColorIndex = bottomBarColorIndex,
+        onTabSelected = onTabSelected
+    )
 }
 
 @Composable
@@ -4482,21 +4681,9 @@ fun FileActionSheet(
 ) {
     val pageCount = remember(file.filePath) { getPdfPageCount(file.filePath) }
     
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = Color(0xF2ECE6F8),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        dragHandle = { BottomSheetDefaults.DragHandle() }
+    AppBottomSheet(
+        onDismiss = onDismiss
     ) {
-        MaterialTheme(colorScheme = glassLavenderColorScheme) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 8.dp)
-                    .padding(bottom = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
                 // Header of Bottom Sheet
                 Row(
                     modifier = Modifier
@@ -4633,8 +4820,6 @@ fun FileActionSheet(
                         onDismiss()
                     }
                 )
-            }
-        }
     }
 }
 

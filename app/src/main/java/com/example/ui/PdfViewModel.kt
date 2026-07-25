@@ -23,6 +23,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.PdfDatabase
 import com.example.data.RecentPdf
 import com.example.data.RecentPdfDao
+import com.example.data.SettingsRepository
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -106,6 +107,8 @@ data class PdfUiState(
     val isSystemBrightness: Boolean = true,
     val customBrightness: Float = 0.5f,
     val keepScreenOn: Boolean = false,
+    val defaultZoom: String = "page-width", // "page-width", "page-fit", "1.0"
+    val doubleTapZoomFactor: Float = 2.0f, // 1.1f to 5.0f
     
     // Bookmarks and AutoScroll
     val bookmarkedPages: Set<Int> = emptySet(),
@@ -145,7 +148,8 @@ data class PdfUiState(
     val freeTextColor: String = "#212121",
     val freeTextSize: Float = 14f,
     val freeTextOpacity: Float = 100f,
-    val isElementSelected: Boolean = false
+    val isElementSelected: Boolean = false,
+    val hasUnsavedChanges: Boolean = false
 )
 
 class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
@@ -214,6 +218,7 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
     }
 
     fun setScrollMode(mode: String) {
+        appContext?.let { SettingsRepository(it).setScrollMode(mode) }
         _uiState.update { it.copy(scrollMode = mode) }
         val jsVal = if (_uiState.value.snapToPage) {
             3
@@ -224,6 +229,7 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
     }
 
     fun setSnapToPage(snap: Boolean) {
+        appContext?.let { SettingsRepository(it).setSnapToPage(snap) }
         _uiState.update { it.copy(snapToPage = snap) }
         val mode = _uiState.value.scrollMode
         val jsVal = if (snap) {
@@ -239,16 +245,35 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
     }
 
     fun setReadingTheme(theme: String) {
+        appContext?.let { SettingsRepository(it).setReadingTheme(theme) }
         _uiState.update { it.copy(readingTheme = theme) }
         sendJsCommand("applyTheme('$theme')")
     }
 
     fun setSystemBrightness(isSystem: Boolean) {
+        appContext?.let { SettingsRepository(it).setSystemBrightness(isSystem) }
         _uiState.update { it.copy(isSystemBrightness = isSystem) }
     }
 
     fun setCustomBrightness(brightness: Float) {
+        appContext?.let { SettingsRepository(it).setCustomBrightness(brightness) }
         _uiState.update { it.copy(customBrightness = brightness, isSystemBrightness = false) }
+    }
+
+    fun setDefaultZoom(zoom: String) {
+        appContext?.let { SettingsRepository(it).setDefaultZoom(zoom) }
+        _uiState.update { it.copy(defaultZoom = zoom) }
+        sendJsCommand("if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) { PDFViewerApplication.pdfViewer.currentScaleValue = '$zoom'; }")
+    }
+
+    fun setDoubleTapZoomFactor(factor: Float) {
+        appContext?.let { SettingsRepository(it).setDoubleTapZoomFactor(factor) }
+        _uiState.update { it.copy(doubleTapZoomFactor = factor) }
+    }
+
+    fun setScreenOrientation(orientation: Int) {
+        appContext?.let { SettingsRepository(it).setScreenOrientation(orientation) }
+        _uiState.update { it.copy(screenOrientation = orientation) }
     }
 
     fun setKeepScreenOn(keep: Boolean) {
@@ -300,7 +325,8 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                     isSearchActive = false,
                     searchMatchesTotal = 0,
                     searchMatchActive = 0,
-                    currentScale = 1.0f
+                    currentScale = 1.0f,
+                    hasUnsavedChanges = false
                 )
             }
         }
@@ -485,6 +511,28 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
         }
     }
 
+    private var pendingExitAfterSave = false
+
+    fun markHasUnsavedChanges(hasChanges: Boolean = true) {
+        _uiState.update { it.copy(hasUnsavedChanges = hasChanges) }
+    }
+
+    fun requestSaveAndExit() {
+        pendingExitAfterSave = true
+        requestSaveAnnotatedPdf()
+    }
+
+    fun discardAndExit() {
+        _uiState.update { 
+            it.copy(
+                isEditMode = false,
+                activeEditTool = "none",
+                hasUnsavedChanges = false
+            ) 
+        }
+        goBackToDashboard()
+    }
+
     fun requestSaveAnnotatedPdf() {
         sendJsCommand("""
             (async () => {
@@ -531,15 +579,21 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 _uiState.update { 
                     it.copy(
                         isEditMode = false,
-                        activeEditTool = "none"
+                        activeEditTool = "none",
+                        hasUnsavedChanges = false
                     ) 
                 }
                 
                 withContext(Dispatchers.Main) {
                     android.widget.Toast.makeText(context, "تم حفظ التعديلات بنجاح", android.widget.Toast.LENGTH_SHORT).show()
+                    if (pendingExitAfterSave) {
+                        pendingExitAfterSave = false
+                        goBackToDashboard()
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
+                pendingExitAfterSave = false
                 withContext(Dispatchers.Main) {
                     android.widget.Toast.makeText(context, "فشل حفظ التعديلات: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
                 }
@@ -548,6 +602,7 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
     }
 
     fun onPdfSaveFailed(context: Context, error: String) {
+        pendingExitAfterSave = false
         viewModelScope.launch(Dispatchers.Main) {
             android.widget.Toast.makeText(context, "خطأ في الحفظ: $error", android.widget.Toast.LENGTH_LONG).show()
         }
@@ -793,10 +848,10 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
     fun initialize(context: Context) {
         appContext = context.applicationContext
         val prefs = context.getSharedPreferences("pdf_reader_prefs", Context.MODE_PRIVATE)
+        val settingsRepo = SettingsRepository(context)
+        val settings = settingsRepo.loadSettings()
+
         val completed = prefs.getBoolean("welcome_completed", false)
-        val showTools = prefs.getBoolean("show_tools_tab", true)
-        val theme = prefs.getString("app_theme", "system") ?: "system"
-        val bottomBarColorIdx = prefs.getInt("bottom_bar_color_index", 0)
         val sortOptName = prefs.getString("sort_option", SortOption.ALPHA_ASC.name) ?: SortOption.ALPHA_ASC.name
         val sortOpt = try { SortOption.valueOf(sortOptName) } catch(e: Exception) { SortOption.ALPHA_ASC }
         
@@ -849,11 +904,19 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
 
             it.copy(
                 welcomeCompleted = completed,
-                showToolsTab = showTools,
+                showToolsTab = settings.showToolsTab,
                 isGridView = savedIsGrid,
                 starredPdfs = starredSet,
-                appTheme = theme,
-                bottomBarColorIndex = bottomBarColorIdx,
+                appTheme = settings.appTheme,
+                bottomBarColorIndex = settings.bottomBarColorIndex,
+                scrollMode = settings.scrollMode,
+                snapToPage = settings.snapToPage,
+                readingTheme = settings.readingTheme,
+                isSystemBrightness = settings.isSystemBrightness,
+                customBrightness = settings.customBrightness,
+                defaultZoom = settings.defaultZoom,
+                doubleTapZoomFactor = settings.doubleTapZoomFactor,
+                screenOrientation = settings.screenOrientation,
                 sortOption = sortOpt,
                 currentScreen = nextScreen,
                 currentPdfPath = path,
@@ -888,14 +951,12 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
     }
 
     fun setAppTheme(context: Context, theme: String) {
-        val prefs = context.getSharedPreferences("pdf_reader_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putString("app_theme", theme).apply()
+        SettingsRepository(context).setAppTheme(theme)
         _uiState.update { it.copy(appTheme = theme) }
     }
 
     fun setBottomBarColorIndex(context: Context, index: Int) {
-        val prefs = context.getSharedPreferences("pdf_reader_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putInt("bottom_bar_color_index", index).apply()
+        SettingsRepository(context).setBottomBarColorIndex(index)
         _uiState.update { it.copy(bottomBarColorIndex = index) }
     }
     
@@ -956,8 +1017,7 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
     }
     
     fun setShowToolsTab(context: Context, show: Boolean) {
-        val prefs = context.getSharedPreferences("pdf_reader_prefs", Context.MODE_PRIVATE)
-        prefs.edit().putBoolean("show_tools_tab", show).apply()
+        SettingsRepository(context).setShowToolsTab(show)
         _uiState.update { it.copy(showToolsTab = show) }
     }
     
