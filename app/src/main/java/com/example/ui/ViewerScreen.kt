@@ -150,13 +150,6 @@ fun ViewerScreen(
     val activity = context as? Activity
     
     var activeSheet by remember { mutableStateOf(BottomSheetType.None) }
-    var isEditingBarActive by remember { mutableStateOf(false) }
-
-    LaunchedEffect(state.annotationEditorMode) {
-        if (state.annotationEditorMode != 0) {
-            isEditingBarActive = true
-        }
-    }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
     var isBarsVisible by remember { mutableStateOf(true) }
     var isBrowsing by remember { mutableStateOf(false) }
@@ -778,27 +771,13 @@ fun ViewerScreen(
                                             tint = Color(0xFF4CAF50),
                                             iconSize = 20.dp
                                         )
-                                    } else {
-                                        GlowingIconButton(
-                                            icon = Icons.Default.Search,
-                                            contentDescription = "البحث",
-                                            onClick = { viewModel.openSearch() },
-                                            tint = Color(0xFF009688),
-                                            iconSize = 18.dp
-                                        )
                                     }
-
                                     GlowingIconButton(
-                                        icon = Icons.Default.Edit,
-                                        contentDescription = "أدوات التحرير والرسم",
-                                        onClick = {
-                                            isEditingBarActive = !isEditingBarActive
-                                            if (!isEditingBarActive) {
-                                                viewModel.setAnnotationEditorMode(0)
-                                            }
-                                        },
-                                        tint = if (isEditingBarActive || state.annotationEditorMode != 0) Color(0xFF7C5CFF) else Color(0xFF4CB050),
-                                        iconSize = 20.dp
+                                        icon = Icons.Default.Search,
+                                        contentDescription = "البحث",
+                                        onClick = { viewModel.openSearch() },
+                                        tint = Color(0xFF009688),
+                                        iconSize = 18.dp
                                     )
                                 }
 
@@ -1884,58 +1863,6 @@ fun PdfWebView(
                                                 }
                                                 #editorModeButtons {
                                                     display: none !important;
-                                                }
-                                                body.edit-mode-active #editorModeButtons {
-                                                    display: flex !important;
-                                                    pointer-events: auto !important;
-                                                    position: fixed !important;
-                                                    top: 10px !important;
-                                                    left: 50% !important;
-                                                    transform: translateX(-50%) !important;
-                                                    z-index: 999999 !important;
-                                                    background: #1e1b2e !important;
-                                                    padding: 6px 12px !important;
-                                                    border-radius: 28px !important;
-                                                    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5) !important;
-                                                    border: 1px solid rgba(124, 92, 255, 0.4) !important;
-                                                    align-items: center !important;
-                                                    gap: 8px !important;
-                                                    direction: ltr !important;
-                                                }
-                                                body.edit-mode-active #editorModeButtons button.toolbarButton {
-                                                    background: rgba(255, 255, 255, 0.1) !important;
-                                                    border: 1px solid rgba(255, 255, 255, 0.15) !important;
-                                                    border-radius: 20px !important;
-                                                    padding: 6px 12px !important;
-                                                    color: #FFFFFF !important;
-                                                    font-size: 13px !important;
-                                                    font-weight: 600 !important;
-                                                    display: inline-flex !important;
-                                                    align-items: center !important;
-                                                    gap: 6px !important;
-                                                    min-height: 36px !important;
-                                                    cursor: pointer !important;
-                                                }
-                                                body.edit-mode-active #editorModeButtons button.toolbarButton[aria-expanded="true"],
-                                                body.edit-mode-active #editorModeButtons button.toolbarButton.toggled {
-                                                    background: #7C5CFF !important;
-                                                    color: #FFFFFF !important;
-                                                    border-color: #7C5CFF !important;
-                                                }
-                                                body.edit-mode-active .editorParamsToolbar:not(.hidden) {
-                                                    display: flex !important;
-                                                    pointer-events: auto !important;
-                                                    position: fixed !important;
-                                                    top: 65px !important;
-                                                    left: 50% !important;
-                                                    transform: translateX(-50%) !important;
-                                                    z-index: 1000000 !important;
-                                                    background: #252033 !important;
-                                                    color: #FFFFFF !important;
-                                                    border-radius: 16px !important;
-                                                    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.6) !important;
-                                                    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-                                                    padding: 12px 16px !important;
                                                 } 
                                                 #outerContainer {
                                                     position: fixed !important;
@@ -2511,28 +2438,6 @@ fun PdfWebView(
                             (function() {
                                 window.lastSelectionRange = null;
                                 window.lastSelectionText = "";
-
-                                window.setEditingToolbarVisible = function(visible) {
-                                    if (visible) {
-                                        document.body.classList.add('edit-mode-active');
-                                        try {
-                                            var btns = document.querySelectorAll('#editorModeButtons button');
-                                            btns.forEach(function(b) { b.removeAttribute('disabled'); });
-                                            if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
-                                                if (!PDFViewerApplication.pdfViewer.annotationEditorMode || PDFViewerApplication.pdfViewer.annotationEditorMode.mode === 0) {
-                                                    PDFViewerApplication.pdfViewer.annotationEditorMode = { mode: 9 };
-                                                }
-                                            }
-                                        } catch(e) {}
-                                    } else {
-                                        document.body.classList.remove('edit-mode-active');
-                                        try {
-                                            if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
-                                                PDFViewerApplication.pdfViewer.annotationEditorMode = { mode: 0 };
-                                            }
-                                        } catch(e) {}
-                                    }
-                                };
 
                                 window.applyHighlightToSelection = function(colorHex) {
                                     try {
