@@ -278,15 +278,19 @@ fun DashboardScreen(
 
     val nestedScrollConnection = remember {
         object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                val delta = available.y
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                val delta = consumed.y
                 if (delta < -10f) {
-                    // Scrolling DOWN (dragging content up) -> Hide bottom bar
+                    // Scrolling DOWN with actual content movement -> Hide bottom bar
                     if (isBottomBarVisible) {
                         isBottomBarVisible = false
                     }
                 } else if (delta > 10f) {
-                    // Scrolling UP (dragging content down) -> Show bottom bar
+                    // Scrolling UP with actual content movement -> Show bottom bar
                     if (!isBottomBarVisible) {
                         isBottomBarVisible = true
                     }
@@ -354,6 +358,7 @@ fun DashboardScreen(
                     selectedFilePaths = selectedFilePaths,
                     onToggleSelectFile = onToggleSelectFile,
                     onShowFileActions = { showFileActionsSheet = it },
+                    onShowFileDetails = { fileToViewInfo = it },
                     onClearSelection = { selectedFilePaths = emptySet() },
                     onShareMultiple = { shareMultiplePdfs(context, selectedFilePaths.toList()) },
                     onDeleteMultiple = { showMultiDeleteConfirm = true }
@@ -363,7 +368,8 @@ fun DashboardScreen(
                     uiState = uiState,
                     selectedFilePaths = selectedFilePaths,
                     onToggleSelectFile = onToggleSelectFile,
-                    onShowFileActions = { showFileActionsSheet = it }
+                    onShowFileActions = { showFileActionsSheet = it },
+                    onShowFileDetails = { fileToViewInfo = it }
                 )
                 DashboardTab.Tools -> ToolsTabScreen(
                     viewModel = viewModel
@@ -519,35 +525,18 @@ fun DashboardScreen(
         )
     }
 
-    // File Info Dialog
+    // File Detail Overlay Sheet
     if (fileToViewInfo != null) {
         val file = fileToViewInfo!!
-        val dateStr = remember(file.lastModified) {
-            try {
-                SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(file.lastModified))
-            } catch (e: Exception) {
-                "غير معروف"
-            }
-        }
-        val pageCount = remember(file.filePath) { getPdfPageCount(file.filePath) }
-        
-        AlertDialog(
-            onDismissRequest = { fileToViewInfo = null },
-            title = { Text("معلومات الملف", fontWeight = FontWeight.Bold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    InfoRow(label = "اسم الملف:", value = file.fileName)
-                    InfoRow(label = "مسار الملف:", value = file.filePath)
-                    InfoRow(label = "حجم الملف:", value = file.fileSize)
-                    InfoRow(label = "تاريخ التعديل:", value = dateStr)
-                    InfoRow(label = "عدد الصفحات:", value = if (pageCount > 0) "$pageCount صفحة" else "غير معروف")
-                    InfoRow(label = "مجلد الملف:", value = file.folderName)
-                }
+        PdfDetailOverlaySheet(
+            file = file,
+            onDismiss = { fileToViewInfo = null },
+            onOpenPdf = { pdfFile ->
+                fileToViewInfo = null
+                viewModel.selectPdf(pdfFile.filePath, pdfFile.fileName)
             },
-            confirmButton = {
-                Button(onClick = { fileToViewInfo = null }) {
-                    Text("حسناً")
-                }
+            onSharePdf = { pdfFile ->
+                sharePdf(context, pdfFile.filePath, pdfFile.fileName)
             }
         )
     }
@@ -566,6 +555,7 @@ fun HomeTabScreen(
     selectedFilePaths: Set<String>,
     onToggleSelectFile: (String) -> Unit,
     onShowFileActions: (LocalPdfFile) -> Unit,
+    onShowFileDetails: (LocalPdfFile) -> Unit,
     onClearSelection: () -> Unit,
     onShareMultiple: () -> Unit,
     onDeleteMultiple: () -> Unit
@@ -913,7 +903,7 @@ fun HomeTabScreen(
                                 if (isInSelectionMode) {
                                     onToggleSelectFile(file.filePath)
                                 } else {
-                                    onShowFileActions(file)
+                                    onShowFileDetails(file)
                                 }
                             },
                             onMenuClick = {
@@ -959,7 +949,7 @@ fun HomeTabScreen(
                                 if (isInSelectionMode) {
                                     onToggleSelectFile(file.filePath)
                                 } else {
-                                    onShowFileActions(file)
+                                    onShowFileDetails(file)
                                 }
                             },
                             onMenuClick = {
@@ -1933,7 +1923,8 @@ fun FoldersTabScreen(
     uiState: PdfUiState,
     selectedFilePaths: Set<String>,
     onToggleSelectFile: (String) -> Unit,
-    onShowFileActions: (LocalPdfFile) -> Unit
+    onShowFileActions: (LocalPdfFile) -> Unit,
+    onShowFileDetails: (LocalPdfFile) -> Unit
 ) {
     val context = LocalContext.current
     val recentPdfs by viewModel.recentPdfs.collectAsState(initial = emptyList())
@@ -2223,7 +2214,7 @@ fun FoldersTabScreen(
                                     if (isInSelectionMode) {
                                         onToggleSelectFile(file.filePath)
                                     } else {
-                                        onShowFileActions(file)
+                                        onShowFileDetails(file)
                                     }
                                 },
                                 onMenuClick = {
@@ -2265,7 +2256,7 @@ fun FoldersTabScreen(
                                     if (isInSelectionMode) {
                                         onToggleSelectFile(file.filePath)
                                     } else {
-                                        onShowFileActions(file)
+                                        onShowFileDetails(file)
                                     }
                                 },
                                 onMenuClick = {
@@ -5661,6 +5652,495 @@ fun ToolResultDialog(
                 }
             }
         }
+    }
+}
+
+// ==========================================
+// PDF METADATA DETAIL OVERLAY SHEET
+// ==========================================
+
+data class PdfMetadata(
+    val fileName: String,
+    val filePath: String,
+    val fileSize: String,
+    val folderName: String,
+    val title: String?,
+    val author: String,
+    val creator: String?,
+    val producer: String?,
+    val creationDate: String,
+    val modificationDate: String,
+    val subject: String?,
+    val keywords: String?,
+    val pageCount: Int,
+    val isEncrypted: Boolean,
+    val pdfVersion: String
+)
+
+fun extractPdfMetadata(context: Context, filePath: String): PdfMetadata {
+    val file = File(filePath)
+    if (!file.exists()) {
+        return PdfMetadata(
+            fileName = if (filePath.isNotBlank()) File(filePath).name else "مستند PDF",
+            filePath = filePath,
+            fileSize = "0 KB",
+            folderName = "غير معروف",
+            title = null,
+            author = "غير محدد",
+            creator = null,
+            producer = null,
+            creationDate = "غير معروف",
+            modificationDate = "غير معروف",
+            subject = null,
+            keywords = null,
+            pageCount = 0,
+            isEncrypted = false,
+            pdfVersion = "PDF"
+        )
+    }
+
+    val fileSizeStr = when {
+        file.length() > 1024 * 1024 -> String.format(Locale.US, "%.2f MB", file.length() / (1024f * 1024f))
+        file.length() > 1024 -> String.format(Locale.US, "%.1f KB", file.length() / 1024f)
+        else -> "${file.length()} Bytes"
+    }
+
+    val dateFormat = SimpleDateFormat("yyyy/MM/dd - hh:mm a", Locale("ar"))
+    val lastModStr = try {
+        dateFormat.format(Date(file.lastModified()))
+    } catch (e: Exception) {
+        "غير معروف"
+    }
+
+    var title: String? = null
+    var author: String? = null
+    var creator: String? = null
+    var producer: String? = null
+    var subject: String? = null
+    var keywords: String? = null
+    var creationDateStr: String? = null
+    var modDateStr: String? = lastModStr
+    var totalPages = 0
+    var isEncrypted = false
+    var versionStr: String? = null
+
+    try {
+        com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(context.applicationContext)
+        val doc = com.tom_roush.pdfbox.pdmodel.PDDocument.load(file)
+        isEncrypted = doc.isEncrypted
+        totalPages = doc.numberOfPages
+        if (doc.version > 0f) {
+            versionStr = "PDF ${doc.version}"
+        }
+
+        val info = doc.documentInformation
+        if (info != null) {
+            title = info.title?.trim()?.takeIf { it.isNotBlank() }
+            author = info.author?.trim()?.takeIf { it.isNotBlank() }
+            creator = info.creator?.trim()?.takeIf { it.isNotBlank() }
+            producer = info.producer?.trim()?.takeIf { it.isNotBlank() }
+            subject = info.subject?.trim()?.takeIf { it.isNotBlank() }
+            keywords = info.keywords?.trim()?.takeIf { it.isNotBlank() }
+
+            info.creationDate?.let { cal ->
+                try {
+                    creationDateStr = dateFormat.format(cal.time)
+                } catch (_: Exception) { }
+            }
+            info.modificationDate?.let { cal ->
+                try {
+                    modDateStr = dateFormat.format(cal.time)
+                } catch (_: Exception) { }
+            }
+        }
+        doc.close()
+    } catch (_: Exception) { }
+
+    if (totalPages == 0) {
+        try {
+            val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+            val renderer = android.graphics.pdf.PdfRenderer(pfd)
+            totalPages = renderer.pageCount
+            renderer.close()
+            pfd.close()
+        } catch (_: Exception) { }
+    }
+
+    val folder = file.parentFile?.name ?: "المستندات"
+
+    return PdfMetadata(
+        fileName = file.name,
+        filePath = file.absolutePath,
+        fileSize = fileSizeStr,
+        folderName = folder,
+        title = title,
+        author = author ?: "غير محدد",
+        creator = creator ?: "غير محدد",
+        producer = producer ?: "غير محدد",
+        creationDate = creationDateStr ?: lastModStr,
+        modificationDate = modDateStr ?: lastModStr,
+        subject = subject,
+        keywords = keywords,
+        pageCount = totalPages,
+        isEncrypted = isEncrypted,
+        pdfVersion = versionStr ?: "PDF 1.7"
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PdfDetailOverlaySheet(
+    file: LocalPdfFile,
+    onDismiss: () -> Unit,
+    onOpenPdf: (LocalPdfFile) -> Unit,
+    onSharePdf: (LocalPdfFile) -> Unit
+) {
+    val context = LocalContext.current
+    var metadata by remember { mutableStateOf<PdfMetadata?>(null) }
+    var thumbnailBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(file.filePath) {
+        isLoading = true
+        withContext(Dispatchers.IO) {
+            val meta = extractPdfMetadata(context, file.filePath)
+            metadata = meta
+
+            try {
+                val f = File(file.filePath)
+                if (f.exists()) {
+                    val descriptor = ParcelFileDescriptor.open(f, ParcelFileDescriptor.MODE_READ_ONLY)
+                    val renderer = android.graphics.pdf.PdfRenderer(descriptor)
+                    if (renderer.pageCount > 0) {
+                        val page = renderer.openPage(0)
+                        val bmp = Bitmap.createBitmap((page.width / 2).coerceAtLeast(100), (page.height / 2).coerceAtLeast(100), Bitmap.Config.ARGB_8888)
+                        page.render(bmp, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                        page.close()
+                        thumbnailBitmap = bmp
+                    }
+                    renderer.close()
+                    descriptor.close()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        isLoading = false
+    }
+
+    AppBottomSheet(
+        onDismiss = onDismiss
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Header Card with Thumbnail & Main Metadata
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(68.dp, 88.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF7C5CFF).copy(alpha = 0.12f))
+                            .border(1.dp, Color(0xFF7C5CFF).copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (thumbnailBitmap != null) {
+                            Image(
+                                bitmap = thumbnailBitmap!!.asImageBitmap(),
+                                contentDescription = "معاينة المستند",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.PictureAsPdf,
+                                contentDescription = null,
+                                tint = Color(0xFF7C5CFF),
+                                modifier = Modifier.size(36.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = file.fileName,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val pagesText = metadata?.let { if (it.pageCount > 0) "${it.pageCount} صفحة" else "PDF" } ?: "جاري..."
+                            DetailBadge(text = pagesText, icon = Icons.Default.MenuBook, color = Color(0xFF7C5CFF))
+                            metadata?.let {
+                                DetailBadge(text = it.fileSize, icon = Icons.Default.Storage, color = Color(0xFF00B0FF))
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = Color(0xFF7C5CFF))
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("جاري استخراج بيانات المستند والميتاداتا...", fontSize = 13.sp, color = Color.Gray)
+                    }
+                }
+            } else {
+                val meta = metadata ?: extractPdfMetadata(context, file.filePath)
+
+                // Chips Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SpecChip(
+                        title = "الإصدار",
+                        value = meta.pdfVersion,
+                        icon = Icons.Outlined.Badge,
+                        modifier = Modifier.weight(1f)
+                    )
+                    SpecChip(
+                        title = "التشفير",
+                        value = if (meta.isEncrypted) "محمي بكلمة مرور" else "غير محمي",
+                        icon = if (meta.isEncrypted) Icons.Outlined.Lock else Icons.Outlined.LockOpen,
+                        color = if (meta.isEncrypted) Color(0xFFE53935) else Color(0xFF43A047),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                // Metadata Cards
+                DetailCardSection(title = "تفاصيل المؤلف والمستند", icon = Icons.Outlined.Person) {
+                    DetailMetaRow(label = "المؤلف / الكاتب", value = meta.author, icon = Icons.Outlined.Person)
+                    if (!meta.title.isNullOrBlank()) {
+                        DetailMetaRow(label = "عنوان المستند", value = meta.title, icon = Icons.Outlined.Title)
+                    }
+                    if (!meta.subject.isNullOrBlank()) {
+                        DetailMetaRow(label = "الموضوع", value = meta.subject, icon = Icons.Outlined.Subject)
+                    }
+                    if (!meta.keywords.isNullOrBlank()) {
+                        DetailMetaRow(label = "الكلمات المفتاحية", value = meta.keywords, icon = Icons.Outlined.Tag)
+                    }
+                }
+
+                DetailCardSection(title = "التواريخ والوقت", icon = Icons.Outlined.CalendarToday) {
+                    DetailMetaRow(label = "تاريخ الإنشاء", value = meta.creationDate, icon = Icons.Outlined.CalendarMonth)
+                    DetailMetaRow(label = "تاريخ آخر تعديل", value = meta.modificationDate, icon = Icons.Outlined.Update)
+                }
+
+                if (!meta.creator.isNullOrBlank() && meta.creator != "غير محدد" || !meta.producer.isNullOrBlank() && meta.producer != "غير محدد") {
+                    DetailCardSection(title = "البرنامج المنشئ والمحرك", icon = Icons.Outlined.Devices) {
+                        if (!meta.creator.isNullOrBlank() && meta.creator != "غير محدد") {
+                            DetailMetaRow(label = "البرنامج المنشئ", value = meta.creator!!, icon = Icons.Outlined.Laptop)
+                        }
+                        if (!meta.producer.isNullOrBlank() && meta.producer != "غير محدد") {
+                            DetailMetaRow(label = "محرك التصدير", value = meta.producer!!, icon = Icons.Outlined.Build)
+                        }
+                    }
+                }
+
+                DetailCardSection(title = "موقع الملف والتخزين", icon = Icons.Outlined.Folder) {
+                    DetailMetaRow(label = "اسم المجلد", value = meta.folderName, icon = Icons.Outlined.FolderOpen)
+
+                    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                        Text("المسار الكامل:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = meta.filePath,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(
+                                onClick = {
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                    val clip = android.content.ClipData.newPlainText("PDF Path", meta.filePath)
+                                    clipboard.setPrimaryClip(clip)
+                                    Toast.makeText(context, "تم نسخ مسار الملف", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(Icons.Outlined.ContentCopy, contentDescription = "نسخ", tint = Color(0xFF7C5CFF), modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+                }
+
+                // Bottom Action Buttons
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            onDismiss()
+                            onOpenPdf(file)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C5CFF)),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("فتح المستند", fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            onSharePdf(file)
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("مشاركة")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DetailBadge(text: String, icon: ImageVector, color: Color) {
+    Surface(
+        color = color.copy(alpha = 0.12f),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(imageVector = icon, contentDescription = null, tint = color, modifier = Modifier.size(12.dp))
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(text = text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = color)
+        }
+    }
+}
+
+@Composable
+fun SpecChip(
+    title: String,
+    value: String,
+    icon: ImageVector,
+    color: Color = Color(0xFF7C5CFF),
+    modifier: Modifier = Modifier
+) {
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier.padding(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .background(color.copy(alpha = 0.12f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(imageVector = icon, contentDescription = null, tint = color, modifier = Modifier.size(16.dp))
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Column {
+                Text(text = title, fontSize = 10.sp, color = Color.Gray)
+                Text(text = value, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            }
+        }
+    }
+}
+
+@Composable
+fun DetailCardSection(
+    title: String,
+    icon: ImageVector,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(imageVector = icon, contentDescription = null, tint = Color(0xFF7C5CFF), modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7C5CFF))
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f), thickness = 1.dp)
+            content()
+        }
+    }
+}
+
+@Composable
+fun DetailMetaRow(label: String, value: String, icon: ImageVector) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(imageVector = icon, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp))
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(text = "$label:", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.Gray)
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = value,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 

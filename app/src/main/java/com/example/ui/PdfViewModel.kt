@@ -580,26 +580,30 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 stickyNotesList = curr.stickyNotesList + highlightNote,
                 hasUnsavedChanges = true,
                 textSelectionHighlightColor = colorHex,
-                showTextSelectionToolbar = false
+                showTextSelectionToolbar = false,
+                selectedPdfText = null
             )
         }
 
         sendJsCommand("""
             (function() {
-                if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
-                    PDFViewerApplication.pdfViewer.annotationEditorMode = { mode: 9 };
-                    if (PDFViewerApplication.eventBus) {
-                        PDFViewerApplication.eventBus.dispatch('switchannotationeditorparams', {
-                            source: window,
-                            type: 7,
-                            value: '$colorHex'
-                        });
+                if (typeof window.applyHighlightToSelection === 'function') {
+                    window.applyHighlightToSelection('$colorHex');
+                } else {
+                    if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
+                        PDFViewerApplication.pdfViewer.annotationEditorMode = { mode: 9 };
+                        if (PDFViewerApplication.eventBus) {
+                            PDFViewerApplication.eventBus.dispatch('switchannotationeditorparams', {
+                                source: window,
+                                type: 7,
+                                value: '$colorHex'
+                            });
+                        }
                     }
                 }
             })();
         """.trimIndent())
 
-        clearTextSelection()
         android.widget.Toast.makeText(context, "تم تظليل النص بنجاح", android.widget.Toast.LENGTH_SHORT).show()
     }
 

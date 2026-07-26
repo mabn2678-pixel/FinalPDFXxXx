@@ -28,6 +28,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.ui.draw.scale
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -150,6 +151,13 @@ fun ViewerScreen(
     val activity = context as? Activity
     
     var activeSheet by remember { mutableStateOf(BottomSheetType.None) }
+    var isEditingBarActive by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.annotationEditorMode) {
+        if (state.annotationEditorMode != 0) {
+            isEditingBarActive = true
+        }
+    }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
     var isBarsVisible by remember { mutableStateOf(true) }
     var isBrowsing by remember { mutableStateOf(false) }
@@ -796,8 +804,13 @@ fun ViewerScreen(
                                     GlowingIconButton(
                                         icon = Icons.Default.Edit,
                                         contentDescription = "أدوات التحرير والرسم",
-                                        onClick = { activeSheet = BottomSheetType.AnnotationTools },
-                                        tint = Color(0xFF4CB050),
+                                        onClick = {
+                                            isEditingBarActive = !isEditingBarActive
+                                            if (!isEditingBarActive) {
+                                                viewModel.setAnnotationEditorMode(0)
+                                            }
+                                        },
+                                        tint = if (isEditingBarActive || state.annotationEditorMode != 0) Color(0xFF7C5CFF) else Color(0xFF4CB050),
                                         iconSize = 20.dp
                                     )
                                 }
@@ -870,66 +883,78 @@ fun ViewerScreen(
                         .fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                        // Sleek circular-dock style Bottom bar with 6 beautifully labeled items
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("native_bottom_bar")
-                                .clip(RoundedCornerShape(28.dp))
-                                .background(Color(0xF2ECE6F8))
-                                .border(BorderStroke(1.dp, Color(0x407C5CFF)), RoundedCornerShape(28.dp))
-                        ) {
-                            Row(
+                        if (isEditingBarActive || state.annotationEditorMode != 0) {
+                            EditingBottomBar(
+                                state = state,
+                                viewModel = viewModel,
+                                onClose = {
+                                    isEditingBarActive = false
+                                    viewModel.setAnnotationEditorMode(0)
+                                },
+                                modifier = Modifier.testTag("editing_bottom_bar")
+                            )
+                        } else {
+                            // Sleek circular-dock style Bottom bar with 6 beautifully labeled items
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 6.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceEvenly
+                                    .testTag("native_bottom_bar")
+                                    .clip(RoundedCornerShape(28.dp))
+                                    .background(Color(0xF2ECE6F8))
+                                    .border(BorderStroke(1.dp, Color(0x407C5CFF)), RoundedCornerShape(28.dp))
                             ) {
-                                val isBookmarked = state.bookmarkedPages.contains(state.currentPage)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 6.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceEvenly
+                                ) {
+                                    val isBookmarked = state.bookmarkedPages.contains(state.currentPage)
 
-                                BottomBarItem(
-                                    icon = Icons.Default.MenuBook,
-                                    label = "الصفحات",
-                                    onClick = { activeSheet = BottomSheetType.DocumentNavigation },
-                                    tint = Color(0xFF4CB050), // Green
-                                    modifier = Modifier.weight(1f)
-                                )
-                                BottomBarItem(
-                                    icon = if (state.scrollMode == "horizontal") Icons.Default.ViewCarousel else Icons.Default.ViewStream,
-                                    label = "العرض",
-                                    onClick = { activeSheet = BottomSheetType.ViewOptions },
-                                    tint = Color(0xFF03A9F4), // Light Blue
-                                    modifier = Modifier.weight(1f)
-                                )
-                                BottomBarItem(
-                                    icon = Icons.Default.ZoomIn,
-                                    label = "الزووم",
-                                    onClick = { activeSheet = BottomSheetType.ZoomSettings },
-                                    tint = Color(0xFFFF9800), // Orange
-                                    modifier = Modifier.weight(1f)
-                                )
-                                BottomBarItem(
-                                    icon = Icons.Default.Palette,
-                                    label = "السمات",
-                                    onClick = { activeSheet = BottomSheetType.DisplaySettings },
-                                    tint = Color(0xFF9C27B0), // Purple
-                                    modifier = Modifier.weight(1f)
-                                )
-                                BottomBarItem(
-                                    icon = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                    label = "إشارة",
-                                    onClick = { viewModel.toggleBookmark(context, state.currentPage) },
-                                    tint = if (isBookmarked) Color(0xFFE91E63) else Color(0xFFE91E63).copy(alpha = 0.5f), // Pink
-                                    modifier = Modifier.weight(1f)
-                                )
-                                BottomBarItem(
-                                    icon = Icons.Default.MoreHoriz,
-                                    label = "أدوات",
-                                    onClick = { activeSheet = BottomSheetType.MoreOptions },
-                                    tint = Color(0xFF009688), // Teal
-                                    modifier = Modifier.weight(1f)
-                                )
+                                    BottomBarItem(
+                                        icon = Icons.Default.MenuBook,
+                                        label = "الصفحات",
+                                        onClick = { activeSheet = BottomSheetType.DocumentNavigation },
+                                        tint = Color(0xFF4CB050), // Green
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    BottomBarItem(
+                                        icon = if (state.scrollMode == "horizontal") Icons.Default.ViewCarousel else Icons.Default.ViewStream,
+                                        label = "العرض",
+                                        onClick = { activeSheet = BottomSheetType.ViewOptions },
+                                        tint = Color(0xFF03A9F4), // Light Blue
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    BottomBarItem(
+                                        icon = Icons.Default.ZoomIn,
+                                        label = "الزووم",
+                                        onClick = { activeSheet = BottomSheetType.ZoomSettings },
+                                        tint = Color(0xFFFF9800), // Orange
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    BottomBarItem(
+                                        icon = Icons.Default.Palette,
+                                        label = "السمات",
+                                        onClick = { activeSheet = BottomSheetType.DisplaySettings },
+                                        tint = Color(0xFF9C27B0), // Purple
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    BottomBarItem(
+                                        icon = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                        label = "إشارة",
+                                        onClick = { viewModel.toggleBookmark(context, state.currentPage) },
+                                        tint = if (isBookmarked) Color(0xFFE91E63) else Color(0xFFE91E63).copy(alpha = 0.5f), // Pink
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    BottomBarItem(
+                                        icon = Icons.Default.MoreHoriz,
+                                        label = "أدوات",
+                                        onClick = { activeSheet = BottomSheetType.MoreOptions },
+                                        tint = Color(0xFF009688), // Teal
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
                             }
                         }
                 }
@@ -1520,15 +1545,16 @@ fun PdfWebView(
                                                 thumb.id = 'fastScrubberThumb';
                                                 thumb.className = 'fast-scrubber-thumb';
 
-                                                var droplet = document.createElement('div');
-                                                droplet.className = 'fast-scrubber-droplet';
-                                                droplet.innerHTML = '<svg viewBox="0 0 24 24" width="8" height="8" fill="rgba(255,255,255,0.95)" style="transform: rotate(45deg);"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>';
+                                                var handle = document.createElement('div');
+                                                handle.className = 'wps-scroll-handle';
+                                                handle.innerHTML = '<div class="wps-handle-line"></div><div class="wps-handle-line"></div><div class="wps-handle-line"></div>';
 
-                                                thumb.appendChild(droplet);
+                                                thumb.appendChild(handle);
                                                 track.appendChild(thumb);
                                                 document.body.appendChild(track);
 
                                                 var isScrubbing = false;
+                                                var startTouchOffsetY = 0;
 
                                                 function updateScrubber() {
                                                     var container = document.getElementById('viewerContainer');
@@ -1547,6 +1573,7 @@ fun PdfWebView(
                                                 }
 
                                                 function doScrub(e) {
+                                                    if (!isScrubbing) return;
                                                     var container = document.getElementById('viewerContainer');
                                                     if (!container || !track || !thumb) return;
                                                     var rect = track.getBoundingClientRect();
@@ -1554,7 +1581,7 @@ fun PdfWebView(
                                                     var trackHeight = rect.height - thumb.clientHeight;
                                                     if (trackHeight <= 0) return;
 
-                                                    var offsetY = clientY - rect.top - (thumb.clientHeight / 2);
+                                                    var offsetY = clientY - rect.top - startTouchOffsetY;
                                                     var ratio = offsetY / trackHeight;
                                                     if (ratio < 0) ratio = 0;
                                                     if (ratio > 1) ratio = 1;
@@ -1570,14 +1597,26 @@ fun PdfWebView(
                                                      }
                                                 }
 
-                                                track.addEventListener('touchstart', function(e) {
+                                                function onThumbStart(e) {
                                                     isScrubbing = true;
+                                                    var clientY = (e.touches && e.touches.length > 0) ? e.touches[0].clientY : e.clientY;
+                                                    var thumbRect = thumb.getBoundingClientRect();
+                                                    startTouchOffsetY = clientY - thumbRect.top;
+                                                    if (startTouchOffsetY < 0 || startTouchOffsetY > thumb.clientHeight) {
+                                                        startTouchOffsetY = thumb.clientHeight / 2;
+                                                    }
+
+                                                    document.body.classList.add('scrolling');
+                                                    document.body.classList.add('scrubbing');
+
                                                     doScrub(e);
                                                     if (e.cancelable) e.preventDefault();
                                                     e.stopPropagation();
-                                                }, {passive: false});
+                                                }
 
-                                                track.addEventListener('touchmove', function(e) {
+                                                thumb.addEventListener('touchstart', onThumbStart, {passive: false});
+
+                                                window.addEventListener('touchmove', function(e) {
                                                     if (isScrubbing) {
                                                         doScrub(e);
                                                         if (e.cancelable) e.preventDefault();
@@ -1585,24 +1624,21 @@ fun PdfWebView(
                                                     }
                                                 }, {passive: false});
 
-                                                track.addEventListener('touchend', function(e) {
+                                                window.addEventListener('touchend', function(e) {
                                                     if (isScrubbing) {
                                                         isScrubbing = false;
                                                         document.body.classList.remove('scrubbing');
                                                     }
                                                 });
 
-                                                track.addEventListener('touchcancel', function(e) {
+                                                window.addEventListener('touchcancel', function(e) {
                                                     if (isScrubbing) {
                                                         isScrubbing = false;
                                                         document.body.classList.remove('scrubbing');
                                                     }
                                                 });
 
-                                                track.addEventListener('mousedown', function(e) {
-                                                    isScrubbing = true;
-                                                    doScrub(e);
-                                                });
+                                                thumb.addEventListener('mousedown', onThumbStart);
 
                                                 window.addEventListener('mousemove', function(e) {
                                                     if (isScrubbing) {
@@ -1756,6 +1792,104 @@ fun PdfWebView(
                                                 }
                                             });
 
+                                            // Setup FreeText Control Header Observer
+                                            function attachFreeTextHeader(freeTextEditor) {
+                                                if (!freeTextEditor || freeTextEditor.querySelector('.freetext-control-header')) return;
+                                                
+                                                var header = document.createElement('div');
+                                                header.className = 'freetext-control-header';
+                                                header.setAttribute('contenteditable', 'false');
+                                                
+                                                var internal = freeTextEditor.querySelector('.internal');
+                                                var currentFontSize = 16;
+                                                if (internal) {
+                                                    var computedSize = parseInt(window.getComputedStyle(internal).fontSize);
+                                                    if (computedSize && !isNaN(computedSize) && computedSize > 0) {
+                                                        currentFontSize = computedSize;
+                                                    }
+                                                }
+                                                
+                                                header.innerHTML = `
+                                                    <button type="button" class="ft-btn ft-down" title="تصغير الخط">A-</button>
+                                                    <span class="ft-label">${'$'}{currentFontSize}px</span>
+                                                    <button type="button" class="ft-btn ft-up" title="تكبير الخط">A+</button>
+                                                    <div class="ft-divider"></div>
+                                                    <button type="button" class="ft-btn ft-del" title="حذف النص">
+                                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="#FF5252">
+                                                            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                                                        </svg>
+                                                    </button>
+                                                `;
+
+                                                header.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+                                                header.addEventListener('touchstart', function(e) { e.stopPropagation(); }, {passive: true});
+                                                header.addEventListener('click', function(e) { e.stopPropagation(); });
+
+                                                var label = header.querySelector('.ft-label');
+                                                var btnDown = header.querySelector('.ft-down');
+                                                var btnUp = header.querySelector('.ft-up');
+                                                var btnDel = header.querySelector('.ft-del');
+
+                                                function updateSize(newSize) {
+                                                    if (newSize < 10) newSize = 10;
+                                                    if (newSize > 72) newSize = 72;
+                                                    currentFontSize = newSize;
+                                                    if (label) label.innerText = currentFontSize + 'px';
+                                                    if (internal) {
+                                                        internal.style.fontSize = currentFontSize + 'px';
+                                                    }
+                                                    if (freeTextEditor.annotationEditor) {
+                                                        freeTextEditor.annotationEditor.fontSize = currentFontSize;
+                                                    }
+                                                    try {
+                                                        if (window.PDFViewerApplication && window.PDFViewerApplication.eventBus) {
+                                                            window.PDFViewerApplication.eventBus.dispatch('switchannotationeditorparams', {
+                                                                type: 1,
+                                                                value: currentFontSize
+                                                            });
+                                                        }
+                                                    } catch(err) {}
+                                                }
+
+                                                if (btnDown) {
+                                                    btnDown.addEventListener('click', function(e) {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        updateSize(currentFontSize - 2);
+                                                    });
+                                                }
+
+                                                if (btnUp) {
+                                                    btnUp.addEventListener('click', function(e) {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        updateSize(currentFontSize + 2);
+                                                    });
+                                                }
+
+                                                if (btnDel) {
+                                                    btnDel.addEventListener('click', function(e) {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        if (freeTextEditor.annotationEditor && typeof freeTextEditor.annotationEditor.remove === 'function') {
+                                                            freeTextEditor.annotationEditor.remove();
+                                                        } else if (typeof freeTextEditor.remove === 'function') {
+                                                            freeTextEditor.remove();
+                                                        }
+                                                    });
+                                                }
+
+                                                freeTextEditor.appendChild(header);
+                                            }
+
+                                            var freeTextObserver = new MutationObserver(function(mutations) {
+                                                var editors = document.querySelectorAll('.annotationEditorLayer .freeTextEditor');
+                                                editors.forEach(function(editor) {
+                                                    attachFreeTextHeader(editor);
+                                                });
+                                            });
+                                            freeTextObserver.observe(document.body, { childList: true, subtree: true });
+
                                             // 3. Complete hide/vanish of PDF.js official viewer toolbar elements
                                             var style = document.createElement('style');
                                             style.type = 'text/css';
@@ -1867,7 +2001,68 @@ fun PdfWebView(
                                                     touch-action: none !important;
                                                     margin: 0 !important;
                                                     transform-origin: 0 0 !important;
+                                                    overflow: visible !important;
                                                     transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease !important;
+                                                }
+                                                .freetext-control-header {
+                                                    position: absolute !important;
+                                                    top: -40px !important;
+                                                    left: 0 !important;
+                                                    display: flex !important;
+                                                    align-items: center !important;
+                                                    gap: 4px !important;
+                                                    background: #1F1B2C !important;
+                                                    color: #FFFFFF !important;
+                                                    padding: 3px 8px !important;
+                                                    border-radius: 18px !important;
+                                                    box-shadow: 0 4px 12px rgba(0,0,0,0.35) !important;
+                                                    border: 1px solid rgba(255,255,255,0.2) !important;
+                                                    z-index: 999999 !important;
+                                                    direction: ltr !important;
+                                                    user-select: none !important;
+                                                    -webkit-user-select: none !important;
+                                                    pointer-events: auto !important;
+                                                    white-space: nowrap !important;
+                                                    font-family: system-ui, -apple-system, sans-serif !important;
+                                                }
+                                                .freetext-control-header .ft-btn {
+                                                    background: rgba(255,255,255,0.12) !important;
+                                                    border: none !important;
+                                                    color: #FFFFFF !important;
+                                                    font-size: 11px !important;
+                                                    font-weight: bold !important;
+                                                    width: 24px !important;
+                                                    height: 24px !important;
+                                                    border-radius: 12px !important;
+                                                    display: inline-flex !important;
+                                                    align-items: center !important;
+                                                    justify-content: center !important;
+                                                    cursor: pointer !important;
+                                                    padding: 0 !important;
+                                                    margin: 0 !important;
+                                                    outline: none !important;
+                                                }
+                                                .freetext-control-header .ft-btn:active {
+                                                    background: rgba(255,255,255,0.3) !important;
+                                                }
+                                                .freetext-control-header .ft-label {
+                                                    font-size: 11px !important;
+                                                    font-weight: 600 !important;
+                                                    color: #D1C4E9 !important;
+                                                    padding: 0 4px !important;
+                                                }
+                                                .freetext-control-header .ft-del {
+                                                    background: rgba(244, 67, 54, 0.25) !important;
+                                                    color: #FF5252 !important;
+                                                }
+                                                .freetext-control-header .ft-del:active {
+                                                    background: rgba(244, 67, 54, 0.5) !important;
+                                                }
+                                                .freetext-control-header .ft-divider {
+                                                    width: 1px !important;
+                                                    height: 14px !important;
+                                                    background-color: rgba(255,255,255,0.2) !important;
+                                                    margin: 0 2px !important;
                                                 }
                                                 .annotationEditorLayer .freeTextEditor.selectedEditor,
                                                 .annotationEditorLayer .freeTextEditor:focus-within {
@@ -1898,7 +2093,7 @@ fun PdfWebView(
                                                     top: 70px !important;
                                                     bottom: 90px !important;
                                                     left: 0px !important;
-                                                    width: 28px !important;
+                                                    width: 36px !important;
                                                     z-index: 99999 !important;
                                                     pointer-events: none !important;
                                                     opacity: 0 !important;
@@ -1908,38 +2103,45 @@ fun PdfWebView(
                                                 body.scrolling .fast-scrubber-track,
                                                 body.scrubbing .fast-scrubber-track {
                                                     opacity: 1 !important;
-                                                    pointer-events: auto !important;
                                                 }
                                                 .fast-scrubber-thumb {
                                                     position: absolute !important;
                                                     left: 0px !important;
                                                     top: 0 !important;
-                                                    width: 24px !important;
-                                                    height: 24px !important;
+                                                    width: 36px !important;
+                                                    height: 54px !important;
                                                     display: flex !important;
                                                     align-items: center !important;
                                                     justify-content: center !important;
                                                     cursor: pointer !important;
                                                     touch-action: none !important;
                                                     will-change: transform !important;
+                                                    pointer-events: auto !important;
                                                 }
-                                                .fast-scrubber-droplet {
-                                                    width: 15px !important;
-                                                    height: 15px !important;
-                                                    background: linear-gradient(135deg, #B388FF, #7C5CFF) !important;
-                                                    border-radius: 50% 50% 50% 0 !important;
-                                                    transform: rotate(-45deg) !important;
-                                                    box-shadow: 0 2px 6px rgba(124, 92, 255, 0.5) !important;
-                                                    border: 1px solid rgba(255, 255, 255, 0.85) !important;
-                                                    transition: transform 0.15s ease, background 0.15s ease !important;
+                                                .wps-scroll-handle {
+                                                    width: 18px !important;
+                                                    height: 46px !important;
+                                                    background: linear-gradient(180deg, #8E6CFF 0%, #673AB7 100%) !important;
+                                                    border-radius: 12px !important;
+                                                    box-shadow: 0 4px 12px rgba(103, 58, 183, 0.5) !important;
+                                                    border: 1.5px solid rgba(255, 255, 255, 0.95) !important;
                                                     display: flex !important;
+                                                    flex-direction: column !important;
                                                     align-items: center !important;
                                                     justify-content: center !important;
+                                                    gap: 3.5px !important;
+                                                    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease !important;
                                                 }
-                                                body.scrubbing .fast-scrubber-droplet {
-                                                    transform: rotate(-45deg) scale(1.2) !important;
-                                                    background: linear-gradient(135deg, #C499FF, #8E6CFF) !important;
-                                                    box-shadow: 0 3px 10px rgba(124, 92, 255, 0.8) !important;
+                                                .wps-handle-line {
+                                                    width: 8px !important;
+                                                    height: 2px !important;
+                                                    background-color: rgba(255, 255, 255, 0.92) !important;
+                                                    border-radius: 2px !important;
+                                                }
+                                                body.scrubbing .wps-scroll-handle {
+                                                    transform: scale(1.15) !important;
+                                                    background: linear-gradient(180deg, #9E7CFF 0%, #7E57C2 100%) !important;
+                                                    box-shadow: 0 6px 18px rgba(103, 58, 183, 0.75) !important;
                                                 }
                                             `;
                                             document.head.appendChild(style);
@@ -2057,7 +2259,7 @@ fun PdfWebView(
                                             var singleTapTimer = null;
 
                                             document.addEventListener('click', function(e) {
-                                                var interactive = e.target.closest('a, button, input, select, textarea, .internalLink, #fastScrubberTrack, .annotationEditorLayer, .freeTextEditor, .internal, [contenteditable="true"]');
+                                                var interactive = e.target.closest('a, button, input, select, textarea, .internalLink, #fastScrubberTrack, #fastScrubberThumb, .wps-scroll-handle, .annotationEditorLayer, .freeTextEditor, .internal, [contenteditable="true"]');
                                                 if (interactive || document.body.classList.contains('edit-mode-active')) {
                                                     return;
                                                 }
@@ -2267,14 +2469,135 @@ fun PdfWebView(
                         
                         val selectionScript = """
                             (function() {
+                                window.lastSelectionRange = null;
+                                window.lastSelectionText = "";
+
+                                window.applyHighlightToSelection = function(colorHex) {
+                                    try {
+                                        var sel = window.getSelection();
+                                        var range = null;
+                                        if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
+                                            range = sel.getRangeAt(0);
+                                        } else if (window.lastSelectionRange) {
+                                            range = window.lastSelectionRange;
+                                        }
+
+                                        if (!range) return false;
+
+                                        var container = range.commonAncestorContainer;
+                                        var pageElem = (container.nodeType === 1 ? container : container.parentElement).closest('.page');
+                                        if (!pageElem) {
+                                            var activePageNum = 1;
+                                            try {
+                                                if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
+                                                    activePageNum = PDFViewerApplication.pdfViewer.currentPageNumber || 1;
+                                                }
+                                            } catch(e) {}
+                                            pageElem = document.querySelector('.page[data-page-number="' + activePageNum + '"]') || document.querySelector('.page');
+                                        }
+
+                                        if (!pageElem) return false;
+
+                                        var rects = range.getClientRects();
+                                        var pageRect = pageElem.getBoundingClientRect();
+
+                                        var highlightLayer = pageElem.querySelector('.custom-pdf-highlights-layer');
+                                        if (!highlightLayer) {
+                                            highlightLayer = document.createElement('div');
+                                            highlightLayer.className = 'custom-pdf-highlights-layer';
+                                            highlightLayer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 8;';
+                                            pageElem.appendChild(highlightLayer);
+                                        }
+
+                                        var addedAny = false;
+                                        if (rects && rects.length > 0) {
+                                            for (var i = 0; i < rects.length; i++) {
+                                                var rect = rects[i];
+                                                if (rect.width > 0.5 && rect.height > 0.5) {
+                                                    var leftPct = ((rect.left - pageRect.left) / pageRect.width) * 100;
+                                                    var topPct = ((rect.top - pageRect.top) / pageRect.height) * 100;
+                                                    var widthPct = (rect.width / pageRect.width) * 100;
+                                                    var heightPct = (rect.height / pageRect.height) * 100;
+
+                                                    var highlightSpan = document.createElement('div');
+                                                    highlightSpan.className = 'custom-highlight-rect';
+                                                    highlightSpan.setAttribute('data-color', colorHex);
+                                                    highlightSpan.style.cssText = 'position: absolute;' +
+                                                        'left: ' + leftPct + '%;' +
+                                                        'top: ' + topPct + '%;' +
+                                                        'width: ' + widthPct + '%;' +
+                                                        'height: ' + heightPct + '%;' +
+                                                        'background-color: ' + colorHex + ';' +
+                                                        'opacity: 0.42;' +
+                                                        'mix-blend-mode: multiply;' +
+                                                        'border-radius: 2px;' +
+                                                        'pointer-events: auto;' +
+                                                        'box-shadow: 0 0 2px ' + colorHex + ';';
+
+                                                    highlightSpan.addEventListener('click', function(ev) {
+                                                        ev.stopPropagation();
+                                                        if (confirm('هل تريد حذف هذا التظليل؟')) {
+                                                            this.remove();
+                                                        }
+                                                    });
+
+                                                    highlightLayer.appendChild(highlightSpan);
+                                                    addedAny = true;
+                                                }
+                                            }
+                                        }
+
+                                        if (!addedAny && window.lastSelectionText) {
+                                            var targetText = window.lastSelectionText.trim();
+                                            var textSpans = pageElem.querySelectorAll('.textLayer span');
+                                            textSpans.forEach(function(s) {
+                                                if (s.textContent && targetText.length > 0 && (s.textContent.includes(targetText) || targetText.includes(s.textContent.trim()))) {
+                                                    s.style.backgroundColor = colorHex;
+                                                    s.style.opacity = '0.5';
+                                                    s.style.borderRadius = '2px';
+                                                    addedAny = true;
+                                                }
+                                            });
+                                        }
+
+                                        try {
+                                            if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
+                                                PDFViewerApplication.pdfViewer.annotationEditorMode = { mode: 9 };
+                                                if (PDFViewerApplication.eventBus) {
+                                                    PDFViewerApplication.eventBus.dispatch('switchannotationeditorparams', {
+                                                        source: window,
+                                                        type: 7,
+                                                        value: colorHex
+                                                    });
+                                                }
+                                            }
+                                        } catch(e) {}
+
+                                        if (window.getSelection) {
+                                            window.getSelection().removeAllRanges();
+                                        }
+                                        window.lastSelectionRange = null;
+
+                                        return addedAny;
+                                    } catch(err) {
+                                        console.error("applyHighlightToSelection error:", err);
+                                        return false;
+                                    }
+                                };
+
                                 var selDebounce = null;
                                 function notifySelection() {
                                     if (selDebounce) clearTimeout(selDebounce);
                                     selDebounce = setTimeout(function() {
                                         var sel = window.getSelection();
-                                        if (sel && !sel.isCollapsed) {
+                                        if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
                                             var text = sel.toString().trim();
                                             if (text.length > 0) {
+                                                try {
+                                                    window.lastSelectionRange = sel.getRangeAt(0).cloneRange();
+                                                    window.lastSelectionText = text;
+                                                } catch(e) {}
+
                                                 var pageNum = 1;
                                                 try {
                                                     if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
@@ -2286,7 +2609,7 @@ fun PdfWebView(
                                                 }
                                             }
                                         }
-                                    }, 200);
+                                    }, 150);
                                 }
                                 document.addEventListener('selectionchange', notifySelection);
                                 document.addEventListener('mouseup', notifySelection);
@@ -6987,5 +7310,322 @@ fun NotesAndHighlightsSheet(
                 }
             }
         }
+    }
+}
+
+// ----------------- TRANSFORMATION EDITING BOTTOM BAR -----------------
+
+@Composable
+fun EditingBottomBar(
+    state: PdfUiState,
+    viewModel: PdfViewModel,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val currentMode = state.annotationEditorMode
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Contextual parameters floating bar (Colors, Thickness, etc.) when an editor tool is selected
+        AnimatedVisibility(
+            visible = currentMode != 0,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0xF21F1B2C))
+                    .border(BorderStroke(1.dp, Color(0x407C5CFF)), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                when (currentMode) {
+                    15 -> { // Ink / Drawing
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            val inkColors = listOf("#E53935", "#4CAF50", "#2196F3", "#FFEB3B", "#FF9800", "#9C27B0", "#000000", "#FFFFFF")
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                inkColors.forEach { hex ->
+                                    val color = try { Color(android.graphics.Color.parseColor(hex)) } catch (e: Exception) { Color.Black }
+                                    val isSelected = state.inkColor.equals(hex, ignoreCase = true)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(if (isSelected) 26.dp else 20.dp)
+                                            .clip(CircleShape)
+                                            .background(color)
+                                            .border(
+                                                width = if (isSelected) 2.5.dp else 1.dp,
+                                                color = if (isSelected) Color.White else Color.White.copy(alpha = 0.3f),
+                                                shape = CircleShape
+                                            )
+                                            .clickable { viewModel.updateAnnotationParam(4, hex) }
+                                    )
+                                }
+                            }
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "السُمك: ${state.inkThickness.toInt()}px",
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Slider(
+                                    value = state.inkThickness,
+                                    onValueChange = { viewModel.updateAnnotationParam(5, it) },
+                                    valueRange = 1f..20f,
+                                    modifier = Modifier.weight(1f),
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = Color(0xFF7C5CFF),
+                                        activeTrackColor = Color(0xFF7C5CFF)
+                                    )
+                                )
+                            }
+                        }
+                    }
+                    9 -> { // Highlight
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val highlightColors = listOf("#FFEB3B", "#8BC34A", "#03A9F4", "#E91E63", "#FF9800", "#9C27B0")
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                highlightColors.forEach { hex ->
+                                    val color = try { Color(android.graphics.Color.parseColor(hex)) } catch (e: Exception) { Color.Yellow }
+                                    val isSelected = state.highlightColor.equals(hex, ignoreCase = true)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(if (isSelected) 26.dp else 20.dp)
+                                            .clip(CircleShape)
+                                            .background(color)
+                                            .border(
+                                                width = if (isSelected) 2.5.dp else 1.dp,
+                                                color = if (isSelected) Color.White else Color.White.copy(alpha = 0.3f),
+                                                shape = CircleShape
+                                            )
+                                            .clickable { viewModel.updateAnnotationParam(7, hex) }
+                                    )
+                                }
+                            }
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "حر",
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    fontSize = 11.sp
+                                )
+                                Switch(
+                                    checked = state.highlightFree,
+                                    onCheckedChange = { viewModel.updateAnnotationParam(10, it) },
+                                    modifier = Modifier.scale(0.75f)
+                                )
+                            }
+                        }
+                    }
+                    3 -> { // Free Text
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "انقر على الصفحة لإضافة نص",
+                                color = Color(0xFFB39DDB),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            val textColors = listOf("#000000", "#E53935", "#2196F3", "#4CAF50", "#9C27B0", "#FFFFFF")
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                textColors.forEach { hex ->
+                                    val color = try { Color(android.graphics.Color.parseColor(hex)) } catch (e: Exception) { Color.Black }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clip(CircleShape)
+                                            .background(color)
+                                            .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+                                            .clickable { viewModel.updateAnnotationParam(1, hex) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    13 -> { // Stamp
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "انقر على الصفحة لإضافة ختم / توقيع",
+                                color = Color(0xFF80CBC4),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Main Editing Bottom Bar Dock
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(28.dp))
+                .background(Color(0xF2ECE6F8))
+                .border(BorderStroke(1.dp, Color(0x407C5CFF)), RoundedCornerShape(28.dp))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                // 1. Highlight / تظليل
+                EditingToolBarItem(
+                    icon = Icons.Default.BorderColor,
+                    label = "تظليل",
+                    isSelected = (currentMode == 9),
+                    activeColor = Color(0xFFFFC107),
+                    onClick = {
+                        if (currentMode == 9) viewModel.setAnnotationEditorMode(0)
+                        else viewModel.setAnnotationEditorMode(9)
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+
+                // 2. Free Draw / رسم حر
+                EditingToolBarItem(
+                    icon = Icons.Default.Create,
+                    label = "رسم حر",
+                    isSelected = (currentMode == 15),
+                    activeColor = Color(0xFF9C27B0),
+                    onClick = {
+                        if (currentMode == 15) viewModel.setAnnotationEditorMode(0)
+                        else viewModel.setAnnotationEditorMode(15)
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+
+                // 3. Free Text / نص حر
+                EditingToolBarItem(
+                    icon = Icons.Default.TextFields,
+                    label = "نص حر",
+                    isSelected = (currentMode == 3),
+                    activeColor = Color(0xFF2196F3),
+                    onClick = {
+                        if (currentMode == 3) viewModel.setAnnotationEditorMode(0)
+                        else viewModel.setAnnotationEditorMode(3)
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+
+                // 4. Stamp / ختم
+                EditingToolBarItem(
+                    icon = Icons.Default.Approval,
+                    label = "ختم",
+                    isSelected = (currentMode == 13),
+                    activeColor = Color(0xFF009688),
+                    onClick = {
+                        if (currentMode == 13) viewModel.setAnnotationEditorMode(0)
+                        else viewModel.setAnnotationEditorMode(13)
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+
+                // 5. Undo / تراجع
+                EditingToolBarItem(
+                    icon = Icons.Default.Undo,
+                    label = "تراجع",
+                    isSelected = false,
+                    activeColor = Color(0xFF3F51B5),
+                    onClick = { viewModel.triggerUndo() },
+                    modifier = Modifier.weight(1f)
+                )
+
+                // 6. Redo / إعادة
+                EditingToolBarItem(
+                    icon = Icons.Default.Redo,
+                    label = "إعادة",
+                    isSelected = false,
+                    activeColor = Color(0xFF3F51B5),
+                    onClick = { viewModel.triggerRedo() },
+                    modifier = Modifier.weight(1f)
+                )
+
+                // 7. Done / Exit Editing / تم
+                EditingToolBarItem(
+                    icon = Icons.Default.Check,
+                    label = "تم",
+                    isSelected = true,
+                    activeColor = Color(0xFF4CAF50),
+                    onClick = onClose,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun EditingToolBarItem(
+    icon: ImageVector,
+    label: String,
+    isSelected: Boolean,
+    activeColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val backgroundColor = if (isSelected) activeColor.copy(alpha = 0.2f) else Color.Transparent
+    val contentColor = if (isSelected) activeColor else Color(0xFF4A4458)
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(backgroundColor)
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = contentColor,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = label,
+            fontSize = 10.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+            color = contentColor,
+            maxLines = 1
+        )
     }
 }
