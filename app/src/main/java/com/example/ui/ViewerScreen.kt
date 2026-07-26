@@ -135,7 +135,6 @@ enum class BottomSheetType {
     DocumentNavigation,
     OcrText,
     CameraOcr,
-    AnnotationTools,
     NotesAndHighlights
 }
 
@@ -515,18 +514,6 @@ fun ViewerScreen(
                             .then(if (isBrowsing) Modifier.statusBarsPadding() else Modifier)
                     )
 
-                    // FLOATING CONTEXTUAL TEXT SELECTION TOOLBAR
-                    if (state.showTextSelectionToolbar && !state.selectedPdfText.isNullOrBlank()) {
-                        TextSelectionToolbar(
-                            viewModel = viewModel,
-                            state = state,
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .statusBarsPadding()
-                                .padding(top = 76.dp)
-                        )
-                    }
-
                     // ADD STICKY NOTE DIALOG
                     if (state.showAddStickyNoteDialog) {
                         AddStickyNoteDialog(
@@ -883,78 +870,66 @@ fun ViewerScreen(
                         .fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                        if (isEditingBarActive || state.annotationEditorMode != 0) {
-                            EditingBottomBar(
-                                state = state,
-                                viewModel = viewModel,
-                                onClose = {
-                                    isEditingBarActive = false
-                                    viewModel.setAnnotationEditorMode(0)
-                                },
-                                modifier = Modifier.testTag("editing_bottom_bar")
-                            )
-                        } else {
-                            // Sleek circular-dock style Bottom bar with 6 beautifully labeled items
-                            Box(
+                        // Sleek circular-dock style Bottom bar with 6 beautifully labeled items
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("native_bottom_bar")
+                                .clip(RoundedCornerShape(28.dp))
+                                .background(Color(0xF2ECE6F8))
+                                .border(BorderStroke(1.dp, Color(0x407C5CFF)), RoundedCornerShape(28.dp))
+                        ) {
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .testTag("native_bottom_bar")
-                                    .clip(RoundedCornerShape(28.dp))
-                                    .background(Color(0xF2ECE6F8))
-                                    .border(BorderStroke(1.dp, Color(0x407C5CFF)), RoundedCornerShape(28.dp))
+                                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 6.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceEvenly
-                                ) {
-                                    val isBookmarked = state.bookmarkedPages.contains(state.currentPage)
+                                val isBookmarked = state.bookmarkedPages.contains(state.currentPage)
 
-                                    BottomBarItem(
-                                        icon = Icons.Default.MenuBook,
-                                        label = "الصفحات",
-                                        onClick = { activeSheet = BottomSheetType.DocumentNavigation },
-                                        tint = Color(0xFF4CB050), // Green
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    BottomBarItem(
-                                        icon = if (state.scrollMode == "horizontal") Icons.Default.ViewCarousel else Icons.Default.ViewStream,
-                                        label = "العرض",
-                                        onClick = { activeSheet = BottomSheetType.ViewOptions },
-                                        tint = Color(0xFF03A9F4), // Light Blue
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    BottomBarItem(
-                                        icon = Icons.Default.ZoomIn,
-                                        label = "الزووم",
-                                        onClick = { activeSheet = BottomSheetType.ZoomSettings },
-                                        tint = Color(0xFFFF9800), // Orange
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    BottomBarItem(
-                                        icon = Icons.Default.Palette,
-                                        label = "السمات",
-                                        onClick = { activeSheet = BottomSheetType.DisplaySettings },
-                                        tint = Color(0xFF9C27B0), // Purple
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    BottomBarItem(
-                                        icon = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                        label = "إشارة",
-                                        onClick = { viewModel.toggleBookmark(context, state.currentPage) },
-                                        tint = if (isBookmarked) Color(0xFFE91E63) else Color(0xFFE91E63).copy(alpha = 0.5f), // Pink
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    BottomBarItem(
-                                        icon = Icons.Default.MoreHoriz,
-                                        label = "أدوات",
-                                        onClick = { activeSheet = BottomSheetType.MoreOptions },
-                                        tint = Color(0xFF009688), // Teal
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                }
+                                BottomBarItem(
+                                    icon = Icons.Default.MenuBook,
+                                    label = "الصفحات",
+                                    onClick = { activeSheet = BottomSheetType.DocumentNavigation },
+                                    tint = Color(0xFF4CB050), // Green
+                                    modifier = Modifier.weight(1f)
+                                )
+                                BottomBarItem(
+                                    icon = if (state.scrollMode == "horizontal") Icons.Default.ViewCarousel else Icons.Default.ViewStream,
+                                    label = "العرض",
+                                    onClick = { activeSheet = BottomSheetType.ViewOptions },
+                                    tint = Color(0xFF03A9F4), // Light Blue
+                                    modifier = Modifier.weight(1f)
+                                )
+                                BottomBarItem(
+                                    icon = Icons.Default.ZoomIn,
+                                    label = "الزووم",
+                                    onClick = { activeSheet = BottomSheetType.ZoomSettings },
+                                    tint = Color(0xFFFF9800), // Orange
+                                    modifier = Modifier.weight(1f)
+                                )
+                                BottomBarItem(
+                                    icon = Icons.Default.Palette,
+                                    label = "السمات",
+                                    onClick = { activeSheet = BottomSheetType.DisplaySettings },
+                                    tint = Color(0xFF9C27B0), // Purple
+                                    modifier = Modifier.weight(1f)
+                                )
+                                BottomBarItem(
+                                    icon = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                    label = "إشارة",
+                                    onClick = { viewModel.toggleBookmark(context, state.currentPage) },
+                                    tint = if (isBookmarked) Color(0xFFE91E63) else Color(0xFFE91E63).copy(alpha = 0.5f), // Pink
+                                    modifier = Modifier.weight(1f)
+                                )
+                                BottomBarItem(
+                                    icon = Icons.Default.MoreHoriz,
+                                    label = "أدوات",
+                                    onClick = { activeSheet = BottomSheetType.MoreOptions },
+                                    tint = Color(0xFF009688), // Teal
+                                    modifier = Modifier.weight(1f)
+                                )
                             }
                         }
                 }
@@ -1080,11 +1055,6 @@ fun ViewerScreen(
                                             state = state,
                                             onDismiss = { activeSheet = BottomSheetType.None }
                                         )
-                                        BottomSheetType.AnnotationTools -> AnnotationToolsSheet(
-                                            viewModel = viewModel,
-                                            state = state,
-                                            onDismiss = { activeSheet = BottomSheetType.None }
-                                        )
                                         BottomSheetType.NotesAndHighlights -> NotesAndHighlightsSheet(
                                             viewModel = viewModel,
                                             state = state,
@@ -1155,11 +1125,6 @@ fun ViewerScreen(
                                     onDismiss = { activeSheet = BottomSheetType.None }
                                 )
                                 BottomSheetType.CameraOcr -> CameraOcrSheet(
-                                    viewModel = viewModel,
-                                    state = state,
-                                    onDismiss = { activeSheet = BottomSheetType.None }
-                                )
-                                BottomSheetType.AnnotationTools -> AnnotationToolsSheet(
                                     viewModel = viewModel,
                                     state = state,
                                     onDismiss = { activeSheet = BottomSheetType.None }
@@ -1894,8 +1859,83 @@ fun PdfWebView(
                                             var style = document.createElement('style');
                                             style.type = 'text/css';
                                             style.innerHTML = `
-                                                #toolbarContainer, .toolbar, #sidebarContainer, .findbar, #secondaryToolbar, .editorParamsToolbar, .annotationEditorParamsToolbar, #editorHighlightParamsToolbar, #editorFreeTextParamsToolbar, #editorInkParamsToolbar, #editorStampParamsToolbar { 
+                                                #sidebarContainer, #secondaryToolbar, .findbar, #toolbarViewerLeft, #toolbarViewerMiddle { 
                                                     display: none !important; 
+                                                } 
+                                                #toolbarContainer, .toolbar {
+                                                    background: transparent !important;
+                                                    border: none !important;
+                                                    box-shadow: none !important;
+                                                    height: 0 !important;
+                                                    min-height: 0 !important;
+                                                    overflow: visible !important;
+                                                    position: absolute !important;
+                                                    top: 0 !important;
+                                                    left: 0 !important;
+                                                    right: 0 !important;
+                                                    z-index: 99999 !important;
+                                                    pointer-events: none !important;
+                                                }
+                                                #toolbarViewerRight {
+                                                    pointer-events: auto !important;
+                                                    width: 100% !important;
+                                                    display: flex !important;
+                                                    justify-content: center !important;
+                                                }
+                                                #editorModeButtons {
+                                                    display: none !important;
+                                                }
+                                                body.edit-mode-active #editorModeButtons {
+                                                    display: flex !important;
+                                                    pointer-events: auto !important;
+                                                    position: fixed !important;
+                                                    top: 10px !important;
+                                                    left: 50% !important;
+                                                    transform: translateX(-50%) !important;
+                                                    z-index: 999999 !important;
+                                                    background: #1e1b2e !important;
+                                                    padding: 6px 12px !important;
+                                                    border-radius: 28px !important;
+                                                    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5) !important;
+                                                    border: 1px solid rgba(124, 92, 255, 0.4) !important;
+                                                    align-items: center !important;
+                                                    gap: 8px !important;
+                                                    direction: ltr !important;
+                                                }
+                                                body.edit-mode-active #editorModeButtons button.toolbarButton {
+                                                    background: rgba(255, 255, 255, 0.1) !important;
+                                                    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+                                                    border-radius: 20px !important;
+                                                    padding: 6px 12px !important;
+                                                    color: #FFFFFF !important;
+                                                    font-size: 13px !important;
+                                                    font-weight: 600 !important;
+                                                    display: inline-flex !important;
+                                                    align-items: center !important;
+                                                    gap: 6px !important;
+                                                    min-height: 36px !important;
+                                                    cursor: pointer !important;
+                                                }
+                                                body.edit-mode-active #editorModeButtons button.toolbarButton[aria-expanded="true"],
+                                                body.edit-mode-active #editorModeButtons button.toolbarButton.toggled {
+                                                    background: #7C5CFF !important;
+                                                    color: #FFFFFF !important;
+                                                    border-color: #7C5CFF !important;
+                                                }
+                                                body.edit-mode-active .editorParamsToolbar:not(.hidden) {
+                                                    display: flex !important;
+                                                    pointer-events: auto !important;
+                                                    position: fixed !important;
+                                                    top: 65px !important;
+                                                    left: 50% !important;
+                                                    transform: translateX(-50%) !important;
+                                                    z-index: 1000000 !important;
+                                                    background: #252033 !important;
+                                                    color: #FFFFFF !important;
+                                                    border-radius: 16px !important;
+                                                    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.6) !important;
+                                                    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+                                                    padding: 12px 16px !important;
                                                 } 
                                                 #outerContainer {
                                                     position: fixed !important;
@@ -2471,6 +2511,28 @@ fun PdfWebView(
                             (function() {
                                 window.lastSelectionRange = null;
                                 window.lastSelectionText = "";
+
+                                window.setEditingToolbarVisible = function(visible) {
+                                    if (visible) {
+                                        document.body.classList.add('edit-mode-active');
+                                        try {
+                                            var btns = document.querySelectorAll('#editorModeButtons button');
+                                            btns.forEach(function(b) { b.removeAttribute('disabled'); });
+                                            if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
+                                                if (!PDFViewerApplication.pdfViewer.annotationEditorMode || PDFViewerApplication.pdfViewer.annotationEditorMode.mode === 0) {
+                                                    PDFViewerApplication.pdfViewer.annotationEditorMode = { mode: 9 };
+                                                }
+                                            }
+                                        } catch(e) {}
+                                    } else {
+                                        document.body.classList.remove('edit-mode-active');
+                                        try {
+                                            if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
+                                                PDFViewerApplication.pdfViewer.annotationEditorMode = { mode: 0 };
+                                            }
+                                        } catch(e) {}
+                                    }
+                                };
 
                                 window.applyHighlightToSelection = function(colorHex) {
                                     try {
@@ -6213,701 +6275,6 @@ fun OcrTextSheet(
 }
 
 @Composable
-fun AnnotationToolsSheet(
-    viewModel: PdfViewModel,
-    state: PdfUiState,
-    onDismiss: () -> Unit
-) {
-    val currentMode = state.annotationEditorMode
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // Top Header with Undo / Redo / Title
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = "أدوات التحرير والرسم",
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = { viewModel.triggerUndo() },
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Undo,
-                        contentDescription = "تراجع",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(4.dp))
-
-                IconButton(
-                    onClick = { viewModel.triggerRedo() },
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Redo,
-                        contentDescription = "إعادة",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
-
-        // Tools selector items row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AnnotationToolItem(
-                icon = Icons.Default.BorderColor,
-                label = "تظليل",
-                isSelected = (currentMode == 9),
-                activeColor = Color(0xFFFFC107),
-                onClick = { viewModel.setAnnotationEditorMode(9) }
-            )
-
-            AnnotationToolItem(
-                icon = Icons.Default.Create,
-                label = "رسم حر",
-                isSelected = (currentMode == 15),
-                activeColor = Color(0xFF9C27B0),
-                onClick = { viewModel.setAnnotationEditorMode(15) }
-            )
-
-            AnnotationToolItem(
-                icon = Icons.Default.TextFields,
-                label = "نص حر",
-                isSelected = (currentMode == 3),
-                activeColor = Color(0xFF2196F3),
-                onClick = { viewModel.setAnnotationEditorMode(3) }
-            )
-
-            AnnotationToolItem(
-                icon = Icons.Default.Approval,
-                label = "ختم / صورة",
-                isSelected = (currentMode == 13),
-                activeColor = Color(0xFF009688),
-                onClick = { viewModel.setAnnotationEditorMode(13) }
-            )
-
-            AnnotationToolItem(
-                icon = Icons.Default.Close,
-                label = "إلغاء التحديد",
-                isSelected = (currentMode == 0),
-                activeColor = Color(0xFFE53935),
-                isResetBtn = true,
-                onClick = {
-                    viewModel.setAnnotationEditorMode(0)
-                }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Contextual controls based on active mode
-        when (currentMode) {
-            15 -> { // INK (رسم حر)
-                Text(
-                    text = "إعدادات الرسم الحر (Ink)",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Start
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                val inkColors = listOf("#E53935", "#4CAF50", "#2196F3", "#FFEB3B", "#FF9800", "#9C27B0", "#000000", "#FFFFFF")
-                AnnotationColorPalette(
-                    selectedHex = state.inkColor,
-                    colors = inkColors,
-                    onColorSelected = { viewModel.updateAnnotationParam(4, it) }
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                AnnotationSliderRow(
-                    title = "سُمك الخط",
-                    value = state.inkThickness,
-                    valueRange = 1f..25f,
-                    unit = "px",
-                    onValueChange = { viewModel.updateAnnotationParam(5, it) }
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                AnnotationSliderRow(
-                    title = "الشفافية",
-                    value = state.inkOpacity,
-                    valueRange = 10f..100f,
-                    unit = "%",
-                    onValueChange = { viewModel.updateAnnotationParam(6, it) }
-                )
-            }
-
-            9 -> { // HIGHLIGHT (تظليل)
-                Text(
-                    text = "إعدادات التظليل (Highlight)",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFFFA000),
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Start
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                val highlightColors = listOf("#FFEB3B", "#8BC34A", "#03A9F4", "#E91E63", "#FF9800", "#9C27B0")
-                AnnotationColorPalette(
-                    selectedHex = state.highlightColor,
-                    colors = highlightColors,
-                    onColorSelected = { viewModel.updateAnnotationParam(7, it) }
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "تظليل حر (Free Highlight)",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Switch(
-                        checked = state.highlightFree,
-                        onCheckedChange = { viewModel.updateAnnotationParam(10, it) }
-                    )
-                }
-
-                if (state.highlightFree) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    AnnotationSliderRow(
-                        title = "سُمك التظليل الحر",
-                        value = state.highlightThickness,
-                        valueRange = 4f..35f,
-                        unit = "px",
-                        onValueChange = { viewModel.updateAnnotationParam(9, it) }
-                    )
-                }
-            }
-
-            3 -> { // FREETEXT (نص حر)
-                Text(
-                    text = "إعدادات النص (FreeText)",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1976D2),
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Start
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                val textColors = listOf("#212121", "#E53935", "#1976D2", "#388E3C", "#F57C00", "#7B1FA2", "#FFFFFF")
-                AnnotationColorPalette(
-                    selectedHex = state.freeTextColor,
-                    colors = textColors,
-                    onColorSelected = { viewModel.updateAnnotationParam(2, it) }
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                AnnotationSliderRow(
-                    title = "حجم الخط",
-                    value = state.freeTextSize,
-                    valueRange = 8f..48f,
-                    unit = "pt",
-                    onValueChange = { viewModel.updateAnnotationParam(1, it) }
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                AnnotationSliderRow(
-                    title = "شفافية النص",
-                    value = state.freeTextOpacity,
-                    valueRange = 10f..100f,
-                    unit = "%",
-                    onValueChange = { viewModel.updateAnnotationParam(3, it) }
-                )
-            }
-
-            13 -> { // STAMP (ختم / صورة)
-                Text(
-                    text = "إضافة صورة أو ختم على المستند",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF00796B),
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Start
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Button(
-                    onClick = { viewModel.updateAnnotationParam(12, "CREATE") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00796B))
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AddPhotoAlternate,
-                        contentDescription = "اختيار صورة",
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("اختر صورة من المعرض لإضافتها", fontSize = 14.sp)
-                }
-            }
-
-            else -> {
-                Text(
-                    text = "انقر على أي أداة أعلاه للبدء بالتحرير، أو انقر على أي عنصر موجود بالصفحة للتعديل عليه مباشرة.",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(vertical = 12.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        // Action Buttons Row (Save & Close)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Button(
-                onClick = {
-                    viewModel.requestSaveAnnotatedPdf()
-                    onDismiss()
-                },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Save,
-                    contentDescription = "حفظ والتطبيق",
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("حفظ التغييرات", fontSize = 14.sp)
-            }
-
-            OutlinedButton(
-                onClick = onDismiss,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text("إغلاق اللوحة", fontSize = 14.sp)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-    }
-}
-
-@Composable
-private fun AnnotationToolItem(
-    icon: ImageVector,
-    label: String,
-    isSelected: Boolean,
-    activeColor: Color,
-    isResetBtn: Boolean = false,
-    onClick: () -> Unit
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                if (isResetBtn) Color(0xFFFFEBEE)
-                else if (isSelected) activeColor.copy(alpha = 0.18f)
-                else Color.White.copy(alpha = 0.7f)
-            )
-            .border(
-                width = if (isSelected) 2.dp else 1.dp,
-                color = if (isResetBtn) Color(0xFFEF5350)
-                        else if (isSelected) activeColor
-                        else Color.LightGray.copy(alpha = 0.5f),
-                shape = RoundedCornerShape(16.dp)
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(42.dp)
-                .clip(CircleShape)
-                .background(
-                    if (isResetBtn) Color(0xFFE53935)
-                    else if (isSelected) activeColor
-                    else activeColor.copy(alpha = 0.12f)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = if (isResetBtn || isSelected) Color.White else activeColor,
-                modifier = Modifier.size(22.dp)
-            )
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            fontWeight = if (isSelected || isResetBtn) FontWeight.Bold else FontWeight.Normal,
-            color = if (isResetBtn) Color(0xFFC62828) else MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
-@Composable
-private fun AnnotationColorPalette(
-    selectedHex: String,
-    colors: List<String>,
-    onColorSelected: (String) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        colors.forEach { hex ->
-            val colorVal = parseAnnotationColor(hex)
-            val isSelected = selectedHex.equals(hex, ignoreCase = true)
-
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(colorVal)
-                    .border(
-                        width = if (isSelected) 3.dp else 1.dp,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.4f),
-                        shape = CircleShape
-                    )
-                    .clickable { onColorSelected(hex) },
-                contentAlignment = Alignment.Center
-            ) {
-                if (isSelected) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = "محدد",
-                        tint = if (isColorDark(colorVal)) Color.White else Color.Black,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AnnotationSliderRow(
-    title: String,
-    value: Float,
-    valueRange: ClosedFloatingPointRange<Float>,
-    unit: String,
-    onValueChange: (Float) -> Unit
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = title,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = "${value.toInt()} $unit",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-        Slider(
-            value = value.coerceIn(valueRange),
-            onValueChange = onValueChange,
-            valueRange = valueRange,
-            modifier = Modifier.fillMaxWidth()
-        )
-    }
-}
-
-private fun parseAnnotationColor(hex: String): Color {
-    return try {
-        Color(android.graphics.Color.parseColor(hex))
-    } catch (e: Exception) {
-        Color.Red
-    }
-}
-
-private fun isColorDark(color: Color): Boolean {
-    val luminance = 0.299f * color.red + 0.587f * color.green + 0.114f * color.blue
-    return luminance < 0.5f
-}
-
-// ----------------- TEXT SELECTION & STICKY NOTES COMPONENTS -----------------
-
-fun speakText(context: Context, text: String) {
-    try {
-        val ttsHolder = arrayOfNulls<android.speech.tts.TextToSpeech>(1)
-        ttsHolder[0] = android.speech.tts.TextToSpeech(context) { status ->
-            if (status == android.speech.tts.TextToSpeech.SUCCESS) {
-                ttsHolder[0]?.language = Locale.getDefault()
-                ttsHolder[0]?.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "SELECTED_TEXT_TTS")
-            }
-        }
-    } catch (e: Exception) {
-        Toast.makeText(context, "تعذر تشغيل القراءة الصوتية", Toast.LENGTH_SHORT).show()
-    }
-}
-
-@Composable
-fun TextSelectionToolbar(
-    viewModel: PdfViewModel,
-    state: PdfUiState,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    val selectedText = state.selectedPdfText ?: return
-    var showColorPicker by remember { mutableStateOf(false) }
-
-    AnimatedVisibility(
-        visible = state.showTextSelectionToolbar && selectedText.isNotBlank(),
-        enter = slideInVertically(initialOffsetY = { -it / 2 }) + fadeIn() + scaleIn(initialScale = 0.9f),
-        exit = slideOutVertically(targetOffsetY = { -it / 2 }) + fadeOut() + scaleOut(targetScale = 0.9f),
-        modifier = modifier
-    ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .widthIn(max = 480.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = Color(0xF21C1B20),
-            tonalElevation = 8.dp,
-            shadowElevation = 12.dp,
-            border = BorderStroke(1.dp, Color(0x407C5CFF))
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(horizontal = 12.dp, vertical = 10.dp)
-            ) {
-                // Header Row: Quote icon, selected text snippet, close button
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 8.dp)
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = Color(0xFF7C5CFF).copy(alpha = 0.2f),
-                            modifier = Modifier.size(24.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.FormatQuote,
-                                contentDescription = null,
-                                tint = Color(0xFFB39DDB),
-                                modifier = Modifier
-                                    .padding(4.dp)
-                                    .size(16.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "\"${if (selectedText.length > 35) selectedText.take(35) + "..." else selectedText}\"",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.9f),
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-
-                    IconButton(
-                        onClick = { viewModel.clearTextSelection() },
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "إلغاء التحديد",
-                            tint = Color.White.copy(alpha = 0.7f),
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 8.dp),
-                    color = Color.White.copy(alpha = 0.12f)
-                )
-
-                // Quick Highlight Color Picker Bar (if toggled)
-                if (showColorPicker) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        val highlightColors = listOf(
-                            "#FFEB3B" to Color(0xFFFFEB3B), // Yellow
-                            "#4CAF50" to Color(0xFF4CAF50), // Green
-                            "#2196F3" to Color(0xFF2196F3), // Blue
-                            "#E91E63" to Color(0xFFE91E63), // Pink
-                            "#FF9800" to Color(0xFFFF9800)  // Orange
-                        )
-                        highlightColors.forEach { (hex, color) ->
-                            Box(
-                                modifier = Modifier
-                                    .size(30.dp)
-                                    .clip(CircleShape)
-                                    .background(color)
-                                    .border(BorderStroke(2.dp, Color.White), CircleShape)
-                                    .clickable {
-                                        viewModel.highlightSelectedText(context, hex)
-                                        showColorPicker = false
-                                    }
-                            )
-                        }
-                    }
-                }
-
-                // Action Buttons Row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SelectionActionButton(
-                        icon = Icons.Default.BorderColor,
-                        label = "تظليل",
-                        tint = Color(0xFFFFEB3B),
-                        onClick = {
-                            if (showColorPicker) {
-                                viewModel.highlightSelectedText(context, state.textSelectionHighlightColor)
-                                showColorPicker = false
-                            } else {
-                                showColorPicker = true
-                            }
-                        }
-                    )
-
-                    SelectionActionButton(
-                        icon = Icons.Outlined.StickyNote2,
-                        label = "ملاحظة",
-                        tint = Color(0xFF81D4FA),
-                        onClick = {
-                            viewModel.openAddStickyNoteDialog()
-                        }
-                    )
-
-                    SelectionActionButton(
-                        icon = Icons.Outlined.ContentCopy,
-                        label = "نسخ",
-                        tint = Color(0xFFA5D6A7),
-                        onClick = {
-                            copyTextToClipboard(context, selectedText)
-                            viewModel.clearTextSelection()
-                        }
-                    )
-
-                    SelectionActionButton(
-                        icon = Icons.Outlined.VolumeUp,
-                        label = "قراءة",
-                        tint = Color(0xFFFFCC80),
-                        onClick = {
-                            speakText(context, selectedText)
-                        }
-                    )
-
-                    SelectionActionButton(
-                        icon = Icons.Outlined.Share,
-                        label = "مشاركة",
-                        tint = Color(0xFFCE93D8),
-                        onClick = {
-                            shareText(context, selectedText, state.currentPdfName ?: "نص مستخرج")
-                            viewModel.clearTextSelection()
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SelectionActionButton(
-    icon: ImageVector,
-    label: String,
-    tint: Color,
-    onClick: () -> Unit
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = tint,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = label,
-            fontSize = 11.sp,
-            color = Color.White.copy(alpha = 0.9f),
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
-
-@Composable
 fun AddStickyNoteDialog(
     viewModel: PdfViewModel,
     state: PdfUiState,
@@ -7313,319 +6680,3 @@ fun NotesAndHighlightsSheet(
     }
 }
 
-// ----------------- TRANSFORMATION EDITING BOTTOM BAR -----------------
-
-@Composable
-fun EditingBottomBar(
-    state: PdfUiState,
-    viewModel: PdfViewModel,
-    onClose: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val currentMode = state.annotationEditorMode
-
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        // Contextual parameters floating bar (Colors, Thickness, etc.) when an editor tool is selected
-        AnimatedVisibility(
-            visible = currentMode != 0,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color(0xF21F1B2C))
-                    .border(BorderStroke(1.dp, Color(0x407C5CFF)), RoundedCornerShape(20.dp))
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-            ) {
-                when (currentMode) {
-                    15 -> { // Ink / Drawing
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            val inkColors = listOf("#E53935", "#4CAF50", "#2196F3", "#FFEB3B", "#FF9800", "#9C27B0", "#000000", "#FFFFFF")
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                inkColors.forEach { hex ->
-                                    val color = try { Color(android.graphics.Color.parseColor(hex)) } catch (e: Exception) { Color.Black }
-                                    val isSelected = state.inkColor.equals(hex, ignoreCase = true)
-                                    Box(
-                                        modifier = Modifier
-                                            .size(if (isSelected) 26.dp else 20.dp)
-                                            .clip(CircleShape)
-                                            .background(color)
-                                            .border(
-                                                width = if (isSelected) 2.5.dp else 1.dp,
-                                                color = if (isSelected) Color.White else Color.White.copy(alpha = 0.3f),
-                                                shape = CircleShape
-                                            )
-                                            .clickable { viewModel.updateAnnotationParam(4, hex) }
-                                    )
-                                }
-                            }
-                            
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    text = "السُمك: ${state.inkThickness.toInt()}px",
-                                    color = Color.White.copy(alpha = 0.9f),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                Slider(
-                                    value = state.inkThickness,
-                                    onValueChange = { viewModel.updateAnnotationParam(5, it) },
-                                    valueRange = 1f..20f,
-                                    modifier = Modifier.weight(1f),
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = Color(0xFF7C5CFF),
-                                        activeTrackColor = Color(0xFF7C5CFF)
-                                    )
-                                )
-                            }
-                        }
-                    }
-                    9 -> { // Highlight
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            val highlightColors = listOf("#FFEB3B", "#8BC34A", "#03A9F4", "#E91E63", "#FF9800", "#9C27B0")
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                highlightColors.forEach { hex ->
-                                    val color = try { Color(android.graphics.Color.parseColor(hex)) } catch (e: Exception) { Color.Yellow }
-                                    val isSelected = state.highlightColor.equals(hex, ignoreCase = true)
-                                    Box(
-                                        modifier = Modifier
-                                            .size(if (isSelected) 26.dp else 20.dp)
-                                            .clip(CircleShape)
-                                            .background(color)
-                                            .border(
-                                                width = if (isSelected) 2.5.dp else 1.dp,
-                                                color = if (isSelected) Color.White else Color.White.copy(alpha = 0.3f),
-                                                shape = CircleShape
-                                            )
-                                            .clickable { viewModel.updateAnnotationParam(7, hex) }
-                                    )
-                                }
-                            }
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = "حر",
-                                    color = Color.White.copy(alpha = 0.9f),
-                                    fontSize = 11.sp
-                                )
-                                Switch(
-                                    checked = state.highlightFree,
-                                    onCheckedChange = { viewModel.updateAnnotationParam(10, it) },
-                                    modifier = Modifier.scale(0.75f)
-                                )
-                            }
-                        }
-                    }
-                    3 -> { // Free Text
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "انقر على الصفحة لإضافة نص",
-                                color = Color(0xFFB39DDB),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            val textColors = listOf("#000000", "#E53935", "#2196F3", "#4CAF50", "#9C27B0", "#FFFFFF")
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                textColors.forEach { hex ->
-                                    val color = try { Color(android.graphics.Color.parseColor(hex)) } catch (e: Exception) { Color.Black }
-                                    Box(
-                                        modifier = Modifier
-                                            .size(20.dp)
-                                            .clip(CircleShape)
-                                            .background(color)
-                                            .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape)
-                                            .clickable { viewModel.updateAnnotationParam(1, hex) }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    13 -> { // Stamp
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "انقر على الصفحة لإضافة ختم / توقيع",
-                                color = Color(0xFF80CBC4),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // Main Editing Bottom Bar Dock
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(28.dp))
-                .background(Color(0xF2ECE6F8))
-                .border(BorderStroke(1.dp, Color(0x407C5CFF)), RoundedCornerShape(28.dp))
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 6.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                // 1. Highlight / تظليل
-                EditingToolBarItem(
-                    icon = Icons.Default.BorderColor,
-                    label = "تظليل",
-                    isSelected = (currentMode == 9),
-                    activeColor = Color(0xFFFFC107),
-                    onClick = {
-                        if (currentMode == 9) viewModel.setAnnotationEditorMode(0)
-                        else viewModel.setAnnotationEditorMode(9)
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-
-                // 2. Free Draw / رسم حر
-                EditingToolBarItem(
-                    icon = Icons.Default.Create,
-                    label = "رسم حر",
-                    isSelected = (currentMode == 15),
-                    activeColor = Color(0xFF9C27B0),
-                    onClick = {
-                        if (currentMode == 15) viewModel.setAnnotationEditorMode(0)
-                        else viewModel.setAnnotationEditorMode(15)
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-
-                // 3. Free Text / نص حر
-                EditingToolBarItem(
-                    icon = Icons.Default.TextFields,
-                    label = "نص حر",
-                    isSelected = (currentMode == 3),
-                    activeColor = Color(0xFF2196F3),
-                    onClick = {
-                        if (currentMode == 3) viewModel.setAnnotationEditorMode(0)
-                        else viewModel.setAnnotationEditorMode(3)
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-
-                // 4. Stamp / ختم
-                EditingToolBarItem(
-                    icon = Icons.Default.Approval,
-                    label = "ختم",
-                    isSelected = (currentMode == 13),
-                    activeColor = Color(0xFF009688),
-                    onClick = {
-                        if (currentMode == 13) viewModel.setAnnotationEditorMode(0)
-                        else viewModel.setAnnotationEditorMode(13)
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-
-                // 5. Undo / تراجع
-                EditingToolBarItem(
-                    icon = Icons.Default.Undo,
-                    label = "تراجع",
-                    isSelected = false,
-                    activeColor = Color(0xFF3F51B5),
-                    onClick = { viewModel.triggerUndo() },
-                    modifier = Modifier.weight(1f)
-                )
-
-                // 6. Redo / إعادة
-                EditingToolBarItem(
-                    icon = Icons.Default.Redo,
-                    label = "إعادة",
-                    isSelected = false,
-                    activeColor = Color(0xFF3F51B5),
-                    onClick = { viewModel.triggerRedo() },
-                    modifier = Modifier.weight(1f)
-                )
-
-                // 7. Done / Exit Editing / تم
-                EditingToolBarItem(
-                    icon = Icons.Default.Check,
-                    label = "تم",
-                    isSelected = true,
-                    activeColor = Color(0xFF4CAF50),
-                    onClick = onClose,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun EditingToolBarItem(
-    icon: ImageVector,
-    label: String,
-    isSelected: Boolean,
-    activeColor: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val backgroundColor = if (isSelected) activeColor.copy(alpha = 0.2f) else Color.Transparent
-    val contentColor = if (isSelected) activeColor else Color(0xFF4A4458)
-
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(backgroundColor)
-            .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = contentColor,
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = label,
-            fontSize = 10.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-            color = contentColor,
-            maxLines = 1
-        )
-    }
-}

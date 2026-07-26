@@ -284,13 +284,13 @@ fun DashboardScreen(
                 source: NestedScrollSource
             ): Offset {
                 val delta = consumed.y
-                if (delta < -10f) {
-                    // Scrolling DOWN with actual content movement -> Hide bottom bar
+                if (delta < -15f && available.y == 0f) {
+                    // Scrolling DOWN on a long list with actual consumed scroll -> Hide bottom bar
                     if (isBottomBarVisible) {
                         isBottomBarVisible = false
                     }
-                } else if (delta > 10f) {
-                    // Scrolling UP with actual content movement -> Show bottom bar
+                } else if (delta > 15f || available.y > 0f) {
+                    // Scrolling UP or overscrolling at top -> Show bottom bar
                     if (!isBottomBarVisible) {
                         isBottomBarVisible = true
                     }
