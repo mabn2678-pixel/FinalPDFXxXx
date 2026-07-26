@@ -287,8 +287,10 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
     }
 
     fun setDoubleTapZoomFactor(factor: Float) {
-        appContext?.let { SettingsRepository(it).setDoubleTapZoomFactor(factor) }
-        _uiState.update { it.copy(doubleTapZoomFactor = factor) }
+        val coerced = factor.coerceIn(1.1f, 5.0f)
+        appContext?.let { SettingsRepository(it).setDoubleTapZoomFactor(coerced) }
+        _uiState.update { it.copy(doubleTapZoomFactor = coerced) }
+        sendJsCommand("window.doubleTapZoomFactor = $coerced;")
     }
 
     fun setScreenOrientation(orientation: Int) {
@@ -854,13 +856,13 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
     }
 
     fun setScale(scale: Float) {
-        val coerced = scale.coerceIn(1.0f, 4.0f)
+        val coerced = scale.coerceIn(0.1f, 5.0f)
         _uiState.update { it.copy(currentScale = coerced) }
         sendJsCommand("window.setScale($coerced)")
     }
 
     fun updateScaleFromJs(scale: Float) {
-        val coerced = scale.coerceIn(1.0f, 4.0f)
+        val coerced = scale.coerceIn(0.1f, 5.0f)
         _uiState.update { it.copy(currentScale = coerced) }
     }
 

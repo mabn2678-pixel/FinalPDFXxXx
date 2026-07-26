@@ -2159,16 +2159,17 @@ fun PdfWebView(
                                                 }
                                             };
 
+                                            window.doubleTapZoomFactor = ${state.doubleTapZoomFactor};
                                             window.defaultScale = null;
                                             window.setScale = function(scale) {
                                                 try {
                                                     if (!window.defaultScale && typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentScale) {
                                                         window.defaultScale = PDFViewerApplication.pdfViewer.currentScale;
                                                     }
-                                                    var minScale = window.defaultScale || 1.0;
-                                                    if (scale < minScale) {
-                                                        scale = minScale;
-                                                     }
+                                                    var minScale = 0.1;
+                                                    var maxScale = 5.0;
+                                                    if (scale < minScale) scale = minScale;
+                                                    if (scale > maxScale) scale = maxScale;
                                                     if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
                                                         PDFViewerApplication.pdfViewer.currentScale = scale;
                                                     }
@@ -2206,8 +2207,8 @@ fun PdfWebView(
                                                     if (!window.defaultScale && typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentScale) {
                                                         window.defaultScale = PDFViewerApplication.pdfViewer.currentScale;
                                                     }
-                                                    var minScale = window.defaultScale || 1.0;
-                                                    newScale = Math.min(Math.max(newScale, minScale), 4.0);
+                                                    var minScale = 0.1;
+                                                    newScale = Math.min(Math.max(newScale, minScale), 5.0);
                                                     window.setScale(newScale);
                                                     AndroidBridge.onScaleChanged(newScale);
                                                 }
@@ -2253,11 +2254,11 @@ fun PdfWebView(
                                                         window.defaultScale = PDFViewerApplication.pdfViewer.currentScale;
                                                     }
 
-                                                    var baseScale = window.defaultScale || 1.0;
+                                                    var baseScale = window.defaultScale || (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer ? PDFViewerApplication.pdfViewer.currentScale : 1.0);
                                                     var curScale = (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentScale) ? PDFViewerApplication.pdfViewer.currentScale : baseScale;
 
-                                                    var factor = ${state.doubleTapZoomFactor};
-                                                    var targetScale = (curScale < baseScale * 1.3) ? (baseScale * factor) : baseScale;
+                                                    var factor = window.doubleTapZoomFactor || ${state.doubleTapZoomFactor};
+                                                    var targetScale = (curScale < baseScale * 1.25) ? (baseScale * factor) : baseScale;
 
                                                     window.setScale(targetScale);
                                                     if (window.AndroidBridge && window.AndroidBridge.onScaleChanged) {
@@ -2335,6 +2336,35 @@ fun PdfWebView(
                                             var initialPage = ${state.currentPage};
                                             if (initialPage > 1) {
                                                 PDFViewerApplication.pdfViewer.currentPageNumber = initialPage;
+                                            }
+
+                                            // Report exact scale from PDF.js to Android bridge
+                                            if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.eventBus) {
+                                                var reportCurrentScale = function() {
+                                                    try {
+                                                        if (PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentScale) {
+                                                            var cs = PDFViewerApplication.pdfViewer.currentScale;
+                                                            if (!window.defaultScale) { window.defaultScale = cs; }
+                                                            if (window.AndroidBridge && window.AndroidBridge.onScaleChanged) {
+                                                                window.AndroidBridge.onScaleChanged(cs);
+                                                            }
+                                                        }
+                                                    } catch(e) {}
+                                                };
+
+                                                PDFViewerApplication.eventBus.on('scalechanging', function(evt) {
+                                                    if (evt && evt.scale && window.AndroidBridge && window.AndroidBridge.onScaleChanged) {
+                                                        window.AndroidBridge.onScaleChanged(evt.scale);
+                                                    } else {
+                                                        reportCurrentScale();
+                                                    }
+                                                });
+                                                PDFViewerApplication.eventBus.on('pagesinit', reportCurrentScale);
+                                                PDFViewerApplication.eventBus.on('pagerendered', reportCurrentScale);
+                                                PDFViewerApplication.eventBus.on('scalechanged', reportCurrentScale);
+
+                                                setTimeout(reportCurrentScale, 300);
+                                                setTimeout(reportCurrentScale, 800);
                                             }
 
                                             // 4b. Completely disable PDF.js History Manager and Hash Updates to prevent scroll jumps
@@ -3159,77 +3189,85 @@ fun ZoomSettingsSheet(
             text = "تعديل مقياس الصفحات واتجاه الشاشة للقراءة المريحة",
             fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 20.dp),
+            modifier = Modifier.padding(bottom = 16.dp),
             textAlign = TextAlign.Start
         )
 
-        // Zoom Control Row (- Percentage +)
-        Row(
+        // Card displaying Current Zoom Percentage with - and +
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(vertical = 4.dp)
         ) {
-            Text(
-                text = "مقياس الزووم الحالي",
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                IconButton(
-                    onClick = { viewModel.triggerZoomOut() },
-                    modifier = Modifier
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
-                        .size(36.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Remove,
-                        contentDescription = "تصغير",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
                 Text(
-                    text = "${(state.currentScale * 100).roundToInt()}%",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.widthIn(min = 48.dp),
-                    textAlign = TextAlign.Center
+                    text = "مقياس الزووم الحالي",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
 
-                IconButton(
-                    onClick = { viewModel.triggerZoomIn() },
-                    modifier = Modifier
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
-                        .size(36.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "تكبير",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    IconButton(
+                        onClick = { viewModel.triggerZoomOut() },
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.surface, CircleShape)
+                            .size(44.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Remove,
+                            contentDescription = "تصغير",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "${(state.currentScale * 100).roundToInt()}%",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 24.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "الحجم الفعلي للملف",
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    IconButton(
+                        onClick = { viewModel.triggerZoomIn() },
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.surface, CircleShape)
+                            .size(44.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "تكبير",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
+
+                Slider(
+                    value = state.currentScale,
+                    onValueChange = { viewModel.setScale(it) },
+                    valueRange = 0.1f..5.0f,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
+                )
             }
         }
-
-        // Zoom Slider
-        Slider(
-            value = state.currentScale,
-            onValueChange = { viewModel.setScale(it) },
-            valueRange = 0.25f..3.0f,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
-        )
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
@@ -3245,15 +3283,14 @@ fun ZoomSettingsSheet(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 16.dp),
+                .padding(bottom = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Actual size
             Button(
                 onClick = { viewModel.setScale(1.0f) },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (state.currentScale == 1.0f) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    contentColor = if (state.currentScale == 1.0f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                    containerColor = if (Math.abs(state.currentScale - 1.0f) < 0.05f) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    contentColor = if (Math.abs(state.currentScale - 1.0f) < 0.05f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                 ),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.weight(1f),
@@ -3262,7 +3299,6 @@ fun ZoomSettingsSheet(
                 Text(text = "الحجم الأصلي", fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
 
-            // Fit width
             Button(
                 onClick = { viewModel.triggerFitWidth() },
                 colors = ButtonDefaults.buttonColors(
@@ -3276,7 +3312,6 @@ fun ZoomSettingsSheet(
                 Text(text = "ملائمة العرض", fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
 
-            // Fit page
             Button(
                 onClick = { viewModel.triggerFitPage() },
                 colors = ButtonDefaults.buttonColors(
@@ -3290,6 +3325,68 @@ fun ZoomSettingsSheet(
                 Text(text = "ملائمة الصفحة", fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
+        // Double Tap Zoom section
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "معامل التكبير عند النقر المزدوج (Double Tap Zoom)",
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "×${String.format("%.1f", state.doubleTapZoomFactor)}",
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            listOf(1.1f, 1.5f, 2.0f, 2.3f, 3.0f, 5.0f).forEach { factor ->
+                val isSelected = Math.abs(state.doubleTapZoomFactor - factor) < 0.1f
+                Surface(
+                    onClick = { viewModel.setDoubleTapZoomFactor(factor) },
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Box(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "×${String.format("%.1f", factor)}",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
+        Slider(
+            value = state.doubleTapZoomFactor,
+            onValueChange = { viewModel.setDoubleTapZoomFactor(it) },
+            valueRange = 1.1f..5.0f,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp)
+        )
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
