@@ -87,15 +87,25 @@ class MainActivity : ComponentActivity() {
 
   private fun handleIntent(intent: Intent?, viewModel: PdfViewModel) {
     if (intent == null) return
-    val action = intent.action
-    val data: Uri? = intent.data
-    if (Intent.ACTION_VIEW == action && data != null) {
+    val action = intent.action ?: return
+    val isSupportedAction = action == Intent.ACTION_VIEW || 
+                          action == Intent.ACTION_EDIT || 
+                          action == Intent.ACTION_SEND || 
+                          action == Intent.ACTION_SEND_MULTIPLE
+
+    if (!isSupportedAction) return
+
+    val targetUri: Uri? = intent.data 
+      ?: @Suppress("DEPRECATION") (intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))
+      ?: if (intent.clipData != null && intent.clipData!!.itemCount > 0) intent.clipData!!.getItemAt(0).uri else null
+
+    if (targetUri != null) {
       try {
         val contentResolver = contentResolver
         var fileName = "opened_file"
         
         // Try to query display name
-        contentResolver.query(data, null, null, null, null)?.use { cursor ->
+        contentResolver.query(targetUri, null, null, null, null)?.use { cursor ->
           val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
           if (nameIndex != -1 && cursor.moveToFirst()) {
             val name = cursor.getString(nameIndex)
@@ -106,7 +116,7 @@ class MainActivity : ComponentActivity() {
         }
         
         if (fileName == "opened_file") {
-          data.lastPathSegment?.let { segment ->
+          targetUri.lastPathSegment?.let { segment ->
             val clean = segment.substringAfterLast("/")
             if (clean.isNotEmpty()) {
               fileName = clean
@@ -121,7 +131,7 @@ class MainActivity : ComponentActivity() {
         val cleanBaseName = fileName.replace(".pdf", "", ignoreCase = true)
         val safeFileName = "open_${System.currentTimeMillis()}_${fileName}"
         val cacheFile = File(cacheDir, safeFileName)
-        contentResolver.openInputStream(data)?.use { inputStream ->
+        contentResolver.openInputStream(targetUri)?.use { inputStream ->
           FileOutputStream(cacheFile).use { outputStream ->
             inputStream.copyTo(outputStream)
           }

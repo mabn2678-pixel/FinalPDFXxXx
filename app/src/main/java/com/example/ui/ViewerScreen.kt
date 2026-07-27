@@ -29,6 +29,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -443,6 +444,23 @@ fun ViewerScreen(
                 insetsController.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
             }
         }
+    }
+
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val primaryHex = remember(primaryColor) {
+        String.format("#%06X", 0xFFFFFF and primaryColor.toArgb())
+    }
+
+    LaunchedEffect(primaryHex, webViewRef) {
+        webViewRef?.evaluateJavascript("if (window.setScrubberColor) window.setScrubberColor('$primaryHex');", null)
+    }
+
+    val configuration = LocalConfiguration.current
+    LaunchedEffect(configuration.orientation, webViewRef) {
+        webViewRef?.evaluateJavascript(
+            "if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) { PDFViewerApplication.pdfViewer.currentScaleValue = 'page-width'; }",
+            null
+        )
     }
 
     // Auto-hide control bars after 5 seconds of inactivity
@@ -936,16 +954,16 @@ fun ViewerScreen(
                             .fillMaxHeight()
                             .width(360.dp)
                             .background(
-                                color = Color(0xF2ECE6F8),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.95f),
                                 shape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)
                             )
                             .border(
-                                BorderStroke(1.dp, Color(0x407C5CFF)),
+                                BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
                                 RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)
                             )
                             .clickable(enabled = false) { } // Prevent clicks through to background
                     ) {
-                        MaterialTheme(colorScheme = glassLavenderColorScheme) {
+                        MaterialTheme(colorScheme = MaterialTheme.colorScheme) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -1298,6 +1316,10 @@ fun PdfWebView(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val primaryHex = remember(primaryColor) {
+        String.format("#%06X", 0xFFFFFF and primaryColor.toArgb())
+    }
 
     val filePathCallbackRef = remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
     val fileChooserLauncher = rememberLauncherForActivityResult(
@@ -2084,9 +2106,9 @@ fun PdfWebView(
                                                 .wps-scroll-handle {
                                                     width: 26px !important;
                                                     height: 26px !important;
-                                                    background: linear-gradient(135deg, #7C5CFF 0%, #5E35B1 100%) !important;
+                                                    background: ${primaryHex} !important;
                                                     border-radius: 50% !important;
-                                                    box-shadow: 0 4px 12px rgba(103, 58, 183, 0.5) !important;
+                                                    box-shadow: 0 4px 12px ${primaryHex}80 !important;
                                                     border: 1.5px solid rgba(255, 255, 255, 0.95) !important;
                                                     display: flex !important;
                                                     flex-direction: column !important;
@@ -2103,11 +2125,22 @@ fun PdfWebView(
                                                 }
                                                 body.scrubbing .wps-scroll-handle {
                                                     transform: scale(1.15) !important;
-                                                    background: linear-gradient(180deg, #9E7CFF 0%, #7E57C2 100%) !important;
-                                                    box-shadow: 0 6px 18px rgba(103, 58, 183, 0.75) !important;
+                                                    background: ${primaryHex} !important;
+                                                    box-shadow: 0 6px 18px ${primaryHex}CC !important;
                                                 }
                                             `;
                                             document.head.appendChild(style);
+
+                                            window.setScrubberColor = function(colorHex) {
+                                                var styleEl = document.getElementById('scrubberDynamicStyle');
+                                                if (!styleEl) {
+                                                    styleEl = document.createElement('style');
+                                                    styleEl.id = 'scrubberDynamicStyle';
+                                                    document.head.appendChild(styleEl);
+                                                }
+                                                styleEl.innerHTML = '.wps-scroll-handle { background: ' + colorHex + ' !important; box-shadow: 0 4px 12px ' + colorHex + '80 !important; } body.scrubbing .wps-scroll-handle { background: ' + colorHex + ' !important; box-shadow: 0 6px 18px ' + colorHex + 'CC !important; }';
+                                            };
+                                            window.setScrubberColor('${primaryHex}');
 
                                             // Define custom helper functions globally
                                             window.applyTheme = function(themeName) {
@@ -2155,28 +2188,55 @@ fun PdfWebView(
                                                 }
                                             };
 
+                                            window.baseFitScale = null;
+                                            if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.eventBus) {
+                                                PDFViewerApplication.eventBus.on('scalechanged', function(evt) {
+                                                    if (PDFViewerApplication.pdfViewer) {
+                                                        var mode = PDFViewerApplication.pdfViewer.currentScaleValue;
+                                                        if (mode === 'page-width' || mode === 'page-fit' || mode === 'auto') {
+                                                            window.baseFitScale = PDFViewerApplication.pdfViewer.currentScale;
+                                                        }
+                                                    }
+                                                });
+                                                PDFViewerApplication.eventBus.on('pagesinit', function() {
+                                                    setTimeout(function() {
+                                                        if (PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentScale) {
+                                                            window.baseFitScale = PDFViewerApplication.pdfViewer.currentScale;
+                                                        }
+                                                    }, 300);
+                                                });
+                                            }
+
                                             window.doubleTapZoomFactor = ${state.doubleTapZoomFactor};
                                             window.defaultScale = null;
                                             window.setScale = function(scale) {
                                                 try {
-                                                    if (!window.defaultScale && typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentScale) {
-                                                        window.defaultScale = PDFViewerApplication.pdfViewer.currentScale;
-                                                    }
-                                                    var minScale = 0.1;
-                                                    var maxScale = 5.0;
-                                                    if (scale < minScale) scale = minScale;
-                                                    if (scale > maxScale) scale = maxScale;
                                                     if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
-                                                        PDFViewerApplication.pdfViewer.currentScale = scale;
+                                                        var pdfViewer = PDFViewerApplication.pdfViewer;
+                                                        if (!window.baseFitScale && pdfViewer.currentScale) {
+                                                            window.baseFitScale = pdfViewer.currentScale;
+                                                        }
+                                                        var minScale = window.baseFitScale || 0.25;
+                                                        var maxScale = 5.0;
+                                                        if (scale < minScale) scale = minScale;
+                                                        if (scale > maxScale) scale = maxScale;
+                                                        pdfViewer.currentScale = scale;
                                                     }
                                                 } catch (e) {
                                                     console.error("Error in setScale JS: " + e);
                                                 }
                                             };
 
+                                            var lastOrientation = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
                                             window.addEventListener('resize', function() {
+                                                var curOrientation = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
                                                 if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
-                                                    PDFViewerApplication.pdfViewer.update();
+                                                    if (curOrientation !== lastOrientation) {
+                                                        lastOrientation = curOrientation;
+                                                        PDFViewerApplication.pdfViewer.currentScaleValue = 'page-width';
+                                                    } else {
+                                                        PDFViewerApplication.pdfViewer.update();
+                                                    }
                                                 }
                                             });
 
@@ -2188,7 +2248,12 @@ fun PdfWebView(
                                                     var t1 = e.touches[0];
                                                     var t2 = e.touches[1];
                                                     initialTouchDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-                                                    initialScale = PDFViewerApplication.pdfViewer.currentScale || 1.0;
+                                                    if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
+                                                        initialScale = PDFViewerApplication.pdfViewer.currentScale || 1.0;
+                                                        if (!window.baseFitScale && PDFViewerApplication.pdfViewer.currentScale) {
+                                                            window.baseFitScale = PDFViewerApplication.pdfViewer.currentScale;
+                                                        }
+                                                    }
                                                 }
                                             }, { passive: true });
 
@@ -2200,13 +2265,18 @@ fun PdfWebView(
                                                     var dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
                                                     var factor = dist / initialTouchDist;
                                                     var newScale = initialScale * factor;
-                                                    if (!window.defaultScale && typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentScale) {
-                                                        window.defaultScale = PDFViewerApplication.pdfViewer.currentScale;
+                                                    var minScale = window.baseFitScale || 0.25;
+                                                    if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentScale) {
+                                                        if (!window.baseFitScale) {
+                                                            window.baseFitScale = PDFViewerApplication.pdfViewer.currentScale;
+                                                            minScale = window.baseFitScale;
+                                                        }
                                                     }
-                                                    var minScale = 0.1;
                                                     newScale = Math.min(Math.max(newScale, minScale), 5.0);
                                                     window.setScale(newScale);
-                                                    AndroidBridge.onScaleChanged(newScale);
+                                                    if (window.AndroidBridge && window.AndroidBridge.onScaleChanged) {
+                                                        window.AndroidBridge.onScaleChanged(newScale);
+                                                    }
                                                 }
                                             }, { passive: false });
 
