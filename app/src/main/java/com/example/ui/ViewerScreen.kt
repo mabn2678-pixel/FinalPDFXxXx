@@ -871,42 +871,42 @@ fun ViewerScreen(
                                     icon = Icons.Default.MenuBook,
                                     label = "الصفحات",
                                     onClick = { activeSheet = BottomSheetType.DocumentNavigation },
-                                    tint = Color(0xFF4CB050), // Green
+                                    tint = Color(0xFF5E8B66), // Muted Sage Green
                                     modifier = Modifier.weight(1f)
                                 )
                                 BottomBarItem(
                                     icon = if (state.scrollMode == "horizontal") Icons.Default.ViewCarousel else Icons.Default.ViewStream,
                                     label = "العرض",
                                     onClick = { activeSheet = BottomSheetType.ViewOptions },
-                                    tint = Color(0xFF03A9F4), // Light Blue
+                                    tint = Color(0xFF587B9C), // Muted Slate Blue
                                     modifier = Modifier.weight(1f)
                                 )
                                 BottomBarItem(
                                     icon = Icons.Default.ZoomIn,
                                     label = "الزووم",
                                     onClick = { activeSheet = BottomSheetType.ZoomSettings },
-                                    tint = Color(0xFFFF9800), // Orange
+                                    tint = Color(0xFF9E7A5A), // Muted Amber/Ochre
                                     modifier = Modifier.weight(1f)
                                 )
                                 BottomBarItem(
                                     icon = Icons.Default.Palette,
                                     label = "السمات",
                                     onClick = { activeSheet = BottomSheetType.DisplaySettings },
-                                    tint = Color(0xFF9C27B0), // Purple
+                                    tint = Color(0xFF836993), // Muted Soft Purple
                                     modifier = Modifier.weight(1f)
                                 )
                                 BottomBarItem(
                                     icon = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
                                     label = "إشارة",
                                     onClick = { viewModel.toggleBookmark(context, state.currentPage) },
-                                    tint = if (isBookmarked) Color(0xFFE91E63) else Color(0xFFE91E63).copy(alpha = 0.5f), // Pink
+                                    tint = if (isBookmarked) Color(0xFFA65D67) else Color(0xFFA65D67).copy(alpha = 0.5f), // Muted Rose/Red
                                     modifier = Modifier.weight(1f)
                                 )
                                 BottomBarItem(
                                     icon = Icons.Default.MoreHoriz,
                                     label = "أدوات",
                                     onClick = { activeSheet = BottomSheetType.MoreOptions },
-                                    tint = Color(0xFF009688), // Teal
+                                    tint = Color(0xFF5A8888), // Muted Slate Teal
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -2076,7 +2076,7 @@ fun PdfWebView(
                                                     left: 0px !important;
                                                     top: 0 !important;
                                                     width: 36px !important;
-                                                    height: 54px !important;
+                                                    height: 36px !important;
                                                     display: flex !important;
                                                     align-items: center !important;
                                                     justify-content: center !important;
@@ -2086,10 +2086,10 @@ fun PdfWebView(
                                                     pointer-events: auto !important;
                                                 }
                                                 .wps-scroll-handle {
-                                                    width: 18px !important;
-                                                    height: 46px !important;
-                                                    background: linear-gradient(180deg, #8E6CFF 0%, #673AB7 100%) !important;
-                                                    border-radius: 12px !important;
+                                                    width: 26px !important;
+                                                    height: 26px !important;
+                                                    background: linear-gradient(135deg, #7C5CFF 0%, #5E35B1 100%) !important;
+                                                    border-radius: 50% !important;
                                                     box-shadow: 0 4px 12px rgba(103, 58, 183, 0.5) !important;
                                                     border: 1.5px solid rgba(255, 255, 255, 0.95) !important;
                                                     display: flex !important;
@@ -3258,7 +3258,7 @@ fun ZoomSettingsSheet(
                     }
                 }
 
-                Slider(
+                AppSlider(
                     value = state.currentScale,
                     onValueChange = { viewModel.setScale(it) },
                     valueRange = 0.1f..5.0f,
@@ -3379,7 +3379,7 @@ fun ZoomSettingsSheet(
             }
         }
 
-        Slider(
+        AppSlider(
             value = state.doubleTapZoomFactor,
             onValueChange = { viewModel.setDoubleTapZoomFactor(it) },
             valueRange = 1.1f..5.0f,
@@ -3565,7 +3565,7 @@ fun DisplaySettingsSheet(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     modifier = Modifier.size(20.dp)
                 )
-                Slider(
+                AppSlider(
                     value = state.customBrightness,
                     onValueChange = { viewModel.setCustomBrightness(it) },
                     valueRange = 0.05f..1.0f,
@@ -4031,7 +4031,7 @@ fun AutoScrollSheet(
             )
         }
 
-        Slider(
+        AppSlider(
             value = speedState,
             onValueChange = {
                 speedState = it
@@ -4981,7 +4981,7 @@ fun EditBottomBar(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.width(60.dp)
                     )
-                    Slider(
+                    AppSlider(
                         value = state.editThickness.coerceIn(1.5f, 18.5f),
                         onValueChange = { viewModel.setEditThickness(it) },
                         valueRange = 1.5f..18.5f,
@@ -5057,7 +5057,7 @@ fun EditBottomBar(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.width(60.dp)
                     )
-                    Slider(
+                    AppSlider(
                         value = state.editThickness.coerceIn(1.5f, 18.5f),
                         onValueChange = { viewModel.setEditThickness(it) },
                         valueRange = 1.5f..18.5f,
@@ -5085,7 +5085,7 @@ fun EditBottomBar(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.width(60.dp)
                     )
-                    Slider(
+                    AppSlider(
                         value = state.editOpacity.coerceIn(10f, 100f),
                         onValueChange = { viewModel.setEditOpacity(it) },
                         valueRange = 10f..100f,
@@ -5399,7 +5399,7 @@ fun EditBottomBar_Old(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.width(50.dp)
                         )
-                        Slider(
+                        AppSlider(
                             value = state.editThickness,
                             onValueChange = { viewModel.setEditThickness(it) },
                             valueRange = 1f..30f,
@@ -5427,7 +5427,7 @@ fun EditBottomBar_Old(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.width(50.dp)
                     )
-                    Slider(
+                    AppSlider(
                         value = state.editOpacity,
                         onValueChange = { viewModel.setEditOpacity(it) },
                         valueRange = 0f..100f,

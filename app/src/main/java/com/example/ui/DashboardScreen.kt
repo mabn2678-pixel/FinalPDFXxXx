@@ -4407,7 +4407,7 @@ fun SettingsTabScreen(
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
                         
-                        Slider(
+                        AppSlider(
                             value = uiState.doubleTapZoomFactor,
                             onValueChange = { viewModel.setDoubleTapZoomFactor(it) },
                             valueRange = 1.1f..5.0f,
@@ -4480,7 +4480,7 @@ fun SettingsTabScreen(
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            Slider(
+                            AppSlider(
                                 value = uiState.customBrightness,
                                 onValueChange = { viewModel.setCustomBrightness(it) },
                                 valueRange = 0.05f..1.0f
