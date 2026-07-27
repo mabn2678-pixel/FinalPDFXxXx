@@ -112,7 +112,7 @@ fun AnimatedBottomNavBar(
         val totalWidth = maxWidth
         val itemCount = items.size.coerceAtLeast(1)
         val itemWidth = totalWidth / itemCount
-        val circleSize = 52.dp
+        val circleSize = 42.dp
 
         // Calculate horizontal position of floating circle
         val targetOffset = (itemWidth * selectedIndex) + ((itemWidth - circleSize) / 2)
@@ -134,16 +134,16 @@ fun AnimatedBottomNavBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter),
-                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
                 color = barBackgroundColor,
-                shadowElevation = 12.dp
+                shadowElevation = 8.dp
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
-                        .height(64.dp)
-                        .padding(horizontal = 8.dp),
+                        .height(50.dp)
+                        .padding(horizontal = 6.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -172,19 +172,19 @@ fun AnimatedBottomNavBar(
                                         imageVector = item.icon,
                                         contentDescription = item.label,
                                         tint = unselectedContentColor,
-                                        modifier = Modifier.size(22.dp)
+                                        modifier = Modifier.size(18.dp)
                                     )
-                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Spacer(modifier = Modifier.height(2.dp))
                                     Text(
                                         text = item.label,
-                                        fontSize = 11.sp,
+                                        fontSize = 10.sp,
                                         fontWeight = FontWeight.Medium,
                                         color = unselectedContentColor,
                                         textAlign = TextAlign.Center
                                     )
                                 } else {
                                     // Empty space placeholder when item is floating above
-                                    Spacer(modifier = Modifier.height(36.dp))
+                                    Spacer(modifier = Modifier.height(28.dp))
                                 }
                             }
                         }
@@ -197,14 +197,14 @@ fun AnimatedBottomNavBar(
                 modifier = Modifier
                     .offset(
                         x = animatedOffsetX,
-                        y = (-14).dp + circleOffsetY.value.dp
+                        y = (-10).dp + circleOffsetY.value.dp
                     )
                     .size(circleSize)
                     .scale(circleScale.value)
                     .align(Alignment.TopStart),
                 shape = CircleShape,
                 color = primaryColor,
-                shadowElevation = 8.dp
+                shadowElevation = 6.dp
             ) {
                 Box(
                     contentAlignment = Alignment.Center,
@@ -220,7 +220,7 @@ fun AnimatedBottomNavBar(
                             imageVector = currentItem.selectedIcon,
                             contentDescription = currentItem.label,
                             tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(26.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
