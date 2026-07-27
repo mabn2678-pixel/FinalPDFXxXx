@@ -124,6 +124,7 @@ fun CameraOcrSheet(
     if (showApiKeyDialog) {
         AlertDialog(
             onDismissRequest = { showApiKeyDialog = false },
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.90f),
             icon = {
                 Icon(
                     imageVector = Icons.Default.VpnKey,

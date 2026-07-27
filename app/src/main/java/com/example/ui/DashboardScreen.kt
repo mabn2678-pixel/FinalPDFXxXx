@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.ui.theme.BottomBarPresets
+import com.example.ui.theme.BottomBarColorPreset
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.net.Uri
@@ -77,142 +79,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
-
-data class BottomBarColorPreset(
-    val name: String,
-    val lightBg: Color,
-    val darkBg: Color,
-    val lightOnSelected: Color,
-    val darkOnSelected: Color,
-    val lightUnselected: Color,
-    val darkUnselected: Color,
-    val lightSelectedContainer: Color,
-    val darkSelectedContainer: Color
-)
-
-val BottomBarPresets = listOf(
-    BottomBarColorPreset(
-        name = "الافتراضي",
-        lightBg = Color.White,
-        darkBg = Color(0xFF1C1B26),
-        lightOnSelected = Color(0xFF7C5CFF), // LavenderPrimary
-        darkOnSelected = Color(0xFFB19DFF), // LavenderSecondary
-        lightUnselected = Color(0xFF767482),
-        darkUnselected = Color(0xFFBBB8CF),
-        lightSelectedContainer = Color(0xFFF1EEFF),
-        darkSelectedContainer = Color(0xFF2A283E)
-    ),
-    BottomBarColorPreset(
-        name = "الأزرق الملكي",
-        lightBg = Color(0xFFE3F2FD),
-        darkBg = Color(0xFF0D47A1),
-        lightOnSelected = Color(0xFF1565C0),
-        darkOnSelected = Color(0xFF90CAF9),
-        lightUnselected = Color(0xFF546E7A),
-        darkUnselected = Color(0xFFB0BEC5),
-        lightSelectedContainer = Color(0xFFBBDEFB),
-        darkSelectedContainer = Color(0xFF1565C0)
-    ),
-    BottomBarColorPreset(
-        name = "الأخضر الزمردي",
-        lightBg = Color(0xFFE8F5E9),
-        darkBg = Color(0xFF1B5E20),
-        lightOnSelected = Color(0xFF2E7D32),
-        darkOnSelected = Color(0xFFA5D6A7),
-        lightUnselected = Color(0xFF4F5B66),
-        darkUnselected = Color(0xFFC8E6C9),
-        lightSelectedContainer = Color(0xFFC8E6C9),
-        darkSelectedContainer = Color(0xFF2E7D32)
-    ),
-    BottomBarColorPreset(
-        name = "البرتقالي الدافئ",
-        lightBg = Color(0xFFFFF3E0),
-        darkBg = Color(0xFFE65100),
-        lightOnSelected = Color(0xFFD84315),
-        darkOnSelected = Color(0xFFFFB74D),
-        lightUnselected = Color(0xFF5D4037),
-        darkUnselected = Color(0xFFFFE0B2),
-        lightSelectedContainer = Color(0xFFFFE0B2),
-        darkSelectedContainer = Color(0xFFD84315)
-    ),
-    BottomBarColorPreset(
-        name = "الأحمر القرمزي",
-        lightBg = Color(0xFFFFEBEE),
-        darkBg = Color(0xFFB71C1C),
-        lightOnSelected = Color(0xFFC62828),
-        darkOnSelected = Color(0xFFFFCDD2),
-        lightUnselected = Color(0xFF5D4037),
-        darkUnselected = Color(0xFFFFCDD2),
-        lightSelectedContainer = Color(0xFFFFCDD2),
-        darkSelectedContainer = Color(0xFFC62828)
-    ),
-    BottomBarColorPreset(
-        name = "خيال اللافندر",
-        lightBg = Color(0xFFF3E5F5),
-        darkBg = Color(0xFF4A148C),
-        lightOnSelected = Color(0xFF6A1B9A),
-        darkOnSelected = Color(0xFFE1BEE7),
-        lightUnselected = Color(0xFF4A148C),
-        darkUnselected = Color(0xFFE1BEE7),
-        lightSelectedContainer = Color(0xFFE1BEE7),
-        darkSelectedContainer = Color(0xFF6A1B9A)
-    ),
-    BottomBarColorPreset(
-        name = "السيبي دافئ",
-        lightBg = Color(0xFFEFEBE9),
-        darkBg = Color(0xFF3E2723),
-        lightOnSelected = Color(0xFF4E342E),
-        darkOnSelected = Color(0xFFD7CCC8),
-        lightUnselected = Color(0xFF705751),
-        darkUnselected = Color(0xFFD7CCC8),
-        lightSelectedContainer = Color(0xFFD7CCC8),
-        darkSelectedContainer = Color(0xFF4E342E)
-    ),
-    BottomBarColorPreset(
-        name = "نسيم التيل",
-        lightBg = Color(0xFFE0F2F1),
-        darkBg = Color(0xFF004D40),
-        lightOnSelected = Color(0xFF00695C),
-        darkOnSelected = Color(0xFF80CBC4),
-        lightUnselected = Color(0xFF37474F),
-        darkUnselected = Color(0xFFB2DFDB),
-        lightSelectedContainer = Color(0xFFB2DFDB),
-        darkSelectedContainer = Color(0xFF00695C)
-    ),
-    BottomBarColorPreset(
-        name = "الوردي المرجاني",
-        lightBg = Color(0xFFFCE4EC),
-        darkBg = Color(0xFF880E4F),
-        lightOnSelected = Color(0xFFAD1457),
-        darkOnSelected = Color(0xFFF8BBD0),
-        lightUnselected = Color(0xFF4A148C),
-        darkUnselected = Color(0xFFF8BBD0),
-        lightSelectedContainer = Color(0xFFF8BBD0),
-        darkSelectedContainer = Color(0xFFAD1457)
-    ),
-    BottomBarColorPreset(
-        name = "إنديغو السيبراني",
-        lightBg = Color(0xFFE8EAF6),
-        darkBg = Color(0xFF1A237E),
-        lightOnSelected = Color(0xFF283593),
-        darkOnSelected = Color(0xFFC5CAE9),
-        lightUnselected = Color(0xFF3F51B5),
-        darkUnselected = Color(0xFFC5CAE9),
-        lightSelectedContainer = Color(0xFFC5CAE9),
-        darkSelectedContainer = Color(0xFF283593)
-    ),
-    BottomBarColorPreset(
-        name = "الفحم الحجري",
-        lightBg = Color(0xFFECEFF1),
-        darkBg = Color(0xFF263238),
-        lightOnSelected = Color(0xFF37474F),
-        darkOnSelected = Color(0xFFCFD8DC),
-        lightUnselected = Color(0xFF455A64),
-        darkUnselected = Color(0xFFCFD8DC),
-        lightSelectedContainer = Color(0xFFCFD8DC),
-        darkSelectedContainer = Color(0xFF37474F)
-    )
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -4031,13 +3897,13 @@ fun SettingsTabScreen(
                 Box(
                     modifier = Modifier
                         .size(50.dp)
-                        .background(Color(0xFF7C5CFF).copy(alpha = 0.15f), RoundedCornerShape(14.dp)),
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), RoundedCornerShape(14.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.PictureAsPdf,
                         contentDescription = null,
-                        tint = Color(0xFF7C5CFF),
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(28.dp)
                     )
                 }
@@ -4055,7 +3921,7 @@ fun SettingsTabScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Box(
                             modifier = Modifier
-                                .background(Color(0xFF7C5CFF), RoundedCornerShape(6.dp))
+                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(6.dp))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
@@ -4224,9 +4090,9 @@ fun SettingsTabScreen(
                 }
             }
 
-            // BOTTOM BAR CUSTOMIZATION SECTION
+            // APP COLOR THEME CUSTOMIZATION SECTION
             item {
-                SettingsSectionHeader(title = "تخصيص لون الشريط السفلي (BOTTOM BAR)", headerColor = headerColor)
+                SettingsSectionHeader(title = "تخصيص ألوان التطبيق", headerColor = headerColor)
             }
             item {
                 Card(
@@ -4237,7 +4103,7 @@ fun SettingsTabScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "اختر لوناً لشريط التنقل السفلي للتطبيق (11 خياراً):",
+                            text = "اختر لوناً مخصصاً لألوان التطبيق والشريط السفلي (11 خياراً):",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -4257,7 +4123,7 @@ fun SettingsTabScreen(
                                     if (isDarkTheme) preset.darkBg else preset.lightBg
                                 }
                                 val previewAccent = if (index == 0) {
-                                    Color(0xFF7C5CFF)
+                                    MaterialTheme.colorScheme.primary
                                 } else {
                                     if (isDarkTheme) preset.darkOnSelected else preset.lightOnSelected
                                 }
@@ -4269,7 +4135,7 @@ fun SettingsTabScreen(
                                         .background(previewBg)
                                         .border(
                                             width = if (isSelected) 3.dp else 1.dp,
-                                            color = if (isSelected) Color(0xFF7C5CFF) else Color.Gray.copy(alpha = 0.4f),
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.4f),
                                             shape = CircleShape
                                         )
                                         .clickable { viewModel.setBottomBarColorIndex(context, index) },
@@ -4976,13 +4842,13 @@ fun FileActionSheet(
                     Box(
                         modifier = Modifier
                             .size(40.dp)
-                            .background(Color(0xFF7C5CFF).copy(alpha = 0.1f), RoundedCornerShape(12.dp)),
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.PictureAsPdf,
                             contentDescription = null,
-                            tint = Color(0xFF7C5CFF),
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -5855,8 +5721,8 @@ fun PdfDetailOverlaySheet(
                         modifier = Modifier
                             .size(68.dp, 88.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFF7C5CFF).copy(alpha = 0.12f))
-                            .border(1.dp, Color(0xFF7C5CFF).copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         if (thumbnailBitmap != null) {
@@ -5870,7 +5736,7 @@ fun PdfDetailOverlaySheet(
                             Icon(
                                 imageVector = Icons.Default.PictureAsPdf,
                                 contentDescription = null,
-                                tint = Color(0xFF7C5CFF),
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(36.dp)
                             )
                         }
@@ -5894,7 +5760,7 @@ fun PdfDetailOverlaySheet(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             val pagesText = metadata?.let { if (it.pageCount > 0) "${it.pageCount} صفحة" else "PDF" } ?: "جاري..."
-                            DetailBadge(text = pagesText, icon = Icons.Default.MenuBook, color = Color(0xFF7C5CFF))
+                            DetailBadge(text = pagesText, icon = Icons.Default.MenuBook, color = MaterialTheme.colorScheme.primary)
                             metadata?.let {
                                 DetailBadge(text = it.fileSize, icon = Icons.Default.Storage, color = Color(0xFF00B0FF))
                             }
@@ -5911,7 +5777,7 @@ fun PdfDetailOverlaySheet(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(color = Color(0xFF7C5CFF))
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.height(12.dp))
                         Text("جاري استخراج بيانات المستند والميتاداتا...", fontSize = 13.sp, color = Color.Gray)
                     }
@@ -6000,7 +5866,7 @@ fun PdfDetailOverlaySheet(
                                 },
                                 modifier = Modifier.size(32.dp)
                             ) {
-                                Icon(Icons.Outlined.ContentCopy, contentDescription = "نسخ", tint = Color(0xFF7C5CFF), modifier = Modifier.size(16.dp))
+                                Icon(Icons.Outlined.ContentCopy, contentDescription = "نسخ", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                             }
                         }
                     }
@@ -6018,7 +5884,7 @@ fun PdfDetailOverlaySheet(
                             onDismiss()
                             onOpenPdf(file)
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C5CFF)),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.weight(1f)
                     ) {

@@ -370,8 +370,6 @@ fun ViewerScreen(
                 isBrowsing = false
                 overlayWebViewRef = null
             }
-        } else if (state.hasUnsavedChanges) {
-            showExitConfirmDialog = true
         } else if (state.isEditMode) {
             viewModel.toggleEditMode(false)
         } else if (webView != null && webView.canGoBack()) {
@@ -1174,7 +1172,7 @@ fun UnsavedChangesDialog(
                 .fillMaxWidth(0.88f)
                 .padding(16.dp),
             shape = RoundedCornerShape(24.dp),
-            color = Color(0xFFECE6F8),
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.90f),
             tonalElevation = 6.dp,
             shadowElevation = 12.dp
         ) {
@@ -1188,13 +1186,13 @@ fun UnsavedChangesDialog(
                 Box(
                     modifier = Modifier
                         .size(56.dp)
-                        .background(Color(0xFF7C5CFF).copy(alpha = 0.15f), CircleShape),
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Save,
                         contentDescription = null,
-                        tint = Color(0xFF7C5CFF),
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(30.dp)
                     )
                 }
@@ -1204,7 +1202,7 @@ fun UnsavedChangesDialog(
                     style = TextStyle(
                         fontWeight = FontWeight.Bold,
                         fontSize = 20.sp,
-                        color = Color(0xFF1C182B),
+                        color = MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.Center
                     )
                 )
@@ -1213,7 +1211,7 @@ fun UnsavedChangesDialog(
                     text = "هناك تعديلات غير محفوظة على هذا المستند. يمكنك حفظ التعديلات الآن أو الخروج بدون حفظ.",
                     style = TextStyle(
                         fontSize = 14.sp,
-                        color = Color(0xFF4C4566),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         lineHeight = 20.sp
                     )
@@ -1229,7 +1227,7 @@ fun UnsavedChangesDialog(
                         .testTag("dialog_save_btn"),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF7C5CFF),
+                        containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = Color.White
                     )
                 ) {
@@ -1731,9 +1729,7 @@ fun PdfWebView(
                                             });
 
                                             PDFViewerApplication.eventBus.on('annotationeditorstateschanged', () => {
-                                                if (window.AndroidBridge && window.AndroidBridge.onAnnotationChanged) {
-                                                    window.AndroidBridge.onAnnotationChanged();
-                                                }
+                                                // Disabled
                                             });
 
                                             // Setup FreeText Control Header Observer
@@ -2250,19 +2246,31 @@ fun PdfWebView(
                                                     }
                                                     lastTapTime = 0;
 
-                                                    if (!window.defaultScale && typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentScale) {
-                                                        window.defaultScale = PDFViewerApplication.pdfViewer.currentScale;
-                                                    }
+                                                    if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
+                                                        var pdfViewer = PDFViewerApplication.pdfViewer;
+                                                        if (!window.defaultScale && pdfViewer.currentScale) {
+                                                            window.defaultScale = pdfViewer.currentScale;
+                                                        }
+                                                        var baseScale = window.defaultScale || pdfViewer.currentScale || 1.0;
+                                                        var curScale = pdfViewer.currentScale || baseScale;
+                                                        var factor = window.doubleTapZoomFactor || ${state.doubleTapZoomFactor};
 
-                                                    var baseScale = window.defaultScale || (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer ? PDFViewerApplication.pdfViewer.currentScale : 1.0);
-                                                    var curScale = (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentScale) ? PDFViewerApplication.pdfViewer.currentScale : baseScale;
-
-                                                    var factor = window.doubleTapZoomFactor || ${state.doubleTapZoomFactor};
-                                                    var targetScale = (curScale < baseScale * 1.25) ? (baseScale * factor) : baseScale;
-
-                                                    window.setScale(targetScale);
-                                                    if (window.AndroidBridge && window.AndroidBridge.onScaleChanged) {
-                                                        window.AndroidBridge.onScaleChanged(targetScale);
+                                                        if (curScale > baseScale * 1.15) {
+                                                            pdfViewer.currentScaleValue = 'page-width';
+                                                            if (window.AndroidBridge && window.AndroidBridge.onScaleChanged) {
+                                                                setTimeout(function() {
+                                                                    if (pdfViewer && pdfViewer.currentScale) {
+                                                                        window.AndroidBridge.onScaleChanged(pdfViewer.currentScale);
+                                                                    }
+                                                                }, 100);
+                                                            }
+                                                        } else {
+                                                            var targetScale = baseScale * factor;
+                                                            window.setScale(targetScale);
+                                                            if (window.AndroidBridge && window.AndroidBridge.onScaleChanged) {
+                                                                window.AndroidBridge.onScaleChanged(targetScale);
+                                                            }
+                                                        }
                                                     }
 
                                                     e.preventDefault();
@@ -2918,16 +2926,6 @@ fun MoreOptionsSheet(
                         onNavigate(BottomSheetType.AutoScroll)
                     }
                 )
-                MoreOptionGridItem(
-                    icon = Icons.Outlined.Print,
-                    label = "طباعة المستند",
-                    onClick = {
-                        onDismiss()
-                        state.currentPdfPath?.let { path ->
-                            printPdf(context, path, state.currentPdfName ?: "doc.pdf")
-                        }
-                    }
-                )
             }
 
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -2967,6 +2965,16 @@ fun MoreOptionsSheet(
                                 pageNumber = state.currentPage,
                                 pdfName = state.currentPdfName ?: "doc.pdf"
                             )
+                        }
+                    }
+                )
+                MoreOptionGridItem(
+                    icon = Icons.Outlined.Print,
+                    label = "طباعة المستند",
+                    onClick = {
+                        onDismiss()
+                        state.currentPdfPath?.let { path ->
+                            printPdf(context, path, state.currentPdfName ?: "doc.pdf")
                         }
                     }
                 )
@@ -3340,14 +3348,22 @@ fun ZoomSettingsSheet(
                 text = "معامل التكبير عند النقر المزدوج (Double Tap Zoom)",
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
             )
-            Text(
-                text = "×${String.format("%.1f", state.doubleTapZoomFactor)}",
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.primary
-            )
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.padding(start = 8.dp)
+            ) {
+                Text(
+                    text = "×${String.format("%.1f", state.doubleTapZoomFactor)}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
         }
 
         Row(

@@ -337,7 +337,8 @@ fun LibraryPdfPickerSheet(
     val context = LocalContext.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.90f)
     ) {
         Column(
             modifier = Modifier

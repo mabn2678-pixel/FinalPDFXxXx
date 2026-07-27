@@ -50,7 +50,11 @@ class MainActivity : ComponentActivity() {
         else -> systemDark
       }
 
-      MyApplicationTheme(darkTheme = isDark, dynamicColor = false) {
+      MyApplicationTheme(
+        darkTheme = isDark,
+        dynamicColor = false,
+        colorPresetIndex = state.bottomBarColorIndex
+      ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background

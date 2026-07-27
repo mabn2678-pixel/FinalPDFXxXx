@@ -1,5 +1,7 @@
 package com.example.ui
 
+import com.example.ui.theme.BottomBarPresets
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
@@ -81,7 +83,7 @@ fun AnimatedBottomNavBar(
     onItemSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
     barBackgroundColor: Color = MaterialTheme.colorScheme.surface,
-    primaryColor: Color = Color(0xFF7C5CFF),
+    primaryColor: Color = MaterialTheme.colorScheme.primary,
     unselectedContentColor: Color = Color(0xFF8E8E93)
 ) {
     val selectedIndex = remember(currentRoute, items) {
@@ -250,7 +252,7 @@ fun DashboardAnimatedBottomNavBar(
     }
 
     val primaryColor = if (bottomBarColorIndex == 0) {
-        Color(0xFF7C5CFF)
+        MaterialTheme.colorScheme.primary
     } else {
         if (isDark) preset.darkOnSelected else preset.lightOnSelected
     }
