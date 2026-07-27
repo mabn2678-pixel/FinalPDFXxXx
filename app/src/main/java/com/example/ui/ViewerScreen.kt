@@ -112,6 +112,11 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import kotlinx.coroutines.launch
@@ -152,6 +157,13 @@ fun ViewerScreen(
     
     var activeSheet by remember { mutableStateOf(BottomSheetType.None) }
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    val zoomAnimatable = remember { Animatable(state.currentScale) }
+    val springZoomSpec = remember {
+        spring<Float>(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        )
+    }
     var isBarsVisible by remember { mutableStateOf(true) }
     var isBrowsing by remember { mutableStateOf(false) }
     var browsingUrl by remember { mutableStateOf<String?>(null) }
@@ -422,14 +434,14 @@ fun ViewerScreen(
         activity?.window?.let { window ->
             val insetsController = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
             if (isBrowsing) {
-                // In-app web browser mode: status bar is ALWAYS visible
+                // In-app web browser mode: status bar is ALWAYS visible with white icons
                 insetsController.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
-                // Light mode -> dark status bar icons (!isDark = true), Dark mode -> light icons (!isDark = false)
-                insetsController.isAppearanceLightStatusBars = !isDark
+                insetsController.isAppearanceLightStatusBars = false
             } else {
                 if (isBarsVisible) {
                     insetsController.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
-                    insetsController.isAppearanceLightStatusBars = !isDark
+                    // Always use white icons over translucent dark status bar overlay
+                    insetsController.isAppearanceLightStatusBars = false
                 } else {
                     // Tap to hide controls: hide phone notification/status bar
                     insetsController.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars())
@@ -461,6 +473,17 @@ fun ViewerScreen(
             "if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) { PDFViewerApplication.pdfViewer.currentScaleValue = 'page-width'; }",
             null
         )
+    }
+
+    LaunchedEffect(state.currentScale) {
+        if (kotlin.math.abs(zoomAnimatable.value - state.currentScale) > 0.005f) {
+            zoomAnimatable.animateTo(
+                targetValue = state.currentScale,
+                animationSpec = springZoomSpec
+            ) {
+                webViewRef?.evaluateJavascript("window.setScale(${this.value})", null)
+            }
+        }
     }
 
     // Auto-hide control bars after 5 seconds of inactivity
@@ -495,6 +518,8 @@ fun ViewerScreen(
                     PdfWebView(
                         pdfPath = state.currentPdfPath!!,
                         viewModel = viewModel,
+                        zoomAnimatable = zoomAnimatable,
+                        springZoomSpec = springZoomSpec,
                         onWebViewCreated = { webViewRef = it },
                         onSingleTap = { 
                             if (!isBrowsing) {
@@ -710,9 +735,17 @@ fun ViewerScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(statusBarHeight)
+                        .height(statusBarHeight + 16.dp)
                         .align(Alignment.TopCenter)
-                        .background(Color.Black.copy(alpha = 0.85f))
+                        .background(
+                            androidx.compose.ui.graphics.Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.50f),
+                                    Color.Black.copy(alpha = 0.20f),
+                                    Color.Transparent
+                                )
+                            )
+                        )
                 )
             }
 
@@ -1305,6 +1338,8 @@ fun UnsavedChangesDialog(
 fun PdfWebView(
     pdfPath: String,
     viewModel: PdfViewModel,
+    zoomAnimatable: Animatable<Float, AnimationVector1D>,
+    springZoomSpec: SpringSpec<Float>,
     onWebViewCreated: (WebView) -> Unit,
     onSingleTap: () -> Unit,
     onScrollEvent: () -> Unit,
@@ -2242,6 +2277,7 @@ fun PdfWebView(
 
                                             var initialTouchDist = 0;
                                             var initialScale = 1.0;
+                                            var lastPinchScale = 1.0;
 
                                             document.addEventListener('touchstart', function(e) {
                                                 if (e.touches.length === 2) {
@@ -2250,6 +2286,7 @@ fun PdfWebView(
                                                     initialTouchDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
                                                     if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
                                                         initialScale = PDFViewerApplication.pdfViewer.currentScale || 1.0;
+                                                        lastPinchScale = initialScale;
                                                         if (!window.baseFitScale && PDFViewerApplication.pdfViewer.currentScale) {
                                                             window.baseFitScale = PDFViewerApplication.pdfViewer.currentScale;
                                                         }
@@ -2273,6 +2310,7 @@ fun PdfWebView(
                                                         }
                                                     }
                                                     newScale = Math.min(Math.max(newScale, minScale), 5.0);
+                                                    lastPinchScale = newScale;
                                                     window.setScale(newScale);
                                                     if (window.AndroidBridge && window.AndroidBridge.onScaleChanged) {
                                                         window.AndroidBridge.onScaleChanged(newScale);
@@ -2281,8 +2319,11 @@ fun PdfWebView(
                                             }, { passive: false });
 
                                             document.addEventListener('touchend', function(e) {
-                                                if (e.touches.length < 2) {
+                                                if (e.touches.length < 2 && initialTouchDist > 0) {
                                                     initialTouchDist = 0;
+                                                    if (window.AndroidBridge && window.AndroidBridge.animateZoomTo) {
+                                                        window.AndroidBridge.animateZoomTo(lastPinchScale);
+                                                    }
                                                 }
                                             }, { passive: true });
 
@@ -2326,19 +2367,17 @@ fun PdfWebView(
                                                         var factor = window.doubleTapZoomFactor || ${state.doubleTapZoomFactor};
 
                                                         if (curScale > baseScale * 1.15) {
-                                                            pdfViewer.currentScaleValue = 'page-width';
-                                                            if (window.AndroidBridge && window.AndroidBridge.onScaleChanged) {
-                                                                setTimeout(function() {
-                                                                    if (pdfViewer && pdfViewer.currentScale) {
-                                                                        window.AndroidBridge.onScaleChanged(pdfViewer.currentScale);
-                                                                    }
-                                                                }, 100);
+                                                            if (window.AndroidBridge && window.AndroidBridge.animateZoomTo) {
+                                                                window.AndroidBridge.animateZoomTo(baseScale);
+                                                            } else {
+                                                                pdfViewer.currentScaleValue = 'page-width';
                                                             }
                                                         } else {
                                                             var targetScale = baseScale * factor;
-                                                            window.setScale(targetScale);
-                                                            if (window.AndroidBridge && window.AndroidBridge.onScaleChanged) {
-                                                                window.AndroidBridge.onScaleChanged(targetScale);
+                                                            if (window.AndroidBridge && window.AndroidBridge.animateZoomTo) {
+                                                                window.AndroidBridge.animateZoomTo(targetScale);
+                                                            } else {
+                                                                window.setScale(targetScale);
                                                             }
                                                         }
                                                     }
@@ -2695,6 +2734,7 @@ fun PdfWebView(
                     }
                 }
 
+                val webViewInstance = this
                 addJavascriptInterface(object {
                     @android.webkit.JavascriptInterface
                     fun onSingleTap() {
@@ -2739,9 +2779,26 @@ fun PdfWebView(
                     }
 
                     @android.webkit.JavascriptInterface
+                    fun animateZoomTo(targetScale: Float) {
+                        coroutineScope.launch {
+                            val coerced = targetScale.coerceIn(0.25f, 5.0f)
+                            viewModel.updateScaleFromJs(coerced)
+                            zoomAnimatable.animateTo(
+                                targetValue = coerced,
+                                animationSpec = springZoomSpec
+                            ) {
+                                webViewInstance.evaluateJavascript("window.setScale(${this.value})", null)
+                            }
+                        }
+                    }
+
+                    @android.webkit.JavascriptInterface
                     fun onScaleChanged(scale: Float) {
                         coroutineScope.launch {
                             viewModel.updateScaleFromJs(scale)
+                            if (kotlin.math.abs(zoomAnimatable.value - scale) > 0.05f && !zoomAnimatable.isRunning) {
+                                zoomAnimatable.snapTo(scale)
+                            }
                         }
                     }
 

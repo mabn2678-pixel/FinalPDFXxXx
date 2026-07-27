@@ -776,13 +776,13 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
     }
 
     fun triggerZoomIn() {
-        sendJsCommand("PDFViewerApplication.pdfViewer.currentScale += 0.25")
-        _uiState.update { it.copy(currentScale = it.currentScale + 0.25f) }
+        val targetScale = (_uiState.value.currentScale + 0.25f).coerceAtMost(5.0f)
+        setScale(targetScale)
     }
 
     fun triggerZoomOut() {
-        sendJsCommand("PDFViewerApplication.pdfViewer.currentScale -= 0.25")
-        _uiState.update { it.copy(currentScale = (it.currentScale - 0.25f).coerceAtLeast(0.25f)) }
+        val targetScale = (_uiState.value.currentScale - 0.25f).coerceAtLeast(0.25f)
+        setScale(targetScale)
     }
 
     fun triggerSearch(query: String) {

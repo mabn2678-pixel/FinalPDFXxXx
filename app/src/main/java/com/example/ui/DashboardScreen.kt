@@ -905,7 +905,7 @@ fun PdfGridItem(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = modifier
             .fillMaxWidth()
-            .height(240.dp)
+            .height(215.dp)
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick
@@ -921,8 +921,8 @@ fun PdfGridItem(
                 onClick = onMenuClick,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(4.dp)
-                    .size(32.dp)
+                    .padding(2.dp)
+                    .size(30.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.MoreVert,
@@ -940,7 +940,7 @@ fun PdfGridItem(
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(8.dp)
+                        .padding(6.dp)
                         .size(20.dp)
                 )
             }
@@ -948,14 +948,14 @@ fun PdfGridItem(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // PDF cover thumbnail with nested progress bar
                 Box(
                     modifier = Modifier
-                        .width(90.dp)
-                        .height(115.dp)
+                        .width(70.dp)
+                        .height(88.dp)
                 ) {
                     PdfThumbnail(
                         filePath = file.filePath,
@@ -970,21 +970,21 @@ fun PdfGridItem(
                             trackColor = Color(0xFF1E88E5).copy(alpha = 0.2f),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(4.dp)
+                                .height(3.dp)
                                 .align(Alignment.BottomCenter)
                                 .clip(RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp))
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
                 // Name of PDF
                 val gridFileNameFontSize = when {
-                    file.fileName.length > 35 -> 9.sp
-                    file.fileName.length > 25 -> 10.sp
-                    file.fileName.length > 15 -> 11.sp
-                    else -> 12.sp
+                    file.fileName.length > 35 -> 8.5.sp
+                    file.fileName.length > 25 -> 9.sp
+                    file.fileName.length > 15 -> 10.sp
+                    else -> 11.sp
                 }
                 Text(
                     text = file.fileName,
@@ -1000,7 +1000,7 @@ fun PdfGridItem(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Small badges - Matching folder card badge style
+                // Small badges - Folder & File Size
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center,
@@ -1008,13 +1008,14 @@ fun PdfGridItem(
                 ) {
                     Box(
                         modifier = Modifier
-                            .background(Color(0xFFFFF9C4), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .weight(1f, fill = false)
+                            .background(Color(0xFFFFF9C4), RoundedCornerShape(5.dp))
+                            .padding(horizontal = 5.dp, vertical = 1.5.dp)
                     ) {
                         val badgeFontSize = when {
                             file.folderName.length > 25 -> 7.sp
-                            file.folderName.length > 15 -> 8.sp
-                            else -> 9.sp
+                            file.folderName.length > 15 -> 7.5.sp
+                            else -> 8.sp
                         }
                         Text(
                             text = file.folderName,
@@ -1025,15 +1026,15 @@ fun PdfGridItem(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
                     Box(
                         modifier = Modifier
-                            .background(Color(0xFFFFF3E0), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .background(Color(0xFFFFF3E0), RoundedCornerShape(5.dp))
+                            .padding(horizontal = 5.dp, vertical = 1.5.dp)
                     ) {
                         Text(
                             text = file.fileSize,
-                            fontSize = 9.sp,
+                            fontSize = 8.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFE65100),
                             maxLines = 1
@@ -1043,10 +1044,10 @@ fun PdfGridItem(
                 
                 // Reading progress and last opened label
                 if (progressPercent != null && progressPercent > 0) {
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "قرأت $progressPercent% • $lastOpenedText",
-                        fontSize = 8.sp,
+                        fontSize = 7.5.sp,
                         color = Color(0xFF1E88E5),
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
@@ -1091,18 +1092,18 @@ fun PdfListItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // PDF cover thumbnail with circular amber badge
             Box(
                 modifier = Modifier
-                    .size(width = 46.dp, height = 60.dp)
+                    .size(width = 42.dp, height = 54.dp)
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(6.dp))
                 ) {
                     PdfThumbnail(
                         filePath = file.filePath,
@@ -1116,7 +1117,7 @@ fun PdfListItem(
                             trackColor = Color(0xFF1E88E5).copy(alpha = 0.2f),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(4.dp)
+                                .height(3.dp)
                                 .align(Alignment.BottomCenter)
                         )
                     }
@@ -1132,7 +1133,7 @@ fun PdfListItem(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = "محدد",
                                 tint = Color.White,
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
@@ -1141,7 +1142,7 @@ fun PdfListItem(
                 // Small circular PDF amber icon badge overlay
                 Box(
                     modifier = Modifier
-                        .size(18.dp)
+                        .size(16.dp)
                         .align(Alignment.TopStart)
                         .offset(x = (-3).dp, y = (-3).dp)
                         .background(Color(0xFFFFF9C4), CircleShape)
@@ -1152,20 +1153,20 @@ fun PdfListItem(
                         imageVector = Icons.Default.PictureAsPdf,
                         contentDescription = null,
                         tint = Color(0xFFFBC02D),
-                        modifier = Modifier.size(11.dp)
+                        modifier = Modifier.size(10.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(14.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
             // File Details
             Column(modifier = Modifier.weight(1f)) {
                 val listFileNameFontSize = when {
-                    file.fileName.length > 35 -> 11.sp
-                    file.fileName.length > 25 -> 12.sp
-                    file.fileName.length > 15 -> 13.sp
-                    else -> 14.sp
+                    file.fileName.length > 35 -> 10.sp
+                    file.fileName.length > 25 -> 11.sp
+                    file.fileName.length > 15 -> 12.sp
+                    else -> 13.sp
                 }
                 Text(
                     text = file.fileName,
@@ -1174,25 +1175,26 @@ fun PdfListItem(
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    lineHeight = (listFileNameFontSize.value + 3).sp
+                    lineHeight = (listFileNameFontSize.value + 2.5).sp
                 )
                 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     // Folder Badge
                     Box(
                         modifier = Modifier
-                            .background(Color(0xFFFFF9C4), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .weight(1f, fill = false)
+                            .background(Color(0xFFFFF9C4), RoundedCornerShape(5.dp))
+                            .padding(horizontal = 5.dp, vertical = 1.5.dp)
                     ) {
                         val badgeFontSize = when {
-                            file.folderName.length > 25 -> 7.sp
+                            file.folderName.length > 25 -> 7.5.sp
                             file.folderName.length > 15 -> 8.sp
-                            else -> 9.sp
+                            else -> 8.5.sp
                         }
                         Text(
                             text = file.folderName,
@@ -1204,15 +1206,15 @@ fun PdfListItem(
                         )
                     }
 
-                    // File Size Badge (Matching orange translucent badge style)
+                    // File Size Badge
                     Box(
                         modifier = Modifier
-                            .background(Color(0xFFFFF3E0), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .background(Color(0xFFFFF3E0), RoundedCornerShape(5.dp))
+                            .padding(horizontal = 5.dp, vertical = 1.5.dp)
                     ) {
                         Text(
                             text = file.fileSize,
-                            fontSize = 9.sp,
+                            fontSize = 8.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFE65100),
                             maxLines = 1
@@ -1222,18 +1224,20 @@ fun PdfListItem(
                     if (lastOpenedText != null) {
                         Text(
                             text = lastOpenedText,
-                            fontSize = 9.sp,
-                            color = Color.Gray
+                            fontSize = 8.5.sp,
+                            color = Color.Gray,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
 
                 // Progress Percentage
                 if (progressPercent != null && progressPercent > 0) {
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(3.dp))
                     Text(
                         text = "تمت قراءة $progressPercent%",
-                        fontSize = 9.sp,
+                        fontSize = 8.5.sp,
                         color = Color(0xFF1E88E5),
                         fontWeight = FontWeight.SemiBold
                     )
@@ -1243,13 +1247,13 @@ fun PdfListItem(
             // 3-dots Menu Button
             IconButton(
                 onClick = onMenuClick,
-                modifier = Modifier.size(36.dp)
+                modifier = Modifier.size(32.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.MoreVert,
                     contentDescription = "خيارات الملف",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
