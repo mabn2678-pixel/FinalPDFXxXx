@@ -43,7 +43,7 @@ fun ExitAppBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = Color(0xFF161622),
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         dragHandle = {
             Box(
@@ -51,7 +51,7 @@ fun ExitAppBottomSheet(
                     .padding(top = 12.dp, bottom = 8.dp)
                     .width(36.dp)
                     .height(4.dp)
-                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+                    .background(Color(0xFF6E6E7E), RoundedCornerShape(2.dp))
             )
         }
     ) {
@@ -66,13 +66,13 @@ fun ExitAppBottomSheet(
             Box(
                 modifier = Modifier
                     .size(72.dp)
-                    .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f), RoundedCornerShape(20.dp)),
+                    .background(Color(0xFF3B201B), RoundedCornerShape(20.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ExitToApp,
                     contentDescription = "Exit",
-                    tint = MaterialTheme.colorScheme.error,
+                    tint = Color(0xFFFA5838),
                     modifier = Modifier.size(36.dp)
                 )
             }
@@ -84,7 +84,7 @@ fun ExitAppBottomSheet(
                 text = "الخروج من التطبيق",
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = Color.White,
                 textAlign = TextAlign.Center
             )
 
@@ -95,7 +95,7 @@ fun ExitAppBottomSheet(
                 text = "هل أنت تأكد من أنك تريد إغلاق التطبيق؟",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Normal,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = Color(0xFF9E9EA9),
                 textAlign = TextAlign.Center
             )
 
@@ -117,8 +117,8 @@ fun ExitAppBottomSheet(
                         .height(52.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error,
-                        contentColor = MaterialTheme.colorScheme.onError
+                        containerColor = Color(0xFFFA5838),
+                        contentColor = Color.White
                     )
                 ) {
                     Row(
@@ -146,10 +146,10 @@ fun ExitAppBottomSheet(
                         .weight(1f)
                         .height(52.dp),
                     shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    border = BorderStroke(1.dp, Color(0xFF333348)),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        containerColor = Color(0xFF222230),
+                        contentColor = Color.White
                     )
                 ) {
                     Row(
@@ -160,13 +160,13 @@ fun ExitAppBottomSheet(
                             text = "بقاء",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = Color.White
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = Color.White,
                             modifier = Modifier.size(20.dp)
                         )
                     }

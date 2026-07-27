@@ -29,9 +29,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.ui.draw.scale
-import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -479,57 +476,36 @@ fun ViewerScreen(
             // Main WebView rendering PDF.js
             if (state.currentPdfPath != null) {
                 key(state.currentPdfPath) {
-                    var zoomScale by remember { mutableStateOf(state.currentScale) }
-
-                    LaunchedEffect(state.currentScale) {
-                        zoomScale = state.currentScale
-                    }
-
-                    Box(
+                    PdfWebView(
+                        pdfPath = state.currentPdfPath!!,
+                        viewModel = viewModel,
+                        onWebViewCreated = { webViewRef = it },
+                        onSingleTap = { 
+                            if (!isBrowsing) {
+                                isBarsVisible = !isBarsVisible 
+                            }
+                        },
+                        onScrollEvent = {
+                            pageIndicatorTrigger = System.currentTimeMillis()
+                        },
+                        onAudioLinkClicked = { url -> playAudio(url) },
+                        onBrowsingStateChanged = { browsing ->
+                            if (!browsing) {
+                                if (browsingUrl == null) {
+                                    isBrowsing = false
+                                }
+                            } else {
+                                isBrowsing = true
+                            }
+                        },
+                        onExternalLinkClicked = { url ->
+                            browsingUrl = url
+                            isBrowsing = true
+                        },
                         modifier = Modifier
                             .fillMaxSize()
-                            .pointerInput(Unit) {
-                                detectTransformGestures { _, _, zoom, _ ->
-                                    zoomScale = (zoomScale * zoom).coerceIn(0.5f, 5.0f)
-                                    viewModel.setScale(zoomScale)
-                                }
-                            }
-                            .graphicsLayer(
-                                scaleX = zoomScale,
-                                scaleY = zoomScale
-                            )
-                    ) {
-                        PdfWebView(
-                            pdfPath = state.currentPdfPath!!,
-                            viewModel = viewModel,
-                            onWebViewCreated = { webViewRef = it },
-                            onSingleTap = { 
-                                if (!isBrowsing) {
-                                    isBarsVisible = !isBarsVisible 
-                                }
-                            },
-                            onScrollEvent = {
-                                pageIndicatorTrigger = System.currentTimeMillis()
-                            },
-                            onAudioLinkClicked = { url -> playAudio(url) },
-                            onBrowsingStateChanged = { browsing ->
-                                if (!browsing) {
-                                    if (browsingUrl == null) {
-                                        isBrowsing = false
-                                    }
-                                } else {
-                                    isBrowsing = true
-                                }
-                            },
-                            onExternalLinkClicked = { url ->
-                                browsingUrl = url
-                                isBrowsing = true
-                            },
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .then(if (isBrowsing) Modifier.statusBarsPadding() else Modifier)
-                        )
-                    }
+                            .then(if (isBrowsing) Modifier.statusBarsPadding() else Modifier)
+                    )
 
                     // ADD STICKY NOTE DIALOG
                     if (state.showAddStickyNoteDialog) {
@@ -732,22 +708,22 @@ fun ViewerScreen(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .statusBarsPadding()
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
                     .widthIn(max = 480.dp)
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp)
-                        .clip(CircleShape)
+                        .heightIn(min = 54.dp, max = 72.dp)
+                        .clip(RoundedCornerShape(percent = 50))
                         .background(Color(0xF2ECE6F8))
-                        .border(BorderStroke(1.dp, Color(0x407C5CFF)), CircleShape),
+                        .border(BorderStroke(1.dp, Color(0x407C5CFF)), RoundedCornerShape(percent = 50)),
                     contentAlignment = Alignment.Center
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 6.dp),
+                            .padding(horizontal = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         if (state.isSearchActive) {
@@ -756,14 +732,14 @@ fun ViewerScreen(
                                 state = state,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 4.dp)
+                                    .padding(horizontal = 6.dp)
                             )
                         } else {
                             val fileName = state.currentPdfName ?: "عرض ملف PDF"
                             val fileNameFontSize = when {
-                                fileName.length > 30 -> 10.5.sp
-                                fileName.length > 18 -> 11.5.sp
-                                else -> 12.sp
+                                fileName.length > 30 -> 12.sp
+                                fileName.length > 18 -> 13.sp
+                                else -> 14.sp
                             }
 
                             Row(
@@ -773,7 +749,7 @@ fun ViewerScreen(
                                 // Left Section: Compact Actions
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(1.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
                                 ) {
                                     GlowingIconButton(
                                         icon = Icons.Default.Share,
@@ -784,8 +760,7 @@ fun ViewerScreen(
                                             }
                                         },
                                         tint = Color(0xFF3F51B5),
-                                        iconSize = 16.dp,
-                                        haloSize = 30.dp
+                                        iconSize = 18.dp
                                     )
 
                                     if (state.annotationEditorMode != 0) {
@@ -794,8 +769,7 @@ fun ViewerScreen(
                                             contentDescription = "حفظ والتطبيق",
                                             onClick = { viewModel.requestSaveAnnotatedPdf() },
                                             tint = Color(0xFF4CAF50),
-                                            iconSize = 18.dp,
-                                            haloSize = 30.dp
+                                            iconSize = 20.dp
                                         )
                                     }
                                     GlowingIconButton(
@@ -803,21 +777,21 @@ fun ViewerScreen(
                                         contentDescription = "البحث",
                                         onClick = { viewModel.openSearch() },
                                         tint = Color(0xFF009688),
-                                        iconSize = 16.dp,
-                                        haloSize = 30.dp
+                                        iconSize = 18.dp
                                     )
                                 }
 
-                                // Centered Title text - Compact single line filename
+                                // Centered Title text - Full filename with up to 4 lines
                                 Text(
                                     text = fileName,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = fileNameFontSize,
-                                    maxLines = 1,
+                                    maxLines = 4,
                                     overflow = TextOverflow.Ellipsis,
+                                    lineHeight = (fileNameFontSize.value + 2).sp,
                                     modifier = Modifier
                                         .weight(1f)
-                                        .padding(horizontal = 6.dp),
+                                        .padding(horizontal = 8.dp),
                                     color = Color(0xFF1C182B),
                                     textAlign = TextAlign.Center
                                 )
@@ -828,8 +802,7 @@ fun ViewerScreen(
                                     contentDescription = "رجوع",
                                     onClick = { attemptExit() },
                                     tint = Color(0xFF9C27B0),
-                                    iconSize = 18.dp,
-                                    haloSize = 30.dp,
+                                    iconSize = 20.dp,
                                     modifier = Modifier.testTag("viewer_back_btn")
                                 )
                             }
@@ -845,19 +818,17 @@ fun ViewerScreen(
                 exit = fadeOut(),
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(20.dp)
+                    .padding(24.dp)
             ) {
                 FloatingActionButton(
                     onClick = { isBarsVisible = true },
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    shape = CircleShape,
-                    modifier = Modifier.size(44.dp)
+                    shape = CircleShape
                 ) {
                     Icon(
                         imageVector = Icons.Default.MenuOpen,
-                        contentDescription = "إظهار شريط التحكم",
-                        modifier = Modifier.size(20.dp)
+                        contentDescription = "إظهار شريط التحكم"
                     )
                 }
             }
@@ -874,23 +845,23 @@ fun ViewerScreen(
                 Column(
                     modifier = Modifier
                         .navigationBarsPadding()
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                        .padding(16.dp)
                         .fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                         // Sleek circular-dock style Bottom bar with 6 beautifully labeled items
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("native_bottom_bar")
-                                .clip(RoundedCornerShape(22.dp))
+                                .clip(RoundedCornerShape(28.dp))
                                 .background(Color(0xF2ECE6F8))
-                                .border(BorderStroke(1.dp, Color(0x407C5CFF)), RoundedCornerShape(22.dp))
+                                .border(BorderStroke(1.dp, Color(0x407C5CFF)), RoundedCornerShape(28.dp))
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 4.dp, vertical = 3.dp),
+                                    .padding(horizontal = 6.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
@@ -900,42 +871,42 @@ fun ViewerScreen(
                                     icon = Icons.Default.MenuBook,
                                     label = "الصفحات",
                                     onClick = { activeSheet = BottomSheetType.DocumentNavigation },
-                                    tint = Color(0xFF538A58), // Matte Green (أخضر مطفي)
+                                    tint = Color(0xFF4CB050), // Green
                                     modifier = Modifier.weight(1f)
                                 )
                                 BottomBarItem(
                                     icon = if (state.scrollMode == "horizontal") Icons.Default.ViewCarousel else Icons.Default.ViewStream,
                                     label = "العرض",
                                     onClick = { activeSheet = BottomSheetType.ViewOptions },
-                                    tint = Color(0xFF427B9B), // Matte Blue (أزرق مطفي)
+                                    tint = Color(0xFF03A9F4), // Light Blue
                                     modifier = Modifier.weight(1f)
                                 )
                                 BottomBarItem(
                                     icon = Icons.Default.ZoomIn,
                                     label = "الزووم",
                                     onClick = { activeSheet = BottomSheetType.ZoomSettings },
-                                    tint = Color(0xFFB8783B), // Matte Amber/Orange (برتقالي مطفي)
+                                    tint = Color(0xFFFF9800), // Orange
                                     modifier = Modifier.weight(1f)
                                 )
                                 BottomBarItem(
                                     icon = Icons.Default.Palette,
                                     label = "السمات",
                                     onClick = { activeSheet = BottomSheetType.DisplaySettings },
-                                    tint = Color(0xFF7B639B), // Matte Purple (بنفسجي مطفي)
+                                    tint = Color(0xFF9C27B0), // Purple
                                     modifier = Modifier.weight(1f)
                                 )
                                 BottomBarItem(
                                     icon = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
                                     label = "إشارة",
                                     onClick = { viewModel.toggleBookmark(context, state.currentPage) },
-                                    tint = if (isBookmarked) Color(0xFFC24B66) else Color(0xFFC24B66).copy(alpha = 0.55f), // Matte Red (أحمر مطفي)
+                                    tint = if (isBookmarked) Color(0xFFE91E63) else Color(0xFFE91E63).copy(alpha = 0.5f), // Pink
                                     modifier = Modifier.weight(1f)
                                 )
                                 BottomBarItem(
                                     icon = Icons.Default.MoreHoriz,
                                     label = "أدوات",
                                     onClick = { activeSheet = BottomSheetType.MoreOptions },
-                                    tint = Color(0xFF4B8B85), // Matte Teal (تيال مطفي)
+                                    tint = Color(0xFF009688), // Teal
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -3287,13 +3258,13 @@ fun ZoomSettingsSheet(
                     }
                 }
 
-                SleekSlider(
+                Slider(
                     value = state.currentScale,
                     onValueChange = { viewModel.setScale(it) },
                     valueRange = 0.1f..5.0f,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 4.dp)
+                        .padding(top = 8.dp)
                 )
             }
         }
@@ -3408,13 +3379,13 @@ fun ZoomSettingsSheet(
             }
         }
 
-        SleekSlider(
+        Slider(
             value = state.doubleTapZoomFactor,
             onValueChange = { viewModel.setDoubleTapZoomFactor(it) },
             valueRange = 1.1f..5.0f,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 8.dp)
+                .padding(bottom = 12.dp)
         )
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
@@ -3594,7 +3565,7 @@ fun DisplaySettingsSheet(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     modifier = Modifier.size(20.dp)
                 )
-                SleekSlider(
+                Slider(
                     value = state.customBrightness,
                     onValueChange = { viewModel.setCustomBrightness(it) },
                     valueRange = 0.05f..1.0f,
@@ -4060,7 +4031,7 @@ fun AutoScrollSheet(
             )
         }
 
-        SleekSlider(
+        Slider(
             value = speedState,
             onValueChange = {
                 speedState = it
@@ -4322,8 +4293,8 @@ fun GlowingIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     tint: Color = MaterialTheme.colorScheme.onSurface,
-    iconSize: androidx.compose.ui.unit.Dp = 18.dp,
-    haloSize: androidx.compose.ui.unit.Dp = 32.dp
+    iconSize: androidx.compose.ui.unit.Dp = 20.dp,
+    haloSize: androidx.compose.ui.unit.Dp = 38.dp
 ) {
     Box(
         modifier = modifier
@@ -4362,27 +4333,26 @@ fun BottomBarItem(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    tint: Color = Color(0xFF6B6578),
+    tint: Color = MaterialTheme.colorScheme.onSurface,
     isSelected: Boolean = false
 ) {
     val activeColor = if (isSelected) MaterialTheme.colorScheme.primary else tint
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 5.dp),
+            .padding(vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
-                .size(32.dp)
+                .size(42.dp)
                 .drawBehind {
-                    val radius = size.minDimension / 2f
+                    val radius = size.minDimension / 2
                     drawCircle(
                         brush = Brush.radialGradient(
                             colors = listOf(
-                                activeColor.copy(alpha = 0.35f),
-                                activeColor.copy(alpha = 0.12f),
+                                activeColor.copy(alpha = 0.28f),
+                                activeColor.copy(alpha = 0.08f),
                                 Color.Transparent
                             ),
                             center = center,
@@ -4397,7 +4367,7 @@ fun BottomBarItem(
                 imageVector = icon,
                 contentDescription = label,
                 tint = activeColor,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(24.dp)
             )
         }
     }
@@ -5011,7 +4981,7 @@ fun EditBottomBar(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.width(60.dp)
                     )
-                    SleekSlider(
+                    Slider(
                         value = state.editThickness.coerceIn(1.5f, 18.5f),
                         onValueChange = { viewModel.setEditThickness(it) },
                         valueRange = 1.5f..18.5f,
@@ -5087,7 +5057,7 @@ fun EditBottomBar(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.width(60.dp)
                     )
-                    SleekSlider(
+                    Slider(
                         value = state.editThickness.coerceIn(1.5f, 18.5f),
                         onValueChange = { viewModel.setEditThickness(it) },
                         valueRange = 1.5f..18.5f,
@@ -5115,7 +5085,7 @@ fun EditBottomBar(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.width(60.dp)
                     )
-                    SleekSlider(
+                    Slider(
                         value = state.editOpacity.coerceIn(10f, 100f),
                         onValueChange = { viewModel.setEditOpacity(it) },
                         valueRange = 10f..100f,
@@ -5429,7 +5399,7 @@ fun EditBottomBar_Old(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.width(50.dp)
                         )
-                        SleekSlider(
+                        Slider(
                             value = state.editThickness,
                             onValueChange = { viewModel.setEditThickness(it) },
                             valueRange = 1f..30f,
@@ -5457,7 +5427,7 @@ fun EditBottomBar_Old(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.width(50.dp)
                     )
-                    SleekSlider(
+                    Slider(
                         value = state.editOpacity,
                         onValueChange = { viewModel.setEditOpacity(it) },
                         valueRange = 0f..100f,

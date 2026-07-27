@@ -9,50 +9,25 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-
-enum class ThemeMode {
-  SYSTEM, LIGHT, DARK, BLACK
-}
-
-val LocalIsDarkTheme = staticCompositionLocalOf { false }
 
 private val DarkColorScheme =
   darkColorScheme(
     primary = LavenderPrimary,
     secondary = LavenderSecondary,
     tertiary = YellowAccent,
-    background = DarkSurfaces.background,
-    surface = DarkSurfaces.surface,
+    background = Color(0xFF12111A),
+    surface = Color(0xFF1C1B26),
     primaryContainer = Color(0xFF2A283E),
     onPrimaryContainer = Color(0xFFE6E0FF),
-    onBackground = DarkSurfaces.onSurface,
-    onSurface = DarkSurfaces.onSurface,
-    surfaceVariant = DarkSurfaces.surfaceVariant,
-    onSurfaceVariant = DarkSurfaces.onSurfaceVariant,
-    outlineVariant = DarkSurfaces.outlineVariant
-  )
-
-private val BlackColorScheme =
-  darkColorScheme(
-    primary = LavenderPrimary,
-    secondary = LavenderSecondary,
-    tertiary = YellowAccent,
-    background = BlackSurfaces.background,
-    surface = BlackSurfaces.surface,
-    primaryContainer = Color(0xFF1F1B36),
-    onPrimaryContainer = Color(0xFFE6E0FF),
-    onBackground = BlackSurfaces.onSurface,
-    onSurface = BlackSurfaces.onSurface,
-    surfaceVariant = BlackSurfaces.surfaceVariant,
-    onSurfaceVariant = BlackSurfaces.onSurfaceVariant,
-    outlineVariant = BlackSurfaces.outlineVariant
+    onBackground = Color(0xFFE6E0FF),
+    onSurface = Color(0xFFE6E0FF),
+    surfaceVariant = Color(0xFF2E2C3F),
+    onSurfaceVariant = Color(0xFFBBB8CF)
   )
 
 private val LightColorScheme =
@@ -60,43 +35,33 @@ private val LightColorScheme =
     primary = LavenderPrimary,
     secondary = LavenderSecondary,
     tertiary = YellowAccent,
-    background = LightSurfaces.background,
-    surface = LightSurfaces.surface,
+    background = OffWhiteBg,
+    surface = Color.White,
     primaryContainer = LavenderContainer,
     onPrimaryContainer = LavenderPrimary,
     secondaryContainer = YellowContainer,
     onSecondaryContainer = Color(0xFF5D4037),
-    onBackground = LightSurfaces.onSurface,
-    onSurface = LightSurfaces.onSurface,
-    onSurfaceVariant = LightSurfaces.onSurfaceVariant,
-    surfaceVariant = LightSurfaces.surfaceVariant,
-    outlineVariant = LightSurfaces.outlineVariant
+    onBackground = DarkText,
+    onSurface = DarkText,
+    onSurfaceVariant = LightText,
+    surfaceVariant = SoftGrayCard
   )
 
 @Composable
 fun MyApplicationTheme(
-  appTheme: String = "system",
   darkTheme: Boolean = isSystemInDarkTheme(),
-  dynamicColor: Boolean = false,
+  // Dynamic color is available on Android 12+
+  dynamicColor: Boolean = true,
   content: @Composable () -> Unit,
 ) {
-  val mode = when (appTheme) {
-    "light" -> ThemeMode.LIGHT
-    "dark" -> ThemeMode.DARK
-    "black" -> ThemeMode.BLACK
-    else -> if (darkTheme) ThemeMode.DARK else ThemeMode.LIGHT
-  }
-
-  val isDark = mode == ThemeMode.DARK || mode == ThemeMode.BLACK
-
   val colorScheme =
     when {
       dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
         val context = LocalContext.current
-        if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
       }
-      mode == ThemeMode.BLACK -> BlackColorScheme
-      isDark -> DarkColorScheme
+
+      darkTheme -> DarkColorScheme
       else -> LightColorScheme
     }
 
@@ -106,29 +71,11 @@ fun MyApplicationTheme(
       val window = (view.context as? Activity)?.window
       if (window != null) {
         val insetsController = WindowCompat.getInsetsController(window, view)
-        insetsController.isAppearanceLightStatusBars = !isDark
+        insetsController.isAppearanceLightStatusBars = !darkTheme
       }
     }
   }
 
-  CompositionLocalProvider(LocalIsDarkTheme provides isDark) {
-    MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
-  }
+  MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
 }
-
-@Composable
-fun PdfReaderProTheme(
-  appTheme: String = "system",
-  darkTheme: Boolean = isSystemInDarkTheme(),
-  dynamicColor: Boolean = false,
-  content: @Composable () -> Unit,
-) {
-  MyApplicationTheme(
-    appTheme = appTheme,
-    darkTheme = darkTheme,
-    dynamicColor = dynamicColor,
-    content = content
-  )
-}
-
 

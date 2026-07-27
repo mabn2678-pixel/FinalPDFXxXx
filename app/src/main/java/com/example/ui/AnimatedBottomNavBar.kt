@@ -81,8 +81,8 @@ fun AnimatedBottomNavBar(
     onItemSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
     barBackgroundColor: Color = MaterialTheme.colorScheme.surface,
-    primaryColor: Color = MaterialTheme.colorScheme.primary,
-    unselectedContentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant
+    primaryColor: Color = Color(0xFF7C5CFF),
+    unselectedContentColor: Color = Color(0xFF8E8E93)
 ) {
     val selectedIndex = remember(currentRoute, items) {
         val idx = items.indexOfFirst { it.route == currentRoute }
@@ -112,7 +112,7 @@ fun AnimatedBottomNavBar(
         val totalWidth = maxWidth
         val itemCount = items.size.coerceAtLeast(1)
         val itemWidth = totalWidth / itemCount
-        val circleSize = 42.dp
+        val circleSize = 52.dp
 
         // Calculate horizontal position of floating circle
         val targetOffset = (itemWidth * selectedIndex) + ((itemWidth - circleSize) / 2)
@@ -134,16 +134,16 @@ fun AnimatedBottomNavBar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter),
-                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
                 color = barBackgroundColor,
-                shadowElevation = 8.dp
+                shadowElevation = 12.dp
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
-                        .height(50.dp)
-                        .padding(horizontal = 6.dp),
+                        .height(64.dp)
+                        .padding(horizontal = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -172,19 +172,19 @@ fun AnimatedBottomNavBar(
                                         imageVector = item.icon,
                                         contentDescription = item.label,
                                         tint = unselectedContentColor,
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(22.dp)
                                     )
-                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Spacer(modifier = Modifier.height(3.dp))
                                     Text(
                                         text = item.label,
-                                        fontSize = 10.sp,
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Medium,
                                         color = unselectedContentColor,
                                         textAlign = TextAlign.Center
                                     )
                                 } else {
                                     // Empty space placeholder when item is floating above
-                                    Spacer(modifier = Modifier.height(28.dp))
+                                    Spacer(modifier = Modifier.height(36.dp))
                                 }
                             }
                         }
@@ -197,14 +197,14 @@ fun AnimatedBottomNavBar(
                 modifier = Modifier
                     .offset(
                         x = animatedOffsetX,
-                        y = (-10).dp + circleOffsetY.value.dp
+                        y = (-14).dp + circleOffsetY.value.dp
                     )
                     .size(circleSize)
                     .scale(circleScale.value)
                     .align(Alignment.TopStart),
                 shape = CircleShape,
                 color = primaryColor,
-                shadowElevation = 6.dp
+                shadowElevation = 8.dp
             ) {
                 Box(
                     contentAlignment = Alignment.Center,
@@ -219,8 +219,8 @@ fun AnimatedBottomNavBar(
                         Icon(
                             imageVector = currentItem.selectedIcon,
                             contentDescription = currentItem.label,
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                            modifier = Modifier.size(20.dp)
+                            tint = Color.White,
+                            modifier = Modifier.size(26.dp)
                         )
                     }
                 }
@@ -250,13 +250,13 @@ fun DashboardAnimatedBottomNavBar(
     }
 
     val primaryColor = if (bottomBarColorIndex == 0) {
-        MaterialTheme.colorScheme.primary
+        Color(0xFF7C5CFF)
     } else {
         if (isDark) preset.darkOnSelected else preset.lightOnSelected
     }
 
     val unselectedColor = if (bottomBarColorIndex == 0) {
-        MaterialTheme.colorScheme.onSurfaceVariant
+        Color(0xFF8E8E93)
     } else {
         if (isDark) preset.darkUnselected else preset.lightUnselected
     }

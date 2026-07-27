@@ -162,20 +162,20 @@ fun CameraOcrSheet(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                                .background(Color(0xFF4CAF50).copy(alpha = 0.12f), RoundedCornerShape(8.dp))
                                 .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = Color(0xFF4CAF50),
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
                                 text = "✓ مفتاح محفوظ ومفعّل",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
+                                color = Color(0xFF4CAF50)
                             )
                         }
                     }
@@ -357,7 +357,7 @@ fun CameraOcrSheet(
                             Icon(
                                 imageVector = Icons.Outlined.PhotoCamera,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = Color(0xFF00E5A3),
                                 modifier = Modifier.size(64.dp)
                             )
                             Spacer(modifier = Modifier.height(16.dp))
@@ -365,24 +365,24 @@ fun CameraOcrSheet(
                                 text = "إذن الكاميرا مطلوب",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 18.sp,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = Color.White
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = "يتطلب الماسح الضوئي الوصول إلى كاميرا الجهاز لتصوير المستندات والأوراق وقراءتها.",
                                 fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = Color.White.copy(alpha = 0.7f),
                                 textAlign = TextAlign.Center
                             )
                             Spacer(modifier = Modifier.height(24.dp))
                             Button(
                                 onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) },
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5A3)),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
-                                Icon(imageVector = Icons.Default.CameraAlt, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
+                                Icon(imageVector = Icons.Default.CameraAlt, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("منح إذن الكاميرا", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+                                Text("منح إذن الكاميرا", fontWeight = FontWeight.Bold, color = Color.Black)
                             }
                         }
                     } else if (capturedBitmap != null) {
@@ -484,7 +484,7 @@ fun CameraOcrSheet(
                             contentAlignment = Alignment.Center
                         ) {
                             Card(
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xEE1C182B)),
                                 shape = RoundedCornerShape(20.dp),
                                 modifier = Modifier.padding(24.dp)
                             ) {
@@ -493,14 +493,14 @@ fun CameraOcrSheet(
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     CircularProgressIndicator(
-                                        color = MaterialTheme.colorScheme.primary,
+                                        color = Color(0xFF00E5A3),
                                         strokeWidth = 3.dp,
                                         modifier = Modifier.size(40.dp)
                                     )
                                     Spacer(modifier = Modifier.height(16.dp))
                                     Text(
                                         text = scanStatusMessage.ifEmpty { "جاري معالجة المستند والمحاذاة الذكية..." },
-                                        color = MaterialTheme.colorScheme.onSurface,
+                                        color = Color.White,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold,
                                         textAlign = TextAlign.Center
@@ -508,7 +508,7 @@ fun CameraOcrSheet(
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(
                                         text = if (preferOnlineAi) "مستخرج النصوص بالذكاء الاصطناعي السحابي" else "محرك ML Kit المحلي",
-                                        color = MaterialTheme.colorScheme.primary,
+                                        color = Color(0xFF00E5A3),
                                         fontSize = 11.sp
                                     )
                                 }

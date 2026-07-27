@@ -656,7 +656,7 @@ fun HomeTabScreen(
 
                     // Delete Selected Files
                     IconButton(onClick = onDeleteMultiple) {
-                        Icon(Icons.Default.Delete, contentDescription = "حذف المحددة", tint = MaterialTheme.colorScheme.error)
+                        Icon(Icons.Default.Delete, contentDescription = "حذف المحددة", tint = Color.Red)
                     }
                 }
             }
@@ -2282,13 +2282,13 @@ fun FolderStatsRow(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // PDF Files Stat Card
+        // PDF Files Stat Card (Dark Navy Blue Translucent Box)
         Box(
             modifier = Modifier
                 .weight(1f)
                 .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f))
-                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f), RoundedCornerShape(20.dp))
+                .background(Color(0xFF111C2E))
+                .border(1.dp, Color(0xFF1E3A8A).copy(alpha = 0.35f), RoundedCornerShape(20.dp))
                 .padding(horizontal = 16.dp, vertical = 18.dp)
         ) {
             Row(
@@ -2301,41 +2301,41 @@ fun FolderStatsRow(
                         text = pdfCount.toString(),
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = Color.White
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "PDFs",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = Color(0xFF94A3B8)
                     )
                 }
 
                 Box(
                     modifier = Modifier
                         .size(42.dp)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), CircleShape)
-                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), CircleShape),
+                        .background(Color(0xFF1E3A8A).copy(alpha = 0.5f), CircleShape)
+                        .border(1.dp, Color(0xFF3B82F6).copy(alpha = 0.4f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Description,
                         contentDescription = "PDFs",
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = Color(0xFF60A5FA),
                         modifier = Modifier.size(22.dp)
                     )
                 }
             }
         }
 
-        // Folders Stat Card
+        // Folders Stat Card (Dark Amber/Orange Translucent Box)
         Box(
             modifier = Modifier
                 .weight(1f)
                 .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f))
-                .border(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.25f), RoundedCornerShape(20.dp))
+                .background(Color(0xFF271A12))
+                .border(1.dp, Color(0xFF7C2D12).copy(alpha = 0.35f), RoundedCornerShape(20.dp))
                 .padding(horizontal = 16.dp, vertical = 18.dp)
         ) {
             Row(
@@ -2348,28 +2348,28 @@ fun FolderStatsRow(
                         text = folderCount.toString(),
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = Color.White
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "Folders",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = Color(0xFFD1D5DB)
                     )
                 }
 
                 Box(
                     modifier = Modifier
                         .size(42.dp)
-                        .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f), CircleShape)
-                        .border(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f), CircleShape),
+                        .background(Color(0xFF7C2D12).copy(alpha = 0.5f), CircleShape)
+                        .border(1.dp, Color(0xFFF97316).copy(alpha = 0.4f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Folder,
                         contentDescription = "Folders",
-                        tint = MaterialTheme.colorScheme.secondary,
+                        tint = Color(0xFFFB923C),
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -4037,7 +4037,7 @@ fun SettingsTabScreen(
                     Icon(
                         imageVector = Icons.Default.PictureAsPdf,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = Color(0xFF7C5CFF),
                         modifier = Modifier.size(28.dp)
                     )
                 }
@@ -4098,9 +4098,8 @@ fun SettingsTabScreen(
                             iconBgColor = Color(0xFF9C27B0),
                             title = "مظهر التطبيق",
                             value = when (uiState.appTheme) {
-                                "dark" -> "الوضع الداكن (Dark Mode)"
-                                "black" -> "وضع الأسود العميق (AMOLED Black)"
-                                "light" -> "الوضع الفاتح (Light Mode)"
+                                "dark" -> "الوضع الداكن"
+                                "light" -> "الوضع الفاتح"
                                 else -> "تلقائي (حسب النظام)"
                             },
                             onClick = { activeSheet = SettingSheetType.APP_THEME }
@@ -4253,12 +4252,12 @@ fun SettingsTabScreen(
                                 val isSelected = uiState.bottomBarColorIndex == index
                                 val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
                                 val previewBg = if (index == 0) {
-                                    MaterialTheme.colorScheme.surface
+                                    if (isDarkTheme) Color(0xFF1C1B26) else Color.White
                                 } else {
                                     if (isDarkTheme) preset.darkBg else preset.lightBg
                                 }
                                 val previewAccent = if (index == 0) {
-                                    MaterialTheme.colorScheme.primary
+                                    Color(0xFF7C5CFF)
                                 } else {
                                     if (isDarkTheme) preset.darkOnSelected else preset.lightOnSelected
                                 }
@@ -4270,7 +4269,7 @@ fun SettingsTabScreen(
                                         .background(previewBg)
                                         .border(
                                             width = if (isSelected) 3.dp else 1.dp,
-                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                                            color = if (isSelected) Color(0xFF7C5CFF) else Color.Gray.copy(alpha = 0.4f),
                                             shape = CircleShape
                                         )
                                         .clickable { viewModel.setBottomBarColorIndex(context, index) },
@@ -4349,8 +4348,7 @@ fun SettingsTabScreen(
                     val themes = listOf(
                         "system" to "تلقائي (حسب النظام)",
                         "light" to "الوضع الفاتح (Light Mode)",
-                        "dark" to "الوضع الداكن (Dark Mode)",
-                        "black" to "وضع الأسود العميق (AMOLED Black)"
+                        "dark" to "الوضع الداكن (Dark Mode)"
                     )
                     themes.forEach { (key, label) ->
                         SettingRadioOptionRow(
@@ -4409,7 +4407,7 @@ fun SettingsTabScreen(
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
                         
-                        SleekSlider(
+                        Slider(
                             value = uiState.doubleTapZoomFactor,
                             onValueChange = { viewModel.setDoubleTapZoomFactor(it) },
                             valueRange = 1.1f..5.0f,
@@ -4482,7 +4480,7 @@ fun SettingsTabScreen(
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            SleekSlider(
+                            Slider(
                                 value = uiState.customBrightness,
                                 onValueChange = { viewModel.setCustomBrightness(it) },
                                 valueRange = 0.05f..1.0f
@@ -4978,13 +4976,13 @@ fun FileActionSheet(
                     Box(
                         modifier = Modifier
                             .size(40.dp)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), RoundedCornerShape(12.dp)),
+                            .background(Color(0xFF7C5CFF).copy(alpha = 0.1f), RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.PictureAsPdf,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = Color(0xFF7C5CFF),
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -5167,13 +5165,13 @@ fun DeleteActionBanner(
         Box(
             modifier = Modifier
                 .size(36.dp)
-                .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f), RoundedCornerShape(12.dp)),
+                .background(Color(0xFFFFCDD2), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
+                tint = Color(0xFFC62828),
                 modifier = Modifier.size(18.dp)
             )
         }
@@ -5484,13 +5482,13 @@ fun ToolResultDialog(
                     modifier = Modifier
                         .size(64.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), RoundedCornerShape(16.dp)),
+                        .background(Color(0xFFE8F5E9)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.CheckCircle,
                         contentDescription = "Success",
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = Color(0xFF2E7D32),
                         modifier = Modifier.size(40.dp)
                     )
                 }
@@ -5872,7 +5870,7 @@ fun PdfDetailOverlaySheet(
                             Icon(
                                 imageVector = Icons.Default.PictureAsPdf,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = Color(0xFF7C5CFF),
                                 modifier = Modifier.size(36.dp)
                             )
                         }
@@ -6002,7 +6000,7 @@ fun PdfDetailOverlaySheet(
                                 },
                                 modifier = Modifier.size(32.dp)
                             ) {
-                                Icon(Icons.Outlined.ContentCopy, contentDescription = "نسخ", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Outlined.ContentCopy, contentDescription = "نسخ", tint = Color(0xFF7C5CFF), modifier = Modifier.size(16.dp))
                             }
                         }
                     }
@@ -6020,7 +6018,7 @@ fun PdfDetailOverlaySheet(
                             onDismiss()
                             onOpenPdf(file)
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C5CFF)),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.weight(1f)
                     ) {
@@ -6116,9 +6114,9 @@ fun DetailCardSection(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                Icon(imageVector = icon, contentDescription = null, tint = Color(0xFF7C5CFF), modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(text = title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(text = title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF7C5CFF))
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f), thickness = 1.dp)
             content()
@@ -6132,9 +6130,9 @@ fun DetailMetaRow(label: String, value: String, icon: ImageVector) {
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+        Icon(imageVector = icon, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(16.dp))
         Spacer(modifier = Modifier.width(8.dp))
-        Text(text = "$label:", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text = "$label:", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.Gray)
         Spacer(modifier = Modifier.width(6.dp))
         Text(
             text = value,
