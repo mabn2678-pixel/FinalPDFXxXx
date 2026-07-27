@@ -73,6 +73,7 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
 import java.io.File
@@ -1260,12 +1261,19 @@ fun PdfListItem(
     }
 }
 
-// In-memory cache for fast, instant thumbnail retrieval during scroll lookups
+// In-memory LruCache for instant, zero-latency thumbnail retrieval during scrolling Lookups
 object ThumbnailMemoryCache {
-    private val cache = java.util.concurrent.ConcurrentHashMap<String, String>()
-    fun get(key: String): String? = cache[key]
-    fun put(key: String, value: String) {
-        cache[key] = value
+    private val maxMemory = (Runtime.getRuntime().maxMemory() / 1024).toInt() / 8
+    private val cache = object : android.util.LruCache<String, Bitmap>(maxMemory.coerceAtLeast(16 * 1024)) {
+        override fun sizeOf(key: String, bitmap: Bitmap): Int {
+            return bitmap.byteCount / 1024
+        }
+    }
+
+    fun getBitmap(key: String): Bitmap? = cache.get(key)
+
+    fun putBitmap(key: String, bitmap: Bitmap) {
+        cache.put(key, bitmap)
     }
 }
 
@@ -1275,17 +1283,16 @@ fun PdfThumbnail(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val cachedPath = remember(filePath) { ThumbnailMemoryCache.get(filePath) }
-    var thumbnailPath by remember(filePath) { mutableStateOf<String?>(cachedPath) }
+    val cachedBitmap = remember(filePath) { ThumbnailMemoryCache.getBitmap(filePath) }
+    var thumbnailBitmap by remember(filePath) { mutableStateOf<Bitmap?>(cachedBitmap) }
     
     LaunchedEffect(filePath) {
-        if (thumbnailPath == null) {
+        if (thumbnailBitmap == null) {
             withContext(Dispatchers.IO) {
-                val path = getPdfThumbnailPath(context, filePath)
-                if (path != null) {
-                    ThumbnailMemoryCache.put(filePath, path)
+                val bitmap = getPdfThumbnailBitmap(context, filePath)
+                if (bitmap != null) {
                     withContext(Dispatchers.Main) {
-                        thumbnailPath = path
+                        thumbnailBitmap = bitmap
                     }
                 }
             }
@@ -1301,9 +1308,10 @@ fun PdfThumbnail(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            if (thumbnailPath != null) {
-                AsyncImage(
-                    model = thumbnailPath,
+            val bitmap = thumbnailBitmap
+            if (bitmap != null && !bitmap.isRecycled) {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxSize()
@@ -1349,22 +1357,33 @@ fun PdfThumbnail(
     }
 }
 
-fun getPdfThumbnailPath(context: Context, filePath: String): String? {
+fun getPdfThumbnailBitmap(context: Context, filePath: String): Bitmap? {
     try {
+        val cached = ThumbnailMemoryCache.getBitmap(filePath)
+        if (cached != null && !cached.isRecycled) return cached
+
         val file = File(filePath)
         if (!file.exists() || !file.canRead()) return null
         
-        val cacheKey = "thumb_w_" + file.nameWithoutExtension.hashCode() + "_" + file.lastModified() + ".png"
+        val cacheKey = "thumb_w_" + file.nameWithoutExtension.hashCode() + "_" + file.lastModified() + ".jpg"
         val cacheFile = File(context.cacheDir, cacheKey)
+        
         if (cacheFile.exists()) {
-            return cacheFile.absolutePath
+            val options = BitmapFactory.Options().apply {
+                inPreferredConfig = Bitmap.Config.RGB_565
+            }
+            val bitmap = BitmapFactory.decodeFile(cacheFile.absolutePath, options)
+            if (bitmap != null) {
+                ThumbnailMemoryCache.putBitmap(filePath, bitmap)
+                return bitmap
+            }
         }
         
         val pfd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY) ?: return null
         val renderer = PdfRenderer(pfd)
         if (renderer.pageCount > 0) {
             val page = renderer.openPage(0)
-            val width = 150
+            val width = 180
             val height = (width.toFloat() / page.width * page.height).toInt().coerceAtLeast(100)
             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             val canvas = android.graphics.Canvas(bitmap)
@@ -1374,10 +1393,16 @@ fun getPdfThumbnailPath(context: Context, filePath: String): String? {
             renderer.close()
             pfd.close()
             
-            FileOutputStream(cacheFile).use { out ->
-                bitmap.compress(Bitmap.CompressFormat.PNG, 80, out)
+            try {
+                FileOutputStream(cacheFile).use { out ->
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 80, out)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-            return cacheFile.absolutePath
+
+            ThumbnailMemoryCache.putBitmap(filePath, bitmap)
+            return bitmap
         } else {
             renderer.close()
             pfd.close()
@@ -1386,6 +1411,15 @@ fun getPdfThumbnailPath(context: Context, filePath: String): String? {
         e.printStackTrace()
     }
     return null
+}
+
+fun getPdfThumbnailPath(context: Context, filePath: String): String? {
+    val bitmap = getPdfThumbnailBitmap(context, filePath)
+    val file = File(filePath)
+    if (!file.exists()) return null
+    val cacheKey = "thumb_w_" + file.nameWithoutExtension.hashCode() + "_" + file.lastModified() + ".jpg"
+    val cacheFile = File(context.cacheDir, cacheKey)
+    return if (cacheFile.exists()) cacheFile.absolutePath else null
 }
 
 fun formatReadingTime(totalSeconds: Long): String {
