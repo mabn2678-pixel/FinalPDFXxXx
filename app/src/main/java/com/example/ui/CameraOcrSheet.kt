@@ -484,7 +484,7 @@ fun CameraOcrSheet(
                             contentAlignment = Alignment.Center
                         ) {
                             Card(
-                                colors = CardDefaults.cardColors(containerColor = Color(0xEE1C182B)),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                                 shape = RoundedCornerShape(20.dp),
                                 modifier = Modifier.padding(24.dp)
                             ) {
@@ -493,14 +493,14 @@ fun CameraOcrSheet(
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     CircularProgressIndicator(
-                                        color = Color(0xFF00E5A3),
+                                        color = MaterialTheme.colorScheme.primary,
                                         strokeWidth = 3.dp,
                                         modifier = Modifier.size(40.dp)
                                     )
                                     Spacer(modifier = Modifier.height(16.dp))
                                     Text(
                                         text = scanStatusMessage.ifEmpty { "جاري معالجة المستند والمحاذاة الذكية..." },
-                                        color = Color.White,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold,
                                         textAlign = TextAlign.Center
@@ -508,7 +508,7 @@ fun CameraOcrSheet(
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(
                                         text = if (preferOnlineAi) "مستخرج النصوص بالذكاء الاصطناعي السحابي" else "محرك ML Kit المحلي",
-                                        color = Color(0xFF00E5A3),
+                                        color = MaterialTheme.colorScheme.primary,
                                         fontSize = 11.sp
                                     )
                                 }

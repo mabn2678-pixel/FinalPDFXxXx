@@ -23,6 +23,7 @@ import com.example.ui.PdfViewModelFactory
 import com.example.ui.Screen
 import com.example.ui.ViewerScreen
 import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.theme.PdfReaderProTheme
 
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,14 +44,7 @@ class MainActivity : ComponentActivity() {
 
     setContent {
       val state by viewModel.uiState.collectAsState()
-      val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
-      val isDark = when (state.appTheme) {
-        "dark" -> true
-        "light" -> false
-        else -> systemDark
-      }
-
-      MyApplicationTheme(darkTheme = isDark, dynamicColor = false) {
+      PdfReaderProTheme(appTheme = state.appTheme, dynamicColor = false) {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background

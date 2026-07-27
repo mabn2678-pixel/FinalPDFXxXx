@@ -140,7 +140,7 @@ fun ToolIntroScreen(
                 Text(
                     text = description,
                     fontSize = 14.sp,
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     lineHeight = 21.sp,
                     maxLines = 3,
@@ -164,7 +164,8 @@ fun ToolIntroScreen(
                     onClick = onSelectSaf,
                     shape = RoundedCornerShape(50.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF7C4DFF)
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -173,7 +174,7 @@ fun ToolIntroScreen(
                     Icon(
                         imageVector = Icons.Outlined.Description,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
@@ -181,7 +182,7 @@ fun ToolIntroScreen(
                         text = buttonText,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onPrimary
                     )
                 }
 
@@ -276,7 +277,7 @@ fun ToolSelectedFileCard(
                     Text(
                         text = "$fileSize • مستند PDF",
                         fontSize = 12.sp,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -360,7 +361,7 @@ fun LibraryPdfPickerSheet(
                 ) {
                     Text(
                         text = "لا توجد ملفات PDF في مكتبة التطبيق حالياً",
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp
                     )
                 }
@@ -408,7 +409,7 @@ fun LibraryPdfPickerSheet(
                                     Text(
                                         text = "$fileSize • مستند PDF",
                                         fontSize = 11.sp,
-                                        color = Color.Gray
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }

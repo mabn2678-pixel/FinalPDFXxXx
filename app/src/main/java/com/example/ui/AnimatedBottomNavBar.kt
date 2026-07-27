@@ -81,8 +81,8 @@ fun AnimatedBottomNavBar(
     onItemSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
     barBackgroundColor: Color = MaterialTheme.colorScheme.surface,
-    primaryColor: Color = Color(0xFF7C5CFF),
-    unselectedContentColor: Color = Color(0xFF8E8E93)
+    primaryColor: Color = MaterialTheme.colorScheme.primary,
+    unselectedContentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant
 ) {
     val selectedIndex = remember(currentRoute, items) {
         val idx = items.indexOfFirst { it.route == currentRoute }
@@ -219,7 +219,7 @@ fun AnimatedBottomNavBar(
                         Icon(
                             imageVector = currentItem.selectedIcon,
                             contentDescription = currentItem.label,
-                            tint = Color.White,
+                            tint = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(26.dp)
                         )
                     }
@@ -250,13 +250,13 @@ fun DashboardAnimatedBottomNavBar(
     }
 
     val primaryColor = if (bottomBarColorIndex == 0) {
-        Color(0xFF7C5CFF)
+        MaterialTheme.colorScheme.primary
     } else {
         if (isDark) preset.darkOnSelected else preset.lightOnSelected
     }
 
     val unselectedColor = if (bottomBarColorIndex == 0) {
-        Color(0xFF8E8E93)
+        MaterialTheme.colorScheme.onSurfaceVariant
     } else {
         if (isDark) preset.darkUnselected else preset.lightUnselected
     }

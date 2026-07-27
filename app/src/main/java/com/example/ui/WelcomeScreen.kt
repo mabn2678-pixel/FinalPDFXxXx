@@ -78,9 +78,9 @@ fun WelcomeScreen(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFFFAF9FE),
-                        Color(0xFFF1EEFF),
-                        Color(0xFFE6E0FF)
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.surface,
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
                     )
                 )
             )
@@ -104,7 +104,7 @@ fun WelcomeScreen(
                     Box(
                         modifier = Modifier
                             .size(140.dp)
-                            .background(Color.White, CircleShape)
+                            .background(MaterialTheme.colorScheme.surface, CircleShape)
                             .padding(24.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -129,7 +129,7 @@ fun WelcomeScreen(
                         text = "FinalPDF",
                         fontSize = 28.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFF1C1B22),
+                        color = MaterialTheme.colorScheme.onBackground,
                         textAlign = TextAlign.Center
                     )
 
@@ -138,7 +138,7 @@ fun WelcomeScreen(
                     Text(
                         text = "مكتبتك المتكاملة لقراءة وتصفح ملفات الـ PDF بكل سلاسة وجمال",
                         fontSize = 14.sp,
-                        color = Color(0xFF767482),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
@@ -150,7 +150,7 @@ fun WelcomeScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 8.dp),
                     shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     Column(
                         modifier = Modifier.padding(20.dp),
@@ -220,7 +220,7 @@ fun WelcomeScreen(
                             text = "منح إذن الوصول إلى الملفات",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onPrimary
                         )
                     }
 
@@ -257,7 +257,7 @@ fun FeatureRow(
         Box(
             modifier = Modifier
                 .size(44.dp)
-                .background(Color(0xFFF1EEFF), RoundedCornerShape(12.dp)),
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), RoundedCornerShape(12.dp)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
@@ -275,14 +275,14 @@ fun FeatureRow(
                 text = title,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF1C1B22),
+                color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Start
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = description,
                 fontSize = 12.sp,
-                color = Color(0xFF767482),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Start,
                 lineHeight = 16.sp
             )
