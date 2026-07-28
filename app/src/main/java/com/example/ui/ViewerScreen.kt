@@ -1432,7 +1432,7 @@ fun PdfWebView(
                     domStorageEnabled = true
                     useWideViewPort = true
                     loadWithOverviewMode = true
-                    builtInZoomControls = true
+                    builtInZoomControls = false
                     displayZoomControls = false
                     cacheMode = WebSettings.LOAD_NO_CACHE
                 }
@@ -2244,6 +2244,7 @@ fun PdfWebView(
 
                                             window.doubleTapZoomFactor = ${state.doubleTapZoomFactor};
                                             window.defaultScale = null;
+                                            window.isProgrammaticScale = false;
                                             window.setScale = function(scale) {
                                                 try {
                                                     if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
@@ -2255,7 +2256,9 @@ fun PdfWebView(
                                                         var maxScale = 5.0;
                                                         if (scale < minScale) scale = minScale;
                                                         if (scale > maxScale) scale = maxScale;
+                                                        window.isProgrammaticScale = true;
                                                         pdfViewer.currentScale = scale;
+                                                        setTimeout(function() { window.isProgrammaticScale = false; }, 200);
                                                     }
                                                 } catch (e) {
                                                     console.error("Error in setScale JS: " + e);
@@ -2300,20 +2303,25 @@ fun PdfWebView(
                                                     var t1 = e.touches[0];
                                                     var t2 = e.touches[1];
                                                     var dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-                                                    var factor = dist / initialTouchDist;
-                                                    var newScale = initialScale * factor;
-                                                    var minScale = window.baseFitScale || 0.25;
-                                                    if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentScale) {
-                                                        if (!window.baseFitScale) {
-                                                            window.baseFitScale = PDFViewerApplication.pdfViewer.currentScale;
-                                                            minScale = window.baseFitScale;
+                                                    if (dist > 0) {
+                                                        var factor = dist / initialTouchDist;
+                                                        var newScale = initialScale * factor;
+                                                        var minScale = window.baseFitScale || 0.25;
+                                                        if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentScale) {
+                                                            if (!window.baseFitScale) {
+                                                                window.baseFitScale = PDFViewerApplication.pdfViewer.currentScale;
+                                                                minScale = window.baseFitScale;
+                                                            }
                                                         }
-                                                    }
-                                                    newScale = Math.min(Math.max(newScale, minScale), 5.0);
-                                                    lastPinchScale = newScale;
-                                                    window.setScale(newScale);
-                                                    if (window.AndroidBridge && window.AndroidBridge.onScaleChanged) {
-                                                        window.AndroidBridge.onScaleChanged(newScale);
+                                                        newScale = Math.min(Math.max(newScale, minScale), 5.0);
+                                                        lastPinchScale = newScale;
+                                                        window.isProgrammaticScale = true;
+                                                        if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
+                                                            PDFViewerApplication.pdfViewer.currentScale = newScale;
+                                                        }
+                                                        if (window.AndroidBridge && window.AndroidBridge.onScaleChanged) {
+                                                            window.AndroidBridge.onScaleChanged(newScale);
+                                                        }
                                                     }
                                                 }
                                             }, { passive: false });
@@ -2321,8 +2329,9 @@ fun PdfWebView(
                                             document.addEventListener('touchend', function(e) {
                                                 if (e.touches.length < 2 && initialTouchDist > 0) {
                                                     initialTouchDist = 0;
-                                                    if (window.AndroidBridge && window.AndroidBridge.animateZoomTo) {
-                                                        window.AndroidBridge.animateZoomTo(lastPinchScale);
+                                                    window.isProgrammaticScale = false;
+                                                    if (window.AndroidBridge && window.AndroidBridge.onScaleEnd) {
+                                                        window.AndroidBridge.onScaleEnd(lastPinchScale);
                                                     }
                                                 }
                                             }, { passive: true });
@@ -2459,6 +2468,7 @@ fun PdfWebView(
                                             if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.eventBus) {
                                                 var reportCurrentScale = function() {
                                                     try {
+                                                        if (window.isProgrammaticScale) return;
                                                         if (PDFViewerApplication.pdfViewer && PDFViewerApplication.pdfViewer.currentScale) {
                                                             var cs = PDFViewerApplication.pdfViewer.currentScale;
                                                             if (!window.defaultScale) { window.defaultScale = cs; }
@@ -2470,6 +2480,7 @@ fun PdfWebView(
                                                 };
 
                                                 PDFViewerApplication.eventBus.on('scalechanging', function(evt) {
+                                                    if (window.isProgrammaticScale) return;
                                                     if (evt && evt.scale && window.AndroidBridge && window.AndroidBridge.onScaleChanged) {
                                                         window.AndroidBridge.onScaleChanged(evt.scale);
                                                     } else {
@@ -2782,23 +2793,25 @@ fun PdfWebView(
                     fun animateZoomTo(targetScale: Float) {
                         coroutineScope.launch {
                             val coerced = targetScale.coerceIn(0.25f, 5.0f)
-                            viewModel.updateScaleFromJs(coerced)
-                            zoomAnimatable.animateTo(
-                                targetValue = coerced,
-                                animationSpec = springZoomSpec
-                            ) {
-                                webViewInstance.evaluateJavascript("window.setScale(${this.value})", null)
-                            }
+                            viewModel.setScale(coerced)
                         }
                     }
 
                     @android.webkit.JavascriptInterface
                     fun onScaleChanged(scale: Float) {
                         coroutineScope.launch {
-                            viewModel.updateScaleFromJs(scale)
-                            if (kotlin.math.abs(zoomAnimatable.value - scale) > 0.05f && !zoomAnimatable.isRunning) {
-                                zoomAnimatable.snapTo(scale)
-                            }
+                            val coerced = scale.coerceIn(0.25f, 5.0f)
+                            viewModel.updateScaleFromJs(coerced)
+                            zoomAnimatable.snapTo(coerced)
+                        }
+                    }
+
+                    @android.webkit.JavascriptInterface
+                    fun onScaleEnd(scale: Float) {
+                        coroutineScope.launch {
+                            val coerced = scale.coerceIn(0.25f, 5.0f)
+                            viewModel.updateScaleFromJs(coerced)
+                            zoomAnimatable.snapTo(coerced)
                         }
                     }
 
@@ -3396,7 +3409,7 @@ fun ZoomSettingsSheet(
                 AppSlider(
                     value = state.currentScale,
                     onValueChange = { viewModel.setScale(it) },
-                    valueRange = 0.1f..5.0f,
+                    valueRange = 0.25f..5.0f,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 8.dp)
