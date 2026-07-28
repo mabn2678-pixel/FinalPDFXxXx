@@ -45,13 +45,11 @@ fun ToolIntroScreen(
     description: String,
     icon: ImageVector,
     accentColor: Color,
-    buttonText: String = "Select File",
+    buttonText: String = "اختيار ملف PDF",
     onSelectSaf: () -> Unit,
     onSelectFromLibrary: (() -> Unit)? = null,
-    onBack: () -> Unit,
-    appLanguage: String = "ar"
+    onBack: () -> Unit
 ) {
-    val strings = remember(appLanguage) { AppStringsProvider.get(appLanguage) }
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val darkTranslucentBg = if (isDark) {
         accentColor.copy(alpha = 0.25f)
@@ -205,7 +203,7 @@ fun ToolIntroScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = strings.selectFromLibrary,
+                            text = "اختيار من مكتبة التطبيق المحلية",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.primary
@@ -333,13 +331,10 @@ fun ToolSelectedFileCard(
 @Composable
 fun LibraryPdfPickerSheet(
     allPdfFiles: List<LocalPdfFile>,
-    appLanguage: String = "ar",
     onFileSelected: (filePath: String, fileName: String) -> Unit,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val strings = remember(appLanguage) { AppStringsProvider.get(appLanguage) }
-
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -351,7 +346,7 @@ fun LibraryPdfPickerSheet(
                 .padding(16.dp)
         ) {
             Text(
-                text = strings.selectFromLibrary,
+                text = "اختر ملفاً من مكتبة التطبيق",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 12.dp)
@@ -365,7 +360,7 @@ fun LibraryPdfPickerSheet(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = strings.noPdfFound,
+                        text = "لا توجد ملفات PDF في مكتبة التطبيق حالياً",
                         color = Color.Gray,
                         fontSize = 13.sp
                     )
@@ -405,14 +400,14 @@ fun LibraryPdfPickerSheet(
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = getLocalizedFileName(file.fileName, strings),
+                                        text = file.fileName,
                                         fontWeight = FontWeight.SemiBold,
                                         fontSize = 14.sp,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
-                                        text = "$fileSize • ${getLocalizedFolderName(file.folderName, strings)}",
+                                        text = "$fileSize • مستند PDF",
                                         fontSize = 11.sp,
                                         color = Color.Gray
                                     )

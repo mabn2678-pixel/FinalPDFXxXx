@@ -239,7 +239,6 @@ fun DashboardAnimatedBottomNavBar(
     selectedTab: DashboardTab,
     showTools: Boolean,
     bottomBarColorIndex: Int,
-    appLanguage: String = "ar",
     onTabSelected: (DashboardTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -264,20 +263,12 @@ fun DashboardAnimatedBottomNavBar(
         if (isDark) preset.darkUnselected else preset.lightUnselected
     }
 
-    val strings = remember(appLanguage) { AppStringsProvider.get(appLanguage) }
-    val (homeLabel, docsLabel, toolsLabel, settingsLabel) = Quadruple(
-        strings.home,
-        strings.documents,
-        strings.tools,
-        strings.settings
-    )
-
-    val allNavItems = remember(showTools, appLanguage) {
+    val allNavItems = remember(showTools) {
         buildList {
             add(
                 BottomNavItem(
                     route = DashboardTab.Home.name,
-                    label = homeLabel,
+                    label = "الصفحة الرئيسية",
                     icon = Icons.Outlined.Home,
                     selectedIcon = Icons.Filled.Home
                 )
@@ -285,7 +276,7 @@ fun DashboardAnimatedBottomNavBar(
             add(
                 BottomNavItem(
                     route = DashboardTab.Folders.name,
-                    label = docsLabel,
+                    label = "ملف",
                     icon = Icons.Outlined.Description,
                     selectedIcon = Icons.Filled.Description
                 )
@@ -294,7 +285,7 @@ fun DashboardAnimatedBottomNavBar(
                 add(
                     BottomNavItem(
                         route = DashboardTab.Tools.name,
-                        label = toolsLabel,
+                        label = "أدوات",
                         icon = Icons.Outlined.Widgets,
                         selectedIcon = Icons.Filled.Widgets
                     )
@@ -303,7 +294,7 @@ fun DashboardAnimatedBottomNavBar(
             add(
                 BottomNavItem(
                     route = DashboardTab.Settings.name,
-                    label = settingsLabel,
+                    label = "الإعدادات",
                     icon = Icons.Outlined.Settings,
                     selectedIcon = Icons.Filled.Settings
                 )
@@ -326,5 +317,3 @@ fun DashboardAnimatedBottomNavBar(
         unselectedContentColor = unselectedColor
     )
 }
-
-private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)

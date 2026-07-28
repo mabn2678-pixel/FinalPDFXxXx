@@ -29,7 +29,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -153,7 +152,6 @@ fun ViewerScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val strings = remember(state.appLanguage) { AppStringsProvider.get(state.appLanguage) }
     val coroutineScope = rememberCoroutineScope()
     val activity = context as? Activity
     
@@ -187,19 +185,6 @@ fun ViewerScreen(
             isPageIndicatorVisible = true
             delay(2000)
             isPageIndicatorVisible = false
-        }
-    }
-
-    var isZoomBadgeVisible by remember { mutableStateOf(false) }
-    var lastZoomScale by remember { mutableFloatStateOf(state.currentScale) }
-
-    // Show floating gesture zoom indicator badge when zoom scale changes
-    LaunchedEffect(state.currentScale) {
-        if (kotlin.math.abs(state.currentScale - lastZoomScale) > 0.005f) {
-            lastZoomScale = state.currentScale
-            isZoomBadgeVisible = true
-            delay(1500)
-            isZoomBadgeVisible = false
         }
     }
 
@@ -571,70 +556,6 @@ fun ViewerScreen(
                             onDismiss = { viewModel.closeAddStickyNoteDialog() }
                         )
                     }
-
-                    // FLOATING GESTURE ZOOM INDICATOR BADGE OVERLAY
-                    AnimatedVisibility(
-                        visible = isZoomBadgeVisible,
-                        enter = fadeIn() + scaleIn(),
-                        exit = fadeOut() + scaleOut(),
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = 80.dp)
-                            .zIndex(10f)
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.95f),
-                            shadowElevation = 8.dp,
-                            tonalElevation = 4.dp,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.ZoomIn,
-                                    contentDescription = "مقياس الزووم",
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Text(
-                                    text = "${(state.currentScale * 100).roundToInt()}%",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
-                        }
-                    }
-
-                    // FLOATING PAGE NUMBER INDICATOR OVERLAY
-                    AnimatedVisibility(
-                        visible = isPageIndicatorVisible,
-                        enter = fadeIn() + slideInVertically(initialOffsetY = { -it / 2 }),
-                        exit = fadeOut() + slideOutVertically(targetOffsetY = { -it / 2 }),
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = 32.dp)
-                            .zIndex(9f)
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
-                            shadowElevation = 4.dp,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                        ) {
-                            Text(
-                                text = "صفحة ${state.currentPage} من ${state.totalPages}",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                            )
-                        }
-                    }
                 }
             } else {
                 Box(
@@ -863,7 +784,7 @@ fun ViewerScreen(
                                     .padding(horizontal = 6.dp)
                             )
                         } else {
-                            val fileName = state.currentPdfName ?: strings.openDocument
+                            val fileName = state.currentPdfName ?: "عرض ملف PDF"
                             val fileNameFontSize = when {
                                 fileName.length > 30 -> 12.sp
                                 fileName.length > 18 -> 13.sp
@@ -881,7 +802,7 @@ fun ViewerScreen(
                                 ) {
                                     GlowingIconButton(
                                         icon = Icons.Default.Share,
-                                        contentDescription = strings.share,
+                                        contentDescription = "مشاركة",
                                         onClick = {
                                             state.currentPdfPath?.let { path ->
                                                 sharePdf(context, path, fileName)
@@ -894,7 +815,7 @@ fun ViewerScreen(
                                     if (state.annotationEditorMode != 0) {
                                         GlowingIconButton(
                                             icon = Icons.Default.Check,
-                                            contentDescription = strings.saveButton,
+                                            contentDescription = "حفظ والتطبيق",
                                             onClick = { viewModel.requestSaveAnnotatedPdf() },
                                             tint = Color(0xFF4CAF50),
                                             iconSize = 20.dp
@@ -902,7 +823,7 @@ fun ViewerScreen(
                                     }
                                     GlowingIconButton(
                                         icon = Icons.Default.Search,
-                                        contentDescription = strings.searchInPdf,
+                                        contentDescription = "البحث",
                                         onClick = { viewModel.openSearch() },
                                         tint = Color(0xFF009688),
                                         iconSize = 18.dp
@@ -927,7 +848,7 @@ fun ViewerScreen(
                                 // Right Section: Back Arrow
                                 GlowingIconButton(
                                     icon = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = strings.closeButton,
+                                    contentDescription = "رجوع",
                                     onClick = { attemptExit() },
                                     tint = Color(0xFF9C27B0),
                                     iconSize = 20.dp,
@@ -997,42 +918,42 @@ fun ViewerScreen(
 
                                 BottomBarItem(
                                     icon = Icons.Default.MenuBook,
-                                    label = strings.pagesTab,
+                                    label = "الصفحات",
                                     onClick = { activeSheet = BottomSheetType.DocumentNavigation },
                                     tint = Color(0xFF5E8B66), // Muted Sage Green
                                     modifier = Modifier.weight(1f)
                                 )
                                 BottomBarItem(
                                     icon = if (state.scrollMode == "horizontal") Icons.Default.ViewCarousel else Icons.Default.ViewStream,
-                                    label = strings.viewTab,
+                                    label = "العرض",
                                     onClick = { activeSheet = BottomSheetType.ViewOptions },
                                     tint = Color(0xFF587B9C), // Muted Slate Blue
                                     modifier = Modifier.weight(1f)
                                 )
                                 BottomBarItem(
                                     icon = Icons.Default.ZoomIn,
-                                    label = strings.zoomTab,
+                                    label = "الزووم",
                                     onClick = { activeSheet = BottomSheetType.ZoomSettings },
                                     tint = Color(0xFF9E7A5A), // Muted Amber/Ochre
                                     modifier = Modifier.weight(1f)
                                 )
                                 BottomBarItem(
                                     icon = Icons.Default.Palette,
-                                    label = strings.themesTab,
+                                    label = "السمات",
                                     onClick = { activeSheet = BottomSheetType.DisplaySettings },
                                     tint = Color(0xFF836993), // Muted Soft Purple
                                     modifier = Modifier.weight(1f)
                                 )
                                 BottomBarItem(
                                     icon = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                    label = strings.bookmarkTab,
+                                    label = "إشارة",
                                     onClick = { viewModel.toggleBookmark(context, state.currentPage) },
                                     tint = if (isBookmarked) Color(0xFFA65D67) else Color(0xFFA65D67).copy(alpha = 0.5f), // Muted Rose/Red
                                     modifier = Modifier.weight(1f)
                                 )
                                 BottomBarItem(
                                     icon = Icons.Default.MoreHoriz,
-                                    label = strings.moreTab,
+                                    label = "أدوات",
                                     onClick = { activeSheet = BottomSheetType.MoreOptions },
                                     tint = Color(0xFF5A8888), // Muted Slate Teal
                                     modifier = Modifier.weight(1f)
@@ -2323,7 +2244,7 @@ fun PdfWebView(
 
                                             window.doubleTapZoomFactor = ${state.doubleTapZoomFactor};
                                             window.defaultScale = null;
-                                            window.setScale = function(scale, anchorX, anchorY) {
+                                            window.setScale = function(scale) {
                                                 try {
                                                     if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
                                                         var pdfViewer = PDFViewerApplication.pdfViewer;
@@ -2334,42 +2255,21 @@ fun PdfWebView(
                                                         var maxScale = 5.0;
                                                         if (scale < minScale) scale = minScale;
                                                         if (scale > maxScale) scale = maxScale;
-
-                                                        var container = document.getElementById('viewerContainer');
-                                                        var oldScale = pdfViewer.currentScale || 1.0;
-                                                        if (Math.abs(oldScale - scale) < 0.001) return;
-
-                                                        var oldScrollTop = container ? container.scrollTop : 0;
-                                                        var oldScrollLeft = container ? container.scrollLeft : 0;
-
-                                                        var cx = (anchorX !== undefined && anchorX !== null) ? anchorX : (container ? container.clientWidth / 2 : 0);
-                                                        var cy = (anchorY !== undefined && anchorY !== null) ? anchorY : (container ? container.clientHeight / 2 : 0);
-
                                                         pdfViewer.currentScale = scale;
-
-                                                        if (container && oldScale > 0) {
-                                                            var ratio = scale / oldScale;
-                                                            container.scrollTop = (oldScrollTop + cy) * ratio - cy;
-                                                            container.scrollLeft = (oldScrollLeft + cx) * ratio - cx;
-                                                        }
                                                     }
                                                 } catch (e) {
                                                     console.error("Error in setScale JS: " + e);
                                                 }
                                             };
 
-                                            var lastWidth = window.innerWidth;
                                             var lastOrientation = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
                                             window.addEventListener('resize', function() {
-                                                var curWidth = window.innerWidth;
                                                 var curOrientation = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
                                                 if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
                                                     if (curOrientation !== lastOrientation) {
                                                         lastOrientation = curOrientation;
-                                                        lastWidth = curWidth;
                                                         PDFViewerApplication.pdfViewer.currentScaleValue = 'page-width';
-                                                    } else if (Math.abs(curWidth - lastWidth) > 30) {
-                                                        lastWidth = curWidth;
+                                                    } else {
                                                         PDFViewerApplication.pdfViewer.update();
                                                     }
                                                 }
@@ -2411,9 +2311,7 @@ fun PdfWebView(
                                                     }
                                                     newScale = Math.min(Math.max(newScale, minScale), 5.0);
                                                     lastPinchScale = newScale;
-                                                    var curCenterX = (t1.clientX + t2.clientX) / 2;
-                                                    var curCenterY = (t1.clientY + t2.clientY) / 2;
-                                                    window.setScale(newScale, curCenterX, curCenterY);
+                                                    window.setScale(newScale);
                                                     if (window.AndroidBridge && window.AndroidBridge.onScaleChanged) {
                                                         window.AndroidBridge.onScaleChanged(newScale);
                                                     }
@@ -3095,7 +2993,6 @@ fun MoreOptionsSheet(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val strings = remember(state.appLanguage) { AppStringsProvider.get(state.appLanguage) }
 
     Column(
         modifier = Modifier
@@ -3105,7 +3002,7 @@ fun MoreOptionsSheet(
             .padding(horizontal = 20.dp)
     ) {
         Text(
-            text = strings.toolsTitle,
+            text = "خيارات إضافية",
             fontWeight = FontWeight.Bold,
             fontSize = 18.sp,
             color = MaterialTheme.colorScheme.onSurface,
@@ -3123,35 +3020,35 @@ fun MoreOptionsSheet(
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 MoreOptionGridItem(
                     icon = Icons.Outlined.StickyNote2,
-                    label = strings.notesHighlights,
+                    label = "الملاحظات والتظليلات",
                     onClick = {
                         onNavigate(BottomSheetType.NotesAndHighlights)
                     }
                 )
                 MoreOptionGridItem(
                     icon = Icons.Outlined.PhotoCamera,
-                    label = strings.cameraOcrTitle,
+                    label = "ماسح الكاميرا الضوئي",
                     onClick = {
                         onNavigate(BottomSheetType.CameraOcr)
                     }
                 )
                 MoreOptionGridItem(
                     icon = Icons.Outlined.DocumentScanner,
-                    label = strings.ocrExtract,
+                    label = "استخراج النص (OCR)",
                     onClick = {
                         onNavigate(BottomSheetType.OcrText)
                     }
                 )
                 MoreOptionGridItem(
                     icon = Icons.Outlined.Pin,
-                    label = strings.bookmarkTab,
+                    label = "الإشارات المرجعية",
                     onClick = {
                         onNavigate(BottomSheetType.Bookmarks)
                     }
                 )
                 MoreOptionGridItem(
                     icon = Icons.Outlined.DirectionsRun,
-                    label = strings.autoScroll,
+                    label = "التمرير التلقائي",
                     onClick = {
                         onNavigate(BottomSheetType.AutoScroll)
                     }
@@ -3161,21 +3058,21 @@ fun MoreOptionsSheet(
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 MoreOptionGridItem(
                     icon = Icons.Outlined.Navigation,
-                    label = strings.jumpToPage,
+                    label = "الانتقال إلى صفحة",
                     onClick = {
                         onNavigate(BottomSheetType.JumpToPage)
                     }
                 )
                 MoreOptionGridItem(
                     icon = Icons.Outlined.Info,
-                    label = strings.fileInfo,
+                    label = "معلومات المستند",
                     onClick = {
                         onNavigate(BottomSheetType.DocumentInfo)
                     }
                 )
                 MoreOptionGridItem(
                     icon = Icons.Outlined.Share,
-                    label = strings.shareFile,
+                    label = "مشاركة الملف",
                     onClick = {
                         onDismiss()
                         state.currentPdfPath?.let { path ->
@@ -3185,7 +3082,7 @@ fun MoreOptionsSheet(
                 )
                 MoreOptionGridItem(
                     icon = Icons.Outlined.PhotoLibrary,
-                    label = strings.exportImage,
+                    label = "تصدير الصفحة (PNG)",
                     onClick = {
                         onDismiss()
                         state.currentPdfPath?.let { path ->
@@ -3200,7 +3097,7 @@ fun MoreOptionsSheet(
                 )
                 MoreOptionGridItem(
                     icon = Icons.Outlined.Print,
-                    label = strings.printDocument,
+                    label = "طباعة المستند",
                     onClick = {
                         onDismiss()
                         state.currentPdfPath?.let { path ->
@@ -4116,7 +4013,7 @@ fun BookmarksSheet(
                     .heightIn(max = 300.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(bookmarks, key = { it }) { page ->
+                items(bookmarks) { page ->
                     val context = LocalContext.current
                     Surface(
                         shape = RoundedCornerShape(12.dp),
@@ -4794,7 +4691,7 @@ fun DocumentNavigationSheet(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             contentPadding = PaddingValues(bottom = 16.dp)
                         ) {
-                            items(bookmarks, key = { it }) { page ->
+                            items(bookmarks) { page ->
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
                                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
@@ -4879,7 +4776,7 @@ fun DocumentNavigationSheet(
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                             contentPadding = PaddingValues(bottom = 24.dp)
                         ) {
-                            items((1..state.totalPages).toList(), key = { it }) { page ->
+                            items((1..state.totalPages).toList()) { page ->
                                 val isCurrent = page == state.currentPage
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,

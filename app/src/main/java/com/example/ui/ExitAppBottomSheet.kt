@@ -21,8 +21,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-import androidx.compose.runtime.remember
-
 private fun Context.findActivity(): Activity? {
     var currentContext = this
     while (currentContext is ContextWrapper) {
@@ -37,11 +35,9 @@ private fun Context.findActivity(): Activity? {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExitAppBottomSheet(
-    onDismiss: () -> Unit,
-    appLanguage: String = "ar"
+    onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val strings = remember(appLanguage) { AppStringsProvider.get(appLanguage) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
@@ -75,7 +71,7 @@ fun ExitAppBottomSheet(
             ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ExitToApp,
-                    contentDescription = null,
+                    contentDescription = "Exit",
                     tint = Color(0xFFFA5838),
                     modifier = Modifier.size(36.dp)
                 )
@@ -85,7 +81,7 @@ fun ExitAppBottomSheet(
 
             // Title
             Text(
-                text = strings.exitAppTitle,
+                text = "الخروج من التطبيق",
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
@@ -96,7 +92,7 @@ fun ExitAppBottomSheet(
 
             // Subtitle
             Text(
-                text = strings.exitAppSubtitle,
+                text = "هل أنت تأكد من أنك تريد إغلاق التطبيق؟",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Normal,
                 color = Color(0xFF9E9EA9),
@@ -110,7 +106,7 @@ fun ExitAppBottomSheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Exit Button
+                // Exit Button (Left)
                 Button(
                     onClick = {
                         onDismiss()
@@ -130,7 +126,7 @@ fun ExitAppBottomSheet(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = strings.exitAppConfirm,
+                            text = "خروج",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -143,7 +139,7 @@ fun ExitAppBottomSheet(
                     }
                 }
 
-                // Cancel / Stay Button
+                // Stay Button (Right)
                 OutlinedButton(
                     onClick = onDismiss,
                     modifier = Modifier
@@ -161,7 +157,7 @@ fun ExitAppBottomSheet(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = strings.cancelButton,
+                            text = "بقاء",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
