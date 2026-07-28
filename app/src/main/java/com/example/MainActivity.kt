@@ -50,24 +50,35 @@ class MainActivity : ComponentActivity() {
         else -> systemDark
       }
 
-      MyApplicationTheme(
-        darkTheme = isDark,
-        dynamicColor = false,
-        colorPresetIndex = state.bottomBarColorIndex
+      val isRtl = when (state.appLanguage) {
+        "ar", "fa", "ur", "he" -> true
+        "auto" -> java.util.Locale.getDefault().language in listOf("ar", "fa", "ur", "he")
+        else -> false
+      }
+      val layoutDirection = if (isRtl) androidx.compose.ui.unit.LayoutDirection.Rtl else androidx.compose.ui.unit.LayoutDirection.Ltr
+
+      androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.ui.platform.LocalLayoutDirection provides layoutDirection
       ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
+        MyApplicationTheme(
+          darkTheme = isDark,
+          dynamicColor = false,
+          colorPresetIndex = state.bottomBarColorIndex
         ) {
-          when (state.currentScreen) {
-            Screen.Welcome -> {
-              com.example.ui.WelcomeScreen(viewModel = viewModel)
-            }
-            Screen.Dashboard -> {
-              DashboardScreen(viewModel = viewModel)
-            }
-            Screen.Viewer -> {
-              ViewerScreen(viewModel = viewModel)
+          Surface(
+              modifier = Modifier.fillMaxSize(),
+              color = MaterialTheme.colorScheme.background
+          ) {
+            when (state.currentScreen) {
+              Screen.Welcome -> {
+                com.example.ui.WelcomeScreen(viewModel = viewModel)
+              }
+              Screen.Dashboard -> {
+                DashboardScreen(viewModel = viewModel)
+              }
+              Screen.Viewer -> {
+                ViewerScreen(viewModel = viewModel)
+              }
             }
           }
         }

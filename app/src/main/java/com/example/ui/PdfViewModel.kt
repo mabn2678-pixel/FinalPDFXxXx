@@ -130,6 +130,7 @@ data class PdfUiState(
     val showToolsTab: Boolean = true,
     val storageInfo: StorageInfo = StorageInfo(),
     val appTheme: String = "system", // "system", "light", "dark"
+    val appLanguage: String = "ar", // "ar", "en", "fr", "de", "es", "tr", "ru", "zh", "ja", "ko", "auto"
     val bottomBarColorIndex: Int = 0, // 0 to 11
 
     // Edit / Annotation State
@@ -1058,6 +1059,7 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 isGridView = savedIsGrid,
                 starredPdfs = starredSet,
                 appTheme = settings.appTheme,
+                appLanguage = settings.appLanguage,
                 bottomBarColorIndex = settings.bottomBarColorIndex,
                 scrollMode = settings.scrollMode,
                 snapToPage = settings.snapToPage,
@@ -1103,6 +1105,33 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
     fun setAppTheme(context: Context, theme: String) {
         SettingsRepository(context).setAppTheme(theme)
         _uiState.update { it.copy(appTheme = theme) }
+    }
+
+    fun setAppLanguage(context: Context, lang: String) {
+        SettingsRepository(context).setAppLanguage(lang)
+        try {
+            val locale = if (lang == "auto") {
+                java.util.Locale.getDefault()
+            } else {
+                java.util.Locale(lang)
+            }
+            java.util.Locale.setDefault(locale)
+            val resources = context.resources
+            val config = resources.configuration
+            config.setLocale(locale)
+            @Suppress("DEPRECATION")
+            resources.updateConfiguration(config, resources.displayMetrics)
+            
+            val appLocaleList = if (lang == "auto") {
+                androidx.core.os.LocaleListCompat.getEmptyLocaleList()
+            } else {
+                androidx.core.os.LocaleListCompat.forLanguageTags(lang)
+            }
+            androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(appLocaleList)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        _uiState.update { it.copy(appLanguage = lang) }
     }
 
     fun setBottomBarColorIndex(context: Context, index: Int) {
@@ -1401,6 +1430,15 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                     allPdfFiles = finalFiles,
                     storageInfo = storage
                 )
+            }
+
+            // Pre-warm thumbnails in background using Dispatchers.IO to ensure zero-lag initial scroll
+            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                finalFiles.take(25).forEach { pdf ->
+                    if (com.example.ui.ThumbnailMemoryCache.getBitmap(pdf.filePath) == null) {
+                        com.example.ui.getPdfThumbnailBitmap(context, pdf.filePath)
+                    }
+                }
             }
         }
     }

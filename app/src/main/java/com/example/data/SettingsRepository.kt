@@ -7,6 +7,7 @@ import android.content.pm.ActivityInfo
 data class AppSettings(
     val showToolsTab: Boolean = true,
     val appTheme: String = "system", // "system", "light", "dark"
+    val appLanguage: String = "ar", // "ar", "en", "fr", "de", "es", "tr", "ru", "zh", "ja", "ko", "auto"
     val isSystemBrightness: Boolean = true,
     val customBrightness: Float = 0.5f,
     val scrollMode: String = "vertical", // "vertical", "horizontal"
@@ -25,6 +26,7 @@ class SettingsRepository(context: Context) {
         return AppSettings(
             showToolsTab = prefs.getBoolean("show_tools_tab", true),
             appTheme = prefs.getString("app_theme", "system") ?: "system",
+            appLanguage = prefs.getString("app_language", "ar") ?: "ar",
             isSystemBrightness = prefs.getBoolean("is_system_brightness", true),
             customBrightness = prefs.getFloat("custom_brightness", 0.5f),
             scrollMode = prefs.getString("scroll_mode", "vertical") ?: "vertical",
@@ -43,6 +45,10 @@ class SettingsRepository(context: Context) {
 
     fun setAppTheme(theme: String) {
         prefs.edit().putString("app_theme", theme).apply()
+    }
+
+    fun setAppLanguage(lang: String) {
+        prefs.edit().putString("app_language", lang).apply()
     }
 
     fun setSystemBrightness(isSystem: Boolean) {

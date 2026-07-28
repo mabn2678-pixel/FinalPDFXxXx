@@ -152,6 +152,7 @@ fun ViewerScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val strings = remember(state.appLanguage) { AppStringsProvider.get(state.appLanguage) }
     val coroutineScope = rememberCoroutineScope()
     val activity = context as? Activity
     
@@ -784,7 +785,7 @@ fun ViewerScreen(
                                     .padding(horizontal = 6.dp)
                             )
                         } else {
-                            val fileName = state.currentPdfName ?: "عرض ملف PDF"
+                            val fileName = state.currentPdfName ?: strings.openDocument
                             val fileNameFontSize = when {
                                 fileName.length > 30 -> 12.sp
                                 fileName.length > 18 -> 13.sp
@@ -802,7 +803,7 @@ fun ViewerScreen(
                                 ) {
                                     GlowingIconButton(
                                         icon = Icons.Default.Share,
-                                        contentDescription = "مشاركة",
+                                        contentDescription = strings.share,
                                         onClick = {
                                             state.currentPdfPath?.let { path ->
                                                 sharePdf(context, path, fileName)
@@ -815,7 +816,7 @@ fun ViewerScreen(
                                     if (state.annotationEditorMode != 0) {
                                         GlowingIconButton(
                                             icon = Icons.Default.Check,
-                                            contentDescription = "حفظ والتطبيق",
+                                            contentDescription = strings.saveButton,
                                             onClick = { viewModel.requestSaveAnnotatedPdf() },
                                             tint = Color(0xFF4CAF50),
                                             iconSize = 20.dp
@@ -823,7 +824,7 @@ fun ViewerScreen(
                                     }
                                     GlowingIconButton(
                                         icon = Icons.Default.Search,
-                                        contentDescription = "البحث",
+                                        contentDescription = strings.searchInPdf,
                                         onClick = { viewModel.openSearch() },
                                         tint = Color(0xFF009688),
                                         iconSize = 18.dp
@@ -848,7 +849,7 @@ fun ViewerScreen(
                                 // Right Section: Back Arrow
                                 GlowingIconButton(
                                     icon = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "رجوع",
+                                    contentDescription = strings.closeButton,
                                     onClick = { attemptExit() },
                                     tint = Color(0xFF9C27B0),
                                     iconSize = 20.dp,
@@ -918,42 +919,42 @@ fun ViewerScreen(
 
                                 BottomBarItem(
                                     icon = Icons.Default.MenuBook,
-                                    label = "الصفحات",
+                                    label = strings.pagesTab,
                                     onClick = { activeSheet = BottomSheetType.DocumentNavigation },
                                     tint = Color(0xFF5E8B66), // Muted Sage Green
                                     modifier = Modifier.weight(1f)
                                 )
                                 BottomBarItem(
                                     icon = if (state.scrollMode == "horizontal") Icons.Default.ViewCarousel else Icons.Default.ViewStream,
-                                    label = "العرض",
+                                    label = strings.viewTab,
                                     onClick = { activeSheet = BottomSheetType.ViewOptions },
                                     tint = Color(0xFF587B9C), // Muted Slate Blue
                                     modifier = Modifier.weight(1f)
                                 )
                                 BottomBarItem(
                                     icon = Icons.Default.ZoomIn,
-                                    label = "الزووم",
+                                    label = strings.zoomTab,
                                     onClick = { activeSheet = BottomSheetType.ZoomSettings },
                                     tint = Color(0xFF9E7A5A), // Muted Amber/Ochre
                                     modifier = Modifier.weight(1f)
                                 )
                                 BottomBarItem(
                                     icon = Icons.Default.Palette,
-                                    label = "السمات",
+                                    label = strings.themesTab,
                                     onClick = { activeSheet = BottomSheetType.DisplaySettings },
                                     tint = Color(0xFF836993), // Muted Soft Purple
                                     modifier = Modifier.weight(1f)
                                 )
                                 BottomBarItem(
                                     icon = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                    label = "إشارة",
+                                    label = strings.bookmarkTab,
                                     onClick = { viewModel.toggleBookmark(context, state.currentPage) },
                                     tint = if (isBookmarked) Color(0xFFA65D67) else Color(0xFFA65D67).copy(alpha = 0.5f), // Muted Rose/Red
                                     modifier = Modifier.weight(1f)
                                 )
                                 BottomBarItem(
                                     icon = Icons.Default.MoreHoriz,
-                                    label = "أدوات",
+                                    label = strings.moreTab,
                                     onClick = { activeSheet = BottomSheetType.MoreOptions },
                                     tint = Color(0xFF5A8888), // Muted Slate Teal
                                     modifier = Modifier.weight(1f)
@@ -2993,6 +2994,7 @@ fun MoreOptionsSheet(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val strings = remember(state.appLanguage) { AppStringsProvider.get(state.appLanguage) }
 
     Column(
         modifier = Modifier
@@ -3002,7 +3004,7 @@ fun MoreOptionsSheet(
             .padding(horizontal = 20.dp)
     ) {
         Text(
-            text = "خيارات إضافية",
+            text = strings.toolsTitle,
             fontWeight = FontWeight.Bold,
             fontSize = 18.sp,
             color = MaterialTheme.colorScheme.onSurface,
@@ -3020,35 +3022,35 @@ fun MoreOptionsSheet(
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 MoreOptionGridItem(
                     icon = Icons.Outlined.StickyNote2,
-                    label = "الملاحظات والتظليلات",
+                    label = strings.notesHighlights,
                     onClick = {
                         onNavigate(BottomSheetType.NotesAndHighlights)
                     }
                 )
                 MoreOptionGridItem(
                     icon = Icons.Outlined.PhotoCamera,
-                    label = "ماسح الكاميرا الضوئي",
+                    label = strings.cameraOcrTitle,
                     onClick = {
                         onNavigate(BottomSheetType.CameraOcr)
                     }
                 )
                 MoreOptionGridItem(
                     icon = Icons.Outlined.DocumentScanner,
-                    label = "استخراج النص (OCR)",
+                    label = strings.ocrExtract,
                     onClick = {
                         onNavigate(BottomSheetType.OcrText)
                     }
                 )
                 MoreOptionGridItem(
                     icon = Icons.Outlined.Pin,
-                    label = "الإشارات المرجعية",
+                    label = strings.bookmarkTab,
                     onClick = {
                         onNavigate(BottomSheetType.Bookmarks)
                     }
                 )
                 MoreOptionGridItem(
                     icon = Icons.Outlined.DirectionsRun,
-                    label = "التمرير التلقائي",
+                    label = strings.autoScroll,
                     onClick = {
                         onNavigate(BottomSheetType.AutoScroll)
                     }
@@ -3058,21 +3060,21 @@ fun MoreOptionsSheet(
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 MoreOptionGridItem(
                     icon = Icons.Outlined.Navigation,
-                    label = "الانتقال إلى صفحة",
+                    label = strings.jumpToPage,
                     onClick = {
                         onNavigate(BottomSheetType.JumpToPage)
                     }
                 )
                 MoreOptionGridItem(
                     icon = Icons.Outlined.Info,
-                    label = "معلومات المستند",
+                    label = strings.fileInfo,
                     onClick = {
                         onNavigate(BottomSheetType.DocumentInfo)
                     }
                 )
                 MoreOptionGridItem(
                     icon = Icons.Outlined.Share,
-                    label = "مشاركة الملف",
+                    label = strings.shareFile,
                     onClick = {
                         onDismiss()
                         state.currentPdfPath?.let { path ->
@@ -3082,7 +3084,7 @@ fun MoreOptionsSheet(
                 )
                 MoreOptionGridItem(
                     icon = Icons.Outlined.PhotoLibrary,
-                    label = "تصدير الصفحة (PNG)",
+                    label = strings.exportImage,
                     onClick = {
                         onDismiss()
                         state.currentPdfPath?.let { path ->
@@ -3097,7 +3099,7 @@ fun MoreOptionsSheet(
                 )
                 MoreOptionGridItem(
                     icon = Icons.Outlined.Print,
-                    label = "طباعة المستند",
+                    label = strings.printDocument,
                     onClick = {
                         onDismiss()
                         state.currentPdfPath?.let { path ->
@@ -4013,7 +4015,7 @@ fun BookmarksSheet(
                     .heightIn(max = 300.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(bookmarks) { page ->
+                items(bookmarks, key = { it }) { page ->
                     val context = LocalContext.current
                     Surface(
                         shape = RoundedCornerShape(12.dp),
@@ -4691,7 +4693,7 @@ fun DocumentNavigationSheet(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             contentPadding = PaddingValues(bottom = 16.dp)
                         ) {
-                            items(bookmarks) { page ->
+                            items(bookmarks, key = { it }) { page ->
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
                                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
@@ -4776,7 +4778,7 @@ fun DocumentNavigationSheet(
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                             contentPadding = PaddingValues(bottom = 24.dp)
                         ) {
-                            items((1..state.totalPages).toList()) { page ->
+                            items((1..state.totalPages).toList(), key = { it }) { page ->
                                 val isCurrent = page == state.currentPage
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,

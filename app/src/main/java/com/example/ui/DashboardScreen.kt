@@ -178,6 +178,7 @@ fun DashboardScreen(
                     selectedTab = uiState.selectedTab,
                     showTools = uiState.showToolsTab,
                     bottomBarColorIndex = uiState.bottomBarColorIndex,
+                    appLanguage = uiState.appLanguage,
                     onTabSelected = { viewModel.setTab(it) }
                 )
             }
@@ -261,7 +262,8 @@ fun DashboardScreen(
             onRename = { fileToRename = file },
             onFileInfo = { fileToViewInfo = file },
             onDelete = { fileToDelete = file },
-            onDismiss = { showFileActionsSheet = null }
+            onDismiss = { showFileActionsSheet = null },
+            appLanguage = uiState.appLanguage
         )
     }
 
@@ -388,7 +390,8 @@ fun DashboardScreen(
 
     if (showExitConfirmSheet) {
         ExitAppBottomSheet(
-            onDismiss = { showExitConfirmSheet = false }
+            onDismiss = { showExitConfirmSheet = false },
+            appLanguage = uiState.appLanguage
         )
     }
 
@@ -404,7 +407,8 @@ fun DashboardScreen(
             },
             onSharePdf = { pdfFile ->
                 sharePdf(context, pdfFile.filePath, pdfFile.fileName)
-            }
+            },
+            appLanguage = uiState.appLanguage
         )
     }
 }
@@ -428,9 +432,10 @@ fun HomeTabScreen(
     onDeleteMultiple: () -> Unit
 ) {
     val context = LocalContext.current
+    val strings = remember(uiState.appLanguage) { AppStringsProvider.get(uiState.appLanguage) }
     val currentHour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
     
-    val greetingText = if (currentHour < 12) "صباح الخير!" else "مساء الخير!"
+    val greetingText = if (currentHour < 12) strings.goodMorning else strings.goodEvening
     val greetingIcon = if (currentHour < 12) Icons.Default.WbSunny else Icons.Default.NightsStay
     val greetingColor = if (currentHour < 12) Color(0xFFFBC02D) else Color(0xFFB19DFF)
 
@@ -554,7 +559,7 @@ fun HomeTabScreen(
                 }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "مرحباً بك في تطبيق FinalPDF",
+                    text = strings.welcomeMessage,
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -574,7 +579,7 @@ fun HomeTabScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Assessment,
-                        contentDescription = "إحصائيات المكتبة",
+                        contentDescription = strings.statsTitle,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(18.dp)
                     )
@@ -589,7 +594,7 @@ fun HomeTabScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
-                        contentDescription = "ترتيب الملفات",
+                        contentDescription = strings.sortTitle,
                         tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(18.dp)
                     )
@@ -617,7 +622,7 @@ fun HomeTabScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Search,
-                        contentDescription = "بحث",
+                        contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp)
                     )
@@ -625,7 +630,7 @@ fun HomeTabScreen(
                     Box(modifier = Modifier.weight(1f)) {
                         if (uiState.dashboardSearchQuery.isEmpty()) {
                             Text(
-                                text = "ابحث في ملفات الـ PDF...",
+                                text = strings.searchPlaceholder,
                                 fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                             )
@@ -639,7 +644,7 @@ fun HomeTabScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "مسح",
+                                contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -663,17 +668,17 @@ fun HomeTabScreen(
                 modifier = Modifier.weight(1f)
             ) {
                 FilterPill(
-                    label = "كل الملفات",
+                    label = strings.allDocs,
                     selected = uiState.selectedFilter == FileFilter.All,
                     onClick = { viewModel.setFileFilter(FileFilter.All) }
                 )
                 FilterPill(
-                    label = "المفضلة",
+                    label = strings.favorites,
                     selected = uiState.selectedFilter == FileFilter.Favorites,
                     onClick = { viewModel.setFileFilter(FileFilter.Favorites) }
                 )
                 FilterPill(
-                    label = "الأخيرة",
+                    label = strings.recent,
                     selected = uiState.selectedFilter == FileFilter.Recent,
                     onClick = { viewModel.setFileFilter(FileFilter.Recent) }
                 )
@@ -730,7 +735,7 @@ fun HomeTabScreen(
 
         // Files List / Grid Renderer
         if (filteredFiles.isEmpty()) {
-            EmptyDashboardView(queryEmpty = uiState.dashboardSearchQuery.isNotEmpty())
+            EmptyDashboardView(queryEmpty = uiState.dashboardSearchQuery.isNotEmpty(), appLanguage = uiState.appLanguage)
         } else {
             if (uiState.isGridView) {
                 // Grid Layout
@@ -776,6 +781,7 @@ fun HomeTabScreen(
                             onMenuClick = {
                                 onShowFileActions(file)
                             },
+                            appLanguage = uiState.appLanguage,
                             modifier = Modifier.animateItem()
                         )
                     }
@@ -822,6 +828,7 @@ fun HomeTabScreen(
                             onMenuClick = {
                                 onShowFileActions(file)
                             },
+                            appLanguage = uiState.appLanguage,
                             modifier = Modifier.animateItem()
                         )
                     }
@@ -835,7 +842,8 @@ fun HomeTabScreen(
         SortFilesSheet(
             sortOption = uiState.sortOption,
             onSortSelected = { viewModel.setSortOption(context, it) },
-            onDismiss = { showSortSheet = false }
+            onDismiss = { showSortSheet = false },
+            appLanguage = uiState.appLanguage
         )
     }
 
@@ -896,8 +904,10 @@ fun PdfGridItem(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onMenuClick: () -> Unit,
+    appLanguage: String = "ar",
     modifier: Modifier = Modifier
 ) {
+    val strings = remember(appLanguage) { AppStringsProvider.get(appLanguage) }
     Card(
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
@@ -988,7 +998,7 @@ fun PdfGridItem(
                     else -> 11.sp
                 }
                 Text(
-                    text = file.fileName,
+                    text = getLocalizedFileName(file.fileName, strings),
                     fontSize = gridFileNameFontSize,
                     fontWeight = FontWeight.Bold,
                     maxLines = 2,
@@ -1019,7 +1029,7 @@ fun PdfGridItem(
                             else -> 8.sp
                         }
                         Text(
-                            text = file.folderName,
+                            text = getLocalizedFolderName(file.folderName, strings),
                             fontSize = badgeFontSize,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF5D4037),
@@ -1071,8 +1081,10 @@ fun PdfListItem(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onMenuClick: () -> Unit,
+    appLanguage: String = "ar",
     modifier: Modifier = Modifier
 ) {
+    val strings = remember(appLanguage) { AppStringsProvider.get(appLanguage) }
     Card(
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
@@ -1132,7 +1144,7 @@ fun PdfListItem(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
-                                contentDescription = "محدد",
+                                contentDescription = strings.confirm,
                                 tint = Color.White,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -1170,7 +1182,7 @@ fun PdfListItem(
                     else -> 13.sp
                 }
                 Text(
-                    text = file.fileName,
+                    text = getLocalizedFileName(file.fileName, strings),
                     fontSize = listFileNameFontSize,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -1198,7 +1210,7 @@ fun PdfListItem(
                             else -> 8.5.sp
                         }
                         Text(
-                            text = file.folderName,
+                            text = getLocalizedFolderName(file.folderName, strings),
                             fontSize = badgeFontSize,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF5D4037),
@@ -1263,8 +1275,8 @@ fun PdfListItem(
 
 // In-memory LruCache for instant, zero-latency thumbnail retrieval during scrolling Lookups
 object ThumbnailMemoryCache {
-    private val maxMemory = (Runtime.getRuntime().maxMemory() / 1024).toInt() / 8
-    private val cache = object : android.util.LruCache<String, Bitmap>(maxMemory.coerceAtLeast(16 * 1024)) {
+    private val maxMemory = (Runtime.getRuntime().maxMemory() / 1024).toInt() / 6
+    private val cache = object : android.util.LruCache<String, Bitmap>(maxMemory.coerceAtLeast(32 * 1024)) {
         override fun sizeOf(key: String, bitmap: Bitmap): Int {
             return bitmap.byteCount / 1024
         }
@@ -1273,9 +1285,13 @@ object ThumbnailMemoryCache {
     fun getBitmap(key: String): Bitmap? = cache.get(key)
 
     fun putBitmap(key: String, bitmap: Bitmap) {
-        cache.put(key, bitmap)
+        if (!bitmap.isRecycled) {
+            cache.put(key, bitmap)
+        }
     }
 }
+
+private val SharedThumbnailIO = Dispatchers.IO.limitedParallelism(4)
 
 @Composable
 fun PdfThumbnail(
@@ -1284,17 +1300,18 @@ fun PdfThumbnail(
 ) {
     val context = LocalContext.current
     val cachedBitmap = remember(filePath) { ThumbnailMemoryCache.getBitmap(filePath) }
-    var thumbnailBitmap by remember(filePath) { mutableStateOf<Bitmap?>(cachedBitmap) }
-    
-    val thumbnailDispatcher = remember { Dispatchers.IO.limitedParallelism(2) }
+    var imageBitmap by remember(filePath) { 
+        mutableStateOf(cachedBitmap?.let { if (!it.isRecycled) it.asImageBitmap() else null }) 
+    }
 
     LaunchedEffect(filePath) {
-        if (thumbnailBitmap == null) {
-            withContext(thumbnailDispatcher) {
+        if (imageBitmap == null) {
+            withContext(SharedThumbnailIO) {
                 val bitmap = getPdfThumbnailBitmap(context, filePath)
-                if (bitmap != null) {
+                if (bitmap != null && !bitmap.isRecycled) {
+                    val img = bitmap.asImageBitmap()
                     withContext(Dispatchers.Main) {
-                        thumbnailBitmap = bitmap
+                        imageBitmap = img
                     }
                 }
             }
@@ -1310,10 +1327,10 @@ fun PdfThumbnail(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            val bitmap = thumbnailBitmap
-            if (bitmap != null && !bitmap.isRecycled) {
+            val img = imageBitmap
+            if (img != null) {
                 Image(
-                    bitmap = bitmap.asImageBitmap(),
+                    bitmap = img,
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxSize()
@@ -1385,8 +1402,8 @@ fun getPdfThumbnailBitmap(context: Context, filePath: String): Bitmap? {
         val renderer = PdfRenderer(pfd)
         if (renderer.pageCount > 0) {
             val page = renderer.openPage(0)
-            val width = 180
-            val height = (width.toFloat() / page.width * page.height).toInt().coerceAtLeast(100)
+            val width = 160
+            val height = (width.toFloat() / page.width * page.height).toInt().coerceAtLeast(90)
             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             val canvas = android.graphics.Canvas(bitmap)
             canvas.drawColor(android.graphics.Color.WHITE)
@@ -1397,7 +1414,7 @@ fun getPdfThumbnailBitmap(context: Context, filePath: String): Bitmap? {
             
             try {
                 FileOutputStream(cacheFile).use { out ->
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 80, out)
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 75, out)
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -1460,8 +1477,11 @@ fun formatLastOpened(timestamp: Long): String {
 fun SortFilesSheet(
     sortOption: SortOption,
     onSortSelected: (SortOption) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    appLanguage: String = "ar"
 ) {
+    val strings = remember(appLanguage) { AppStringsProvider.get(appLanguage) }
+
     AppBottomSheet(
         onDismiss = onDismiss
     ) {
@@ -1477,14 +1497,14 @@ fun SortFilesSheet(
                     modifier = Modifier.size(24.dp)
                 )
                 Text(
-                    text = "ترتيب الملفات",
+                    text = strings.sortTitle,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
             Text(
-                text = "اختر طريقة تنظيم واستعراض ملفات الـ PDF الخاصة بك",
+                text = strings.sortSubtitle,
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
@@ -1492,7 +1512,7 @@ fun SortFilesSheet(
 
             // Category 1: Alphabetical
             Text(
-                text = "أبجدي",
+                text = strings.sortAlphabetical,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -1503,13 +1523,13 @@ fun SortFilesSheet(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 SortChip(
-                    label = "أ -> ي  ↑",
+                    label = strings.sortAlphaAsc,
                     selected = sortOption == SortOption.ALPHA_ASC,
                     onClick = { onSortSelected(SortOption.ALPHA_ASC); onDismiss() },
                     modifier = Modifier.weight(1f)
                 )
                 SortChip(
-                    label = "ي -> أ  ↓",
+                    label = strings.sortAlphaDesc,
                     selected = sortOption == SortOption.ALPHA_DESC,
                     onClick = { onSortSelected(SortOption.ALPHA_DESC); onDismiss() },
                     modifier = Modifier.weight(1f)
@@ -1520,7 +1540,7 @@ fun SortFilesSheet(
 
             // Category 2: File Size
             Text(
-                text = "حجم الملف",
+                text = strings.sortFileSizeLabel,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -1531,13 +1551,13 @@ fun SortFilesSheet(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 SortChip(
-                    label = "الأصغر أولاً  ↑",
+                    label = strings.sortSizeAsc,
                     selected = sortOption == SortOption.SIZE_ASC,
                     onClick = { onSortSelected(SortOption.SIZE_ASC); onDismiss() },
                     modifier = Modifier.weight(1f)
                 )
                 SortChip(
-                    label = "الأكبر أولاً  ↓",
+                    label = strings.sortSizeDesc,
                     selected = sortOption == SortOption.SIZE_DESC,
                     onClick = { onSortSelected(SortOption.SIZE_DESC); onDismiss() },
                     modifier = Modifier.weight(1f)
@@ -1548,7 +1568,7 @@ fun SortFilesSheet(
 
             // Category 3: Date Modified
             Text(
-                text = "تاريخ الإضافة",
+                text = strings.sortDateAddedLabel,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -1559,13 +1579,13 @@ fun SortFilesSheet(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 SortChip(
-                    label = "الأقدم أولاً  ↑",
+                    label = strings.sortDateAsc,
                     selected = sortOption == SortOption.DATE_ASC,
                     onClick = { onSortSelected(SortOption.DATE_ASC); onDismiss() },
                     modifier = Modifier.weight(1f)
                 )
                 SortChip(
-                    label = "الأحدث أولاً  ↓",
+                    label = strings.sortDateDesc,
                     selected = sortOption == SortOption.DATE_DESC,
                     onClick = { onSortSelected(SortOption.DATE_DESC); onDismiss() },
                     modifier = Modifier.weight(1f)
@@ -1612,6 +1632,7 @@ fun LibraryStatsSheet(
     recentPdfs: List<RecentPdf>,
     onDismiss: () -> Unit
 ) {
+    val strings = remember(uiState.appLanguage) { AppStringsProvider.get(uiState.appLanguage) }
     val totalFiles = uiState.allPdfFiles.size
     
     fun getSizeBytes(sizeStr: String): Long {
@@ -1652,14 +1673,14 @@ fun LibraryStatsSheet(
                     modifier = Modifier.size(24.dp)
                 )
                 Text(
-                    text = "إحصائيات المكتبة",
+                    text = strings.statsTitle,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
             Text(
-                text = "نظرة عامة على ملفات ومؤشرات القراءة في مكتبتك",
+                text = strings.libraryOverviewSubtitle,
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, bottom = 20.dp)
@@ -1675,14 +1696,14 @@ fun LibraryStatsSheet(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     StatCard(
-                        title = "إجمالي الملفات",
-                        value = "$totalFiles ملف",
+                        title = strings.totalFiles,
+                        value = strings.fileCountFormat(totalFiles),
                         icon = Icons.Default.PictureAsPdf,
                         iconColor = Color(0xFFEF5350),
                         modifier = Modifier.weight(1f)
                     )
                     StatCard(
-                        title = "حجم المستندات",
+                        title = strings.documentSize,
                         value = totalPdfSizeFormatted,
                         icon = Icons.Default.SdStorage,
                         iconColor = Color(0xFF42A5F5),
@@ -1695,15 +1716,15 @@ fun LibraryStatsSheet(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     StatCard(
-                        title = "الملفات المفضلة",
-                        value = "$favoriteCount ملف",
+                        title = strings.favoriteFiles,
+                        value = strings.fileCountFormat(favoriteCount),
                         icon = Icons.Default.Star,
                         iconColor = Color(0xFFFFCA28),
                         modifier = Modifier.weight(1f)
                     )
                     StatCard(
-                        title = "الملفات المفتوحة",
-                        value = "$openedCount ملف",
+                        title = strings.openedFiles,
+                        value = strings.fileCountFormat(openedCount),
                         icon = Icons.Default.History,
                         iconColor = Color(0xFF66BB6A),
                         modifier = Modifier.weight(1f)
@@ -1715,15 +1736,15 @@ fun LibraryStatsSheet(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     StatCard(
-                        title = "ساعات القراءة",
+                        title = strings.readingHours,
                         value = formattedReadingTime,
                         icon = Icons.Default.AccessTime,
                         iconColor = Color(0xFFAB47BC),
                         modifier = Modifier.weight(1f)
                     )
                     StatCard(
-                        title = "مفقودة من الهاتف",
-                        value = "$deletedCount ملف",
+                        title = strings.missingFiles,
+                        value = strings.fileCountFormat(deletedCount),
                         icon = Icons.Default.FolderOff,
                         iconColor = Color(0xFF78909C),
                         modifier = Modifier.weight(1f)
@@ -1788,7 +1809,8 @@ fun StatCard(
 }
 
 @Composable
-fun EmptyDashboardView(queryEmpty: Boolean) {
+fun EmptyDashboardView(queryEmpty: Boolean, appLanguage: String = "ar") {
+    val strings = remember(appLanguage) { AppStringsProvider.get(appLanguage) }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1804,15 +1826,14 @@ fun EmptyDashboardView(queryEmpty: Boolean) {
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = if (queryEmpty) "لم نجد نتائج بحث مطابقة" else "مكتبتك فارغة حالياً",
+            text = if (queryEmpty) strings.noSearchResultsTitle else strings.emptyLibraryTitle,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
             color = Color.Gray
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = if (queryEmpty) "تأكد من كتابة اسم الملف بشكل صحيح وجرب مجدداً." 
-            else "اضغط على زر الإضافة (+) لفتح وقراءة أول ملف PDF لك.",
+            text = if (queryEmpty) strings.noSearchResultsSubtitle else strings.emptyLibrarySubtitle,
             fontSize = 12.sp,
             color = Color.Gray.copy(alpha = 0.7f),
             textAlign = TextAlign.Center,
@@ -1835,6 +1856,7 @@ fun FoldersTabScreen(
 ) {
     val context = LocalContext.current
     val recentPdfs by viewModel.recentPdfs.collectAsState(initial = emptyList())
+    val strings = remember(uiState.appLanguage) { AppStringsProvider.get(uiState.appLanguage) }
 
     val recentPdfsMap = remember(recentPdfs) {
         recentPdfs.associateBy { it.filePath }
@@ -1862,6 +1884,7 @@ fun FoldersTabScreen(
         FolderStatsRow(
             pdfCount = uiState.allPdfFiles.size,
             folderCount = folderGroups.keys.size,
+            appLanguage = uiState.appLanguage,
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
@@ -1871,8 +1894,7 @@ fun FoldersTabScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                folderGroups.forEach { (folderName, files) ->
-                    item {
+                items(folderGroups.toList(), key = { it.first }) { (folderName, files) ->
                         Card(
                             shape = RoundedCornerShape(14.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -1911,7 +1933,7 @@ fun FoldersTabScreen(
                                         else -> 14.sp
                                     }
                                     Text(
-                                        text = folderName,
+                                        text = getLocalizedFolderName(folderName, strings),
                                         fontSize = folderNameFontSize,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface,
@@ -1920,7 +1942,7 @@ fun FoldersTabScreen(
                                     )
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = "${files.size} ملفات PDF",
+                                        text = strings.fileCountFormat(files.size),
                                         fontSize = 12.sp,
                                         color = Color.Gray
                                     )
@@ -1928,13 +1950,12 @@ fun FoldersTabScreen(
 
                                 Icon(
                                     imageVector = Icons.Default.ChevronRight,
-                                    contentDescription = "استعراض",
+                                    contentDescription = null,
                                     tint = Color.Gray.copy(alpha = 0.5f)
                                 )
                             }
                         }
                     }
-                }
             }
         } else {
             // Expanded Folder Content View
@@ -1962,7 +1983,7 @@ fun FoldersTabScreen(
                 IconButton(onClick = { expandedFolder = null }) {
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "رجوع",
+                        contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -1974,7 +1995,7 @@ fun FoldersTabScreen(
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = expandedFolder ?: "",
+                        text = getLocalizedFolderName(expandedFolder ?: "", strings),
                         fontSize = expandedFolderTitleFontSize,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground,
@@ -1982,7 +2003,7 @@ fun FoldersTabScreen(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "يتضمن ${folderFiles.size} مستندات داخل المجلد",
+                        text = strings.fileCountFormat(folderFiles.size),
                         fontSize = 11.sp,
                         color = Color.Gray
                     )
@@ -2003,17 +2024,17 @@ fun FoldersTabScreen(
                     modifier = Modifier.weight(1f)
                 ) {
                     FilterPill(
-                        label = "كل الملفات",
+                        label = strings.allDocs,
                         selected = folderFilter == FileFilter.All,
                         onClick = { folderFilter = FileFilter.All }
                     )
                     FilterPill(
-                        label = "المفضلة",
+                        label = strings.favorites,
                         selected = folderFilter == FileFilter.Favorites,
                         onClick = { folderFilter = FileFilter.Favorites }
                     )
                     FilterPill(
-                        label = "الأخيرة",
+                        label = strings.recent,
                         selected = folderFilter == FileFilter.Recent,
                         onClick = { folderFilter = FileFilter.Recent }
                     )
@@ -2030,7 +2051,7 @@ fun FoldersTabScreen(
                     IconButton(
                         onClick = {
                             viewModel.scanFiles(context)
-                            Toast.makeText(context, "تم تحديث وفحص المجلد الحالي!", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, strings.processSuccess, Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), CircleShape)
@@ -2127,6 +2148,7 @@ fun FoldersTabScreen(
                                 onMenuClick = {
                                     onShowFileActions(file)
                                 },
+                                appLanguage = uiState.appLanguage,
                                 modifier = Modifier.animateItem()
                             )
                         }
@@ -2169,6 +2191,7 @@ fun FoldersTabScreen(
                                 onMenuClick = {
                                     onShowFileActions(file)
                                 },
+                                appLanguage = uiState.appLanguage,
                                 modifier = Modifier.animateItem()
                             )
                         }
@@ -2183,8 +2206,10 @@ fun FoldersTabScreen(
 fun FolderStatsRow(
     pdfCount: Int,
     folderCount: Int,
+    appLanguage: String = "ar",
     modifier: Modifier = Modifier
 ) {
+    val strings = remember(appLanguage) { AppStringsProvider.get(appLanguage) }
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -2212,7 +2237,7 @@ fun FolderStatsRow(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "PDFs",
+                        text = strings.pdfFiles,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color(0xFF94A3B8)
@@ -2228,7 +2253,7 @@ fun FolderStatsRow(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Description,
-                        contentDescription = "PDFs",
+                        contentDescription = strings.pdfFiles,
                         tint = Color(0xFF60A5FA),
                         modifier = Modifier.size(22.dp)
                     )
@@ -2259,7 +2284,7 @@ fun FolderStatsRow(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Folders",
+                        text = strings.folders,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color(0xFFD1D5DB)
@@ -2275,7 +2300,7 @@ fun FolderStatsRow(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Folder,
-                        contentDescription = "Folders",
+                        contentDescription = strings.folders,
                         tint = Color(0xFFFB923C),
                         modifier = Modifier.size(22.dp)
                     )
@@ -2306,6 +2331,7 @@ enum class ActiveTool {
 
 enum class SettingSheetType {
     APP_THEME,
+    APP_LANGUAGE,
     SCROLL_MODE,
     DEFAULT_ZOOM,
     DOUBLE_TAP_ZOOM,
@@ -2353,6 +2379,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
     var completedResultFilePath by remember { mutableStateOf<String?>(null) }
     var isProcessing by remember { mutableStateOf(false) }
     var showLibraryPickerSheet by remember { mutableStateOf(false) }
+    val strings = remember(uiState.appLanguage) { AppStringsProvider.get(uiState.appLanguage) }
 
     Column(
         modifier = Modifier
@@ -2360,14 +2387,14 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
             .padding(16.dp)
     ) {
         Text(
-            text = "أدوات الـ PDF المتقدمة",
+            text = strings.toolsTitle,
             fontSize = 20.sp,
             fontWeight = FontWeight.ExtraBold,
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.padding(bottom = 4.dp)
         )
         Text(
-            text = "أدوات ذكية حقيقية لتعديل وتخصيص مستنداتك وحفظها فوراً",
+            text = strings.toolsSubtitle,
             fontSize = 12.sp,
             color = Color.Gray,
             modifier = Modifier.padding(bottom = 16.dp)
@@ -2379,13 +2406,13 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
         ) {
             // OCR SECTION
             item {
-                ToolSectionHeader(title = "الماسح الضوئي والتعرف على النصوص (OCR)")
+                ToolSectionHeader(title = "OCR")
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     ToolGridCard(
-                        title = "ماسح الكاميرا الضوئي (Camera OCR)",
-                        desc = "تصوير أي مستند واستخراج النصوص فوراً بتقنية ML Kit",
+                        title = strings.cameraOcrTitle,
+                        desc = strings.cameraOcrDesc,
                         icon = Icons.Default.DocumentScanner,
                         color = Color(0xFFE8E0F5),
                         modifier = Modifier.weight(1f),
@@ -2394,8 +2421,8 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                         }
                     )
                     ToolGridCard(
-                        title = "تحويل PDF إلى نص (OCR السحابي)",
-                        desc = "تحويل ملفات الـ PDF المصورة إلى مستندات قابلة لتحديد ونسخ النص بدقة عالية عبر الإنترنت.",
+                        title = strings.cloudOcrTitle,
+                        desc = strings.cloudOcrDesc,
                         icon = Icons.Default.CloudSync,
                         color = Color(0xFFE3F2FD),
                         modifier = Modifier.weight(1f),
@@ -2411,31 +2438,31 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
 
             // ORGANIZE SECTION
             item {
-                ToolSectionHeader(title = "تنظيم وترتيب الملفات")
+                ToolSectionHeader(title = "PDF Tools")
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     ToolGridCard(
-                        title = "دمج ملفات PDF",
-                        desc = "دمج عدة ملفات في ملف واحد مخصص",
+                        title = strings.mergePdfTitle,
+                        desc = strings.mergePdfDesc,
                         icon = Icons.Default.MergeType,
                         color = Color(0xFFE6E0FF),
                         modifier = Modifier.weight(1f),
                         onClick = {
                             activeTool = ActiveTool.Merge
-                            targetFileName = "دمج_المستندات"
+                            targetFileName = "Merged_Document"
                             selectedFilePaths = emptySet()
                         }
                     )
                     ToolGridCard(
-                        title = "تقسيم ملف PDF",
-                        desc = "استخراج صفحات محددة لملف جديد",
+                        title = strings.splitPdfTitle,
+                        desc = strings.splitPdfDesc,
                         icon = Icons.Default.CallSplit,
                         color = Color(0xFFFFF9C4),
                         modifier = Modifier.weight(1f),
                         onClick = {
                             activeTool = ActiveTool.Split
-                            targetFileName = "تقسيم_الملف"
+                            targetFileName = "Split_Document"
                             selectedSingleFilePath = ""
                             splitFromPage = "1"
                             splitToPage = "1"
@@ -2446,27 +2473,27 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     ToolGridCard(
-                        title = "ضغط ملف PDF",
-                        desc = "تصغير الحجم بكفاءة عالية للحفظ والمشاركة",
+                        title = strings.compressPdfTitle,
+                        desc = strings.compressPdfDesc,
                         icon = Icons.Default.Compress,
                         color = Color(0xFFF1EEFF),
                         modifier = Modifier.weight(1f),
                         onClick = {
                             activeTool = ActiveTool.Compress
-                            targetFileName = "الملف_المضغوط"
+                            targetFileName = "Compressed_Document"
                             selectedSingleFilePath = ""
                             compressionLevel = "medium"
                         }
                     )
                     ToolGridCard(
-                        title = "تدوير الصفحات",
-                        desc = "تغيير اتجاه لصفحة معينة أو كل الصفحات",
+                        title = strings.rotatePdfTitle,
+                        desc = strings.rotatePdfDesc,
                         icon = Icons.Default.RotateRight,
                         color = Color(0xFFFFF9C4),
                         modifier = Modifier.weight(1f),
                         onClick = {
                             activeTool = ActiveTool.Rotate
-                            targetFileName = "الملف_المعدل"
+                            targetFileName = "Rotated_Document"
                             selectedSingleFilePath = ""
                             rotateDegrees = 90
                             rotateTargetPage = "-1"
@@ -2482,27 +2509,27 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     ToolGridCard(
-                        title = "إعادة ترتيب الصفحات",
-                        desc = "تنظيم تسلسل الصفحات حسب رغبتك",
+                        title = strings.reorderPdfTitle,
+                        desc = strings.reorderPdfDesc,
                         icon = Icons.Default.List,
                         color = Color(0xFFE6E0FF),
                         modifier = Modifier.weight(1f),
                         onClick = {
                             activeTool = ActiveTool.Reorder
-                            targetFileName = "الملف_المرتب"
+                            targetFileName = "Reordered_Document"
                             selectedSingleFilePath = ""
                             reorderSequence = ""
                         }
                     )
                     ToolGridCard(
-                        title = "حذف الصفحات",
-                        desc = "إزالة صفحة واحدة أو أكثر من المستند",
+                        title = strings.deletePdfTitle,
+                        desc = strings.deletePdfDesc,
                         icon = Icons.Default.Delete,
                         color = Color(0xFFFFD1D1),
                         modifier = Modifier.weight(1f),
                         onClick = {
                             activeTool = ActiveTool.DeletePages
-                            targetFileName = "الملف_بعد_الحذف"
+                            targetFileName = "Modified_Document"
                             selectedSingleFilePath = ""
                             deletePagesSetInput = ""
                         }
@@ -2668,17 +2695,17 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
 
             if (!hasSelectedFile) {
                 val info = when (activeTool) {
-                    ActiveTool.Merge -> ToolInfo("دمج ملفات PDF", "اختر ملفات الـ PDF التي ترغب في دمجها بالترتيب المناسب لتصديرها في مستند واحد مخصص", Icons.Default.MergeType, Color(0xFFE6E0FF))
-                    ActiveTool.Split -> ToolInfo("تقسيم ملف PDF", "اختر ملف الـ PDF والصفحات المراد استخراجها وفصلها في مستند جديد منفصل", Icons.Default.CallSplit, Color(0xFFFFF9C4))
-                    ActiveTool.Compress -> ToolInfo("ضغط ملف PDF", "تقليل حجم المستند بكفاءة عالية للحفظ والمشاركة مع الحفاظ على جودة القراءة", Icons.Default.Compress, Color(0xFFF1EEFF))
-                    ActiveTool.Rotate -> ToolInfo("تدوير صفحات PDF", "تعديل اتجاه وزاوية دوران صفحات مستند الـ PDF (90°، 180°، 270°) بكل سهولة", Icons.Default.RotateRight, Color(0xFFFFF9C4))
-                    ActiveTool.Reorder -> ToolInfo("إعادة ترتيب الصفحات", "إعادة تنظيم وترتيب تسلسل صفحات ملف الـ PDF بالطريقة التي تناسبك", Icons.Default.List, Color(0xFFE6E0FF))
-                    ActiveTool.DeletePages -> ToolInfo("حذف صفحات من PDF", "إزالة صفحة واحدة أو أكثر غير مرغوبة من مستند الـ PDF وتصديره", Icons.Default.Delete, Color(0xFFFFD1D1))
-                    ActiveTool.ImageToPdf -> ToolInfo("صورة إلى PDF", "اختر صورة أو أكثر من المعرض وتحويلها إلى ملف PDF مرتب وعالي الجودة", Icons.Default.Image, Color(0xFFE1F5FE))
-                    ActiveTool.PdfToImages -> ToolInfo("تحويل PDF إلى صور", "استخراج صفحات مستند الـ PDF وحفظها كصور عالية الجودة (PNG / JPEG)", Icons.Default.Collections, Color(0xFFE8F5E9))
-                    ActiveTool.LockPdf -> ToolInfo("تشفير وقفل ملف PDF", "حماية مستند الـ PDF بكلمة سر وتعيين صلاحيات القراءة والطباعة لمنع الفتح غير المصرح به", Icons.Default.Lock, Color(0xFFFFEBEE))
-                    ActiveTool.UnlockPdf -> ToolInfo("فك قفل وإزالة حماية PDF", "إزالة كلمة السر والتشفير من مستند مشفر لحفظ نسخة مفتوحة وقابلة للقراءة دائماً", Icons.Default.LockOpen, Color(0xFFFFF3E0))
-                    ActiveTool.CloudOcr -> ToolInfo("تحويل PDF (OCR)", "تحويل ملفات الـ PDF المصورة إلى مستندات قابلة لتحديد ونسخ النص عبر التعرف السحابي", Icons.Default.CloudSync, Color(0xFFE3F2FD))
+                    ActiveTool.Merge -> ToolInfo(strings.mergePdfTitle, strings.mergePdfDesc, Icons.Default.MergeType, Color(0xFFE6E0FF))
+                    ActiveTool.Split -> ToolInfo(strings.splitPdfTitle, strings.splitPdfDesc, Icons.Default.CallSplit, Color(0xFFFFF9C4))
+                    ActiveTool.Compress -> ToolInfo(strings.compressPdfTitle, strings.compressPdfDesc, Icons.Default.Compress, Color(0xFFF1EEFF))
+                    ActiveTool.Rotate -> ToolInfo(strings.rotatePdfTitle, strings.rotatePdfDesc, Icons.Default.RotateRight, Color(0xFFFFF9C4))
+                    ActiveTool.Reorder -> ToolInfo(strings.reorderPdfTitle, strings.reorderPdfDesc, Icons.Default.List, Color(0xFFE6E0FF))
+                    ActiveTool.DeletePages -> ToolInfo(strings.deletePdfTitle, strings.deletePdfDesc, Icons.Default.Delete, Color(0xFFFFD1D1))
+                    ActiveTool.ImageToPdf -> ToolInfo(strings.importImages, strings.toolsSubtitle, Icons.Default.Image, Color(0xFFE1F5FE))
+                    ActiveTool.PdfToImages -> ToolInfo(strings.exportImage, strings.toolsSubtitle, Icons.Default.Collections, Color(0xFFE8F5E9))
+                    ActiveTool.LockPdf -> ToolInfo(strings.lockPdfTitle, strings.lockPdfDesc, Icons.Default.Lock, Color(0xFFFFEBEE))
+                    ActiveTool.UnlockPdf -> ToolInfo(strings.unlockPdfTitle, strings.unlockPdfDesc, Icons.Default.LockOpen, Color(0xFFFFF3E0))
+                    ActiveTool.CloudOcr -> ToolInfo(strings.cloudOcrTitle, strings.cloudOcrDesc, Icons.Default.CloudSync, Color(0xFFE3F2FD))
                     else -> ToolInfo("", "", Icons.Default.Build, Color.Gray)
                 }
 
@@ -2687,7 +2714,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                     description = info.subtitle,
                     icon = info.icon,
                     accentColor = info.color,
-                    buttonText = if (activeTool == ActiveTool.Merge) "اختيار ملفات PDF" else if (activeTool == ActiveTool.ImageToPdf) "اختيار صور من المعرض" else "اختيار ملف PDF",
+                    buttonText = if (activeTool == ActiveTool.Merge) strings.importFiles else if (activeTool == ActiveTool.ImageToPdf) strings.importImages else strings.selectFile,
                     onSelectSaf = {
                         when (activeTool) {
                             ActiveTool.Merge -> toolMultiPickerLauncher.launch(arrayOf("application/pdf"))
@@ -2698,23 +2725,26 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                     onSelectFromLibrary = if (activeTool != ActiveTool.ImageToPdf) {
                         { showLibraryPickerSheet = true }
                     } else null,
-                    onBack = { activeTool = ActiveTool.None }
+                    onBack = { activeTool = ActiveTool.None },
+                    appLanguage = uiState.appLanguage
                 )
             } else {
-                val (toolTitle, toolSubtitle) = when (activeTool) {
-                    ActiveTool.Merge -> "دمج ملفات PDF" to "اختر ترتيب الملفات والاسم لإنشاء مستند واحد"
-                    ActiveTool.Split -> "تقسيم ملف PDF" to "حدد نطاق الصفحات واسم الملف الناتج"
-                    ActiveTool.Compress -> "ضغط ملف PDF" to "حدد مستوى الضغط واسم الملف الناتج"
-                    ActiveTool.Rotate -> "تدوير صفحات PDF" to "حدد زاوية التدوير والصفحات المستهدفة"
-                    ActiveTool.Reorder -> "إعادة ترتيب الصفحات" to "أدخل التسلسل الجديد لصفحات الملف"
-                    ActiveTool.DeletePages -> "حذف صفحات من PDF" to "أدخل أرقام الصفحات المراد استبعادها"
-                    ActiveTool.ImageToPdf -> "تحويل صور إلى PDF" to "ترتيب الصور وإنشاء ملف الـ PDF"
-                    ActiveTool.PdfToImages -> "تحويل PDF إلى صور" to "حدد صيغة الصور والصفحات المراد تصديرها"
-                    ActiveTool.LockPdf -> "تشفير وقفل ملف PDF" to "تعيين كلمة السر والصلاحيات المطلوبة"
-                    ActiveTool.UnlockPdf -> "فك قفل وإزالة حماية PDF" to "أدخل كلمة السر الفعالية لفك التشفير"
-                    ActiveTool.CloudOcr -> "تحويل PDF (OCR)" to "اختر لغة التعرف والاسم لبدء المعالجة"
-                    else -> "" to ""
+                val toolInfo = when (activeTool) {
+                    ActiveTool.Merge -> Pair(strings.mergePdfTitle, strings.mergePdfDesc)
+                    ActiveTool.Split -> Pair(strings.splitPdfTitle, strings.splitPdfDesc)
+                    ActiveTool.Compress -> Pair(strings.compressPdfTitle, strings.compressPdfDesc)
+                    ActiveTool.Rotate -> Pair(strings.rotatePdfTitle, strings.rotatePdfDesc)
+                    ActiveTool.Reorder -> Pair(strings.reorderPdfTitle, strings.reorderPdfDesc)
+                    ActiveTool.DeletePages -> Pair(strings.deletePdfTitle, strings.deletePdfDesc)
+                    ActiveTool.ImageToPdf -> Pair(strings.importImages, strings.toolsSubtitle)
+                    ActiveTool.PdfToImages -> Pair(strings.exportImage, strings.toolsSubtitle)
+                    ActiveTool.LockPdf -> Pair(strings.lockPdfTitle, strings.lockPdfDesc)
+                    ActiveTool.UnlockPdf -> Pair(strings.unlockPdfTitle, strings.unlockPdfDesc)
+                    ActiveTool.CloudOcr -> Pair(strings.cloudOcrTitle, strings.cloudOcrDesc)
+                    else -> Pair("", "")
                 }
+                val toolTitle = toolInfo.first
+                val toolSubtitle = toolInfo.second
 
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -3706,7 +3736,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                                 return@Button
                                             }
                                             isProcessing = true
-                                            ocrStatusText = "جاري رفع الملف..."
+                                            ocrStatusText = strings.extractingMetadata
                                             viewModel.convertPdfCloudOcr(
                                                 context = context,
                                                 filePath = selectedSingleFilePath,
@@ -3738,18 +3768,18 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                     .height(52.dp)
                             ) {
                                 val buttonText = when (activeTool) {
-                                    ActiveTool.Merge -> "دمج المستندات"
-                                    ActiveTool.Split -> "تقسيم وحفظ"
-                                    ActiveTool.Compress -> "ابدأ الضغط الآن"
-                                    ActiveTool.Rotate -> "تدوير وحفظ"
-                                    ActiveTool.Reorder -> "إعادة الترتيب وحفظ"
-                                    ActiveTool.DeletePages -> "تأكيد الحذف وحفظ"
-                                    ActiveTool.ImageToPdf -> "إنشاء ملف PDF"
-                                    ActiveTool.PdfToImages -> "تصدير الصور"
-                                    ActiveTool.LockPdf -> "قفل وتشفير الملف"
-                                    ActiveTool.UnlockPdf -> "فك حماية وقفل الملف"
-                                    ActiveTool.CloudOcr -> "تحويل المستند"
-                                    else -> "تأكيد"
+                                    ActiveTool.Merge -> strings.mergePdfTitle
+                                    ActiveTool.Split -> strings.splitPdfTitle
+                                    ActiveTool.Compress -> strings.compressPdfTitle
+                                    ActiveTool.Rotate -> strings.rotatePdfTitle
+                                    ActiveTool.Reorder -> strings.reorderPdfTitle
+                                    ActiveTool.DeletePages -> strings.deletePdfTitle
+                                    ActiveTool.ImageToPdf -> strings.importImages
+                                    ActiveTool.PdfToImages -> strings.exportImage
+                                    ActiveTool.LockPdf -> strings.lockPdfTitle
+                                    ActiveTool.UnlockPdf -> strings.unlockPdfTitle
+                                    ActiveTool.CloudOcr -> strings.cloudOcrTitle
+                                    else -> strings.confirm
                                 }
                                 Text(buttonText, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             }
@@ -3771,13 +3801,15 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
             },
             onShare = { path ->
                 sharePdfFile(context, path)
-            }
+            },
+            appLanguage = uiState.appLanguage
         )
     }
 
     if (showLibraryPickerSheet) {
         LibraryPdfPickerSheet(
             allPdfFiles = uiState.allPdfFiles,
+            appLanguage = uiState.appLanguage,
             onFileSelected = { path, name ->
                 showLibraryPickerSheet = false
                 val cleanName = name.replace(".pdf", "", ignoreCase = true).replace("_", " ")
@@ -3787,23 +3819,23 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                     }
                     ActiveTool.Split -> {
                         selectedSingleFilePath = path
-                        targetFileName = "${cleanName}_مقسم"
+                        targetFileName = "${cleanName}_split"
                     }
                     ActiveTool.Compress -> {
                         selectedSingleFilePath = path
-                        targetFileName = "${cleanName}_مضغوط"
+                        targetFileName = "${cleanName}_compressed"
                     }
                     ActiveTool.Rotate -> {
                         selectedSingleFilePath = path
-                        targetFileName = "${cleanName}_مدور"
+                        targetFileName = "${cleanName}_rotated"
                     }
                     ActiveTool.Reorder -> {
                         selectedSingleFilePath = path
-                        targetFileName = "${cleanName}_مرتب"
+                        targetFileName = "${cleanName}_reordered"
                     }
                     ActiveTool.DeletePages -> {
                         selectedSingleFilePath = path
-                        targetFileName = "${cleanName}_بعد_الحذف"
+                        targetFileName = "${cleanName}_modified"
                     }
                     ActiveTool.PdfToImages -> {
                         selectedSingleFilePath = path
@@ -3811,11 +3843,11 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                     }
                     ActiveTool.LockPdf -> {
                         selectedSingleFilePath = path
-                        targetFileName = "${cleanName}_محمي"
+                        targetFileName = "${cleanName}_protected"
                     }
                     ActiveTool.UnlockPdf -> {
                         selectedSingleFilePath = path
-                        targetFileName = "${cleanName}_مفتوح"
+                        targetFileName = "${cleanName}_unlocked"
                     }
                     ActiveTool.CloudOcr -> {
                         selectedSingleFilePath = path
@@ -3933,6 +3965,7 @@ fun SettingsTabScreen(
 ) {
     val context = LocalContext.current
     var activeSheet by remember { mutableStateOf<SettingSheetType?>(null) }
+    val strings = remember(uiState.appLanguage) { AppStringsProvider.get(uiState.appLanguage) }
 
     // Surface colors for PDF Reader Pro dark aesthetic
     val cardBg = MaterialTheme.colorScheme.surface
@@ -3977,7 +4010,7 @@ fun SettingsTabScreen(
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "تطبيق FinalPDF Pro",
+                            text = "FinalPDF Pro",
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -3998,7 +4031,7 @@ fun SettingsTabScreen(
                     }
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "الإصدار 2.2.0 - محرك قراءة متكامل",
+                        text = "v2.2.0 - FinalPDF Engine",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -4012,7 +4045,7 @@ fun SettingsTabScreen(
         ) {
             // APPEARANCE SECTION
             item {
-                SettingsSectionHeader(title = "تخصيص المظهر (APPEARANCE)", headerColor = headerColor)
+                SettingsSectionHeader(title = strings.appearanceSection, headerColor = headerColor)
             }
             item {
                 Card(
@@ -4026,13 +4059,36 @@ fun SettingsTabScreen(
                         SettingsItemRow(
                             icon = Icons.Default.Brightness4,
                             iconBgColor = Color(0xFF9C27B0),
-                            title = "مظهر التطبيق",
+                            title = strings.appThemeTitle,
                             value = when (uiState.appTheme) {
-                                "dark" -> "الوضع الداكن"
-                                "light" -> "الوضع الفاتح"
-                                else -> "تلقائي (حسب النظام)"
+                                "dark" -> "Dark"
+                                "light" -> "Light"
+                                else -> "Auto (System)"
                             },
                             onClick = { activeSheet = SettingSheetType.APP_THEME }
+                        )
+
+                        Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), thickness = 0.5.dp)
+
+                        // App Language Row
+                        SettingsItemRow(
+                            icon = Icons.Default.Language,
+                            iconBgColor = Color(0xFFE91E63),
+                            title = strings.appLanguageTitle,
+                            value = when (uiState.appLanguage) {
+                                "en" -> "English"
+                                "fr" -> "Français"
+                                "de" -> "Deutsch"
+                                "es" -> "Español"
+                                "tr" -> "Türkçe"
+                                "ru" -> "Русский"
+                                "zh" -> "中文"
+                                "ja" -> "日本語"
+                                "ko" -> "한국어"
+                                "auto" -> "Auto Multi-language"
+                                else -> "العربية - Arabic"
+                            },
+                            onClick = { activeSheet = SettingSheetType.APP_LANGUAGE }
                         )
 
                         Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), thickness = 0.5.dp)
@@ -4041,8 +4097,8 @@ fun SettingsTabScreen(
                         SettingsSwitchRow(
                             icon = Icons.Default.Grid3x3,
                             iconBgColor = Color(0xFF4CAF50),
-                            title = "إظهار تبويب الأدوات",
-                            subtitle = "إظهار أو إخفاء تبويب الأدوات في الشريط السفلي",
+                            title = strings.showToolsTabTitle,
+                            subtitle = strings.showToolsTabSubtitle,
                             checked = uiState.showToolsTab,
                             onCheckedChange = { viewModel.setShowToolsTab(context, it) }
                         )
@@ -4052,7 +4108,7 @@ fun SettingsTabScreen(
 
             // READER & DISPLAY SECTION
             item {
-                SettingsSectionHeader(title = "إعدادات القارئ والشاشة (READER & DISPLAY)", headerColor = headerColor)
+                SettingsSectionHeader(title = strings.readerDisplaySection, headerColor = headerColor)
             }
             item {
                 Card(
@@ -4066,8 +4122,8 @@ fun SettingsTabScreen(
                         SettingsItemRow(
                             icon = Icons.Default.SwapVert,
                             iconBgColor = Color(0xFF2196F3),
-                            title = "اتجاه التمرير",
-                            value = if (uiState.scrollMode == "horizontal") "أفقي (Horizontal)" else "عمودي (Vertical)",
+                            title = strings.scrollDirectionTitle,
+                            value = if (uiState.scrollMode == "horizontal") "Horizontal" else "Vertical",
                             onClick = { activeSheet = SettingSheetType.SCROLL_MODE }
                         )
 
@@ -4077,11 +4133,11 @@ fun SettingsTabScreen(
                         SettingsItemRow(
                             icon = Icons.Default.ZoomIn,
                             iconBgColor = Color(0xFF00BCD4),
-                            title = "مستوى الزووم الافتراضي",
+                            title = strings.defaultZoomTitle,
                             value = when (uiState.defaultZoom) {
-                                "page-fit" -> "ملائمة الصفحة الكاملة (Fit Page)"
-                                "1.0" -> "الحجم الأصلي 100% (Actual Size)"
-                                else -> "ملائمة عرض الشاشة (Fit Width)"
+                                "page-fit" -> "Fit Page"
+                                "1.0" -> "Actual Size (100%)"
+                                else -> "Fit Width"
                             },
                             onClick = { activeSheet = SettingSheetType.DEFAULT_ZOOM }
                         )
@@ -4092,7 +4148,7 @@ fun SettingsTabScreen(
                         SettingsItemRow(
                             icon = Icons.Default.TouchApp,
                             iconBgColor = Color(0xFF009688),
-                            title = "تكبير النقر المزدوج (Double Tap)",
+                            title = strings.doubleTapZoomTitle,
                             value = String.format("%.1fx", uiState.doubleTapZoomFactor),
                             onClick = { activeSheet = SettingSheetType.DOUBLE_TAP_ZOOM }
                         )
@@ -4103,12 +4159,12 @@ fun SettingsTabScreen(
                         SettingsItemRow(
                             icon = Icons.Default.ColorLens,
                             iconBgColor = Color(0xFF3F51B5),
-                            title = "مظهر خلفية القراءة",
+                            title = strings.readingThemeTitle,
                             value = when (uiState.readingTheme) {
-                                "dark" -> "داكن (Dark Gray)"
-                                "black" -> "أسود عميق (AMOLED Black)"
-                                "sepia" -> "دافئ (Sepia)"
-                                else -> "فاتح (Light)"
+                                "dark" -> "Dark Gray"
+                                "black" -> "AMOLED Black"
+                                "sepia" -> "Sepia"
+                                else -> "Light"
                             },
                             onClick = { activeSheet = SettingSheetType.READING_THEME }
                         )
@@ -4119,8 +4175,8 @@ fun SettingsTabScreen(
                         SettingsItemRow(
                             icon = Icons.Default.Brightness6,
                             iconBgColor = Color(0xFFFF9800),
-                            title = "سطوع الشاشة أثناء القراءة",
-                            value = if (uiState.isSystemBrightness) "تلقائي (سطوع النظام)" else "${(uiState.customBrightness * 100).toInt()}%",
+                            title = strings.readerDisplaySection,
+                            value = if (uiState.isSystemBrightness) strings.autoSystem else "${(uiState.customBrightness * 100).toInt()}%",
                             onClick = { activeSheet = SettingSheetType.BRIGHTNESS }
                         )
 
@@ -4130,11 +4186,11 @@ fun SettingsTabScreen(
                         SettingsItemRow(
                             icon = Icons.Default.ScreenRotation,
                             iconBgColor = Color(0xFFE91E63),
-                            title = "اتجاه الشاشة",
+                            title = strings.scrollDirectionTitle,
                             value = when (uiState.screenOrientation) {
-                                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT -> "عمودي (Portrait)"
-                                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE -> "أفقي (Landscape)"
-                                else -> "تلقائي (Auto)"
+                                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT -> strings.portraitMode
+                                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE -> strings.landscapeMode
+                                else -> strings.autoSystem
                             },
                             onClick = { activeSheet = SettingSheetType.SCREEN_ORIENTATION }
                         )
@@ -4145,8 +4201,8 @@ fun SettingsTabScreen(
                         SettingsSwitchRow(
                             icon = Icons.Default.LibraryAddCheck,
                             iconBgColor = Color(0xFFFF5722),
-                            title = "محاذاة التمرير للصفحات (Snap)",
-                            subtitle = "قفل التمرير تلقائياً عند حدود كل صفحة",
+                            title = strings.scrollDirectionTitle,
+                            subtitle = strings.scrollDirectionTitle,
                             checked = uiState.snapToPage,
                             onCheckedChange = { viewModel.setSnapToPage(it) }
                         )
@@ -4156,7 +4212,7 @@ fun SettingsTabScreen(
 
             // APP COLOR THEME CUSTOMIZATION SECTION
             item {
-                SettingsSectionHeader(title = "تخصيص ألوان التطبيق", headerColor = headerColor)
+                SettingsSectionHeader(title = strings.appearanceSection, headerColor = headerColor)
             }
             item {
                 Card(
@@ -4167,7 +4223,7 @@ fun SettingsTabScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "اختر لوناً مخصصاً لألوان التطبيق والشريط السفلي (11 خياراً):",
+                            text = strings.appThemeTitle,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -4229,7 +4285,7 @@ fun SettingsTabScreen(
 
             // GENERAL UTILITIES
             item {
-                SettingsSectionHeader(title = "الدعم والنظام (SYSTEM)", headerColor = headerColor)
+                SettingsSectionHeader(title = "SYSTEM", headerColor = headerColor)
             }
             item {
                 Card(
@@ -4242,11 +4298,11 @@ fun SettingsTabScreen(
                         SettingsItemRow(
                             icon = Icons.Default.DeleteSweep,
                             iconBgColor = Color(0xFF607D8B),
-                            title = "مسح ذاكرة التخزين المؤقت",
-                            value = "تنظيف سجل القراءة والملفات المؤقتة",
+                            title = strings.deleteFile,
+                            value = strings.deleteFileDesc,
                             onClick = {
                                 viewModel.clearHistory()
-                                Toast.makeText(context, "تم تنظيف السجل وذاكرة الكاش بنجاح!", Toast.LENGTH_LONG).show()
+                                Toast.makeText(context, strings.processSuccess, Toast.LENGTH_LONG).show()
                             }
                         )
                     }
@@ -4264,21 +4320,22 @@ fun SettingsTabScreen(
         AppBottomSheet(
             onDismiss = { activeSheet = null },
             title = when (sheet) {
-                SettingSheetType.APP_THEME -> "اختر مظهر التطبيق"
-                SettingSheetType.SCROLL_MODE -> "اتجاه التمرير الافتراضي"
-                SettingSheetType.DEFAULT_ZOOM -> "الزووم الافتراضي عند الفتح"
-                SettingSheetType.DOUBLE_TAP_ZOOM -> "تكبير النقر المزدوج"
-                SettingSheetType.READING_THEME -> "مظهر خلفية صفحة القراءة"
-                SettingSheetType.BRIGHTNESS -> "ضبط سطوع الشاشة"
-                SettingSheetType.SCREEN_ORIENTATION -> "اتجاه دوران الشاشة"
+                SettingSheetType.APP_THEME -> strings.appThemeTitle
+                SettingSheetType.APP_LANGUAGE -> strings.appLanguageTitle
+                SettingSheetType.SCROLL_MODE -> strings.scrollDirectionTitle
+                SettingSheetType.DEFAULT_ZOOM -> strings.defaultZoomTitle
+                SettingSheetType.DOUBLE_TAP_ZOOM -> strings.doubleTapZoomTitle
+                SettingSheetType.READING_THEME -> strings.readingThemeTitle
+                SettingSheetType.BRIGHTNESS -> strings.readerDisplaySection
+                SettingSheetType.SCREEN_ORIENTATION -> strings.scrollDirectionTitle
             }
         ) {
             when (sheet) {
                 SettingSheetType.APP_THEME -> {
                     val themes = listOf(
-                        "system" to "تلقائي (حسب النظام)",
-                        "light" to "الوضع الفاتح (Light Mode)",
-                        "dark" to "الوضع الداكن (Dark Mode)"
+                        "system" to strings.autoSystem,
+                        "light" to strings.themeLight,
+                        "dark" to strings.themeDark
                     )
                     themes.forEach { (key, label) ->
                         SettingRadioOptionRow(
@@ -4292,10 +4349,36 @@ fun SettingsTabScreen(
                     }
                 }
 
+                SettingSheetType.APP_LANGUAGE -> {
+                    val languages = listOf(
+                        "ar" to "العربية (Arabic)",
+                        "auto" to strings.autoSystem,
+                        "en" to "English",
+                        "fr" to "Français (French)",
+                        "de" to "Deutsch (German)",
+                        "es" to "Español (Spanish)",
+                        "tr" to "Türkçe (Turkish)",
+                        "ru" to "Русский (Russian)",
+                        "zh" to "中文 (Chinese)",
+                        "ja" to "日本語 (Japanese)",
+                        "ko" to "한국어 (Korean)"
+                    )
+                    languages.forEach { (key, label) ->
+                        SettingRadioOptionRow(
+                            label = label,
+                            isSelected = uiState.appLanguage == key,
+                            onClick = {
+                                viewModel.setAppLanguage(context, key)
+                                activeSheet = null
+                            }
+                        )
+                    }
+                }
+
                 SettingSheetType.SCROLL_MODE -> {
                     val modes = listOf(
-                        "vertical" to "التمرير العمودي (Vertical)",
-                        "horizontal" to "التمرير الأفقي (Horizontal)"
+                        "vertical" to strings.verticalScroll,
+                        "horizontal" to strings.horizontalScroll
                     )
                     modes.forEach { (key, label) ->
                         SettingRadioOptionRow(
@@ -4311,9 +4394,9 @@ fun SettingsTabScreen(
 
                 SettingSheetType.DEFAULT_ZOOM -> {
                     val zooms = listOf(
-                        "page-width" to "ملائمة عرض الشاشة (Fit Width)",
-                        "page-fit" to "ملائمة الصفحة الكاملة (Fit Page)",
-                        "1.0" to "الحجم الأصلي 100% (Actual Size)"
+                        "page-width" to strings.fitWidth,
+                        "page-fit" to strings.fitPage,
+                        "1.0" to strings.actualSize
                     )
                     zooms.forEach { (key, label) ->
                         SettingRadioOptionRow(
@@ -4330,7 +4413,7 @@ fun SettingsTabScreen(
                 SettingSheetType.DOUBLE_TAP_ZOOM -> {
                     Column(modifier = Modifier.padding(vertical = 8.dp)) {
                         Text(
-                            text = "معامل التكبير عند الضغط المزدوج: ${String.format("%.1fx", uiState.doubleTapZoomFactor)}",
+                            text = "${strings.doubleTapZoomTitle}: ${String.format(Locale.US, "%.1fx", uiState.doubleTapZoomFactor)}",
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -4363,10 +4446,10 @@ fun SettingsTabScreen(
 
                 SettingSheetType.READING_THEME -> {
                     val themes = listOf(
-                        "light" to "فاتح (Light - أبيض)",
-                        "sepia" to "دافئ (Sepia - بني دافئ مريح للعين)",
-                        "dark" to "داكن (Dark - رمادي غامق)",
-                        "black" to "أسود عميق (AMOLED Black - حماية العين والتوفير)"
+                        "light" to strings.themeLight,
+                        "sepia" to strings.themeSepia,
+                        "dark" to strings.themeDark,
+                        "black" to strings.themeAmoled
                     )
                     themes.forEach { (key, label) ->
                         SettingRadioOptionRow(
@@ -4392,7 +4475,7 @@ fun SettingsTabScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "استخدام سطوع النظام التلقائي",
+                                text = strings.useSystemBrightness,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -4405,7 +4488,7 @@ fun SettingsTabScreen(
                         if (!uiState.isSystemBrightness) {
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "مستوى السطوع المخصص: ${(uiState.customBrightness * 100).toInt()}%",
+                                text = "${strings.readerDisplaySection}: ${(uiState.customBrightness * 100).toInt()}%",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -4421,9 +4504,9 @@ fun SettingsTabScreen(
 
                 SettingSheetType.SCREEN_ORIENTATION -> {
                     val orientations = listOf(
-                        ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED to "تلقائي (حسب دوران الجهاز)",
-                        ActivityInfo.SCREEN_ORIENTATION_PORTRAIT to "عمودي ثابت (Portrait)",
-                        ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE to "أفقي ثابت (Landscape)"
+                        ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED to strings.autoSystem,
+                        ActivityInfo.SCREEN_ORIENTATION_PORTRAIT to strings.portraitMode,
+                        ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE to strings.landscapeMode
                     )
                     orientations.forEach { (orientationVal, label) ->
                         SettingRadioOptionRow(
@@ -4705,12 +4788,14 @@ fun CustomBottomBar(
     selectedTab: DashboardTab,
     showTools: Boolean,
     bottomBarColorIndex: Int,
+    appLanguage: String = "ar",
     onTabSelected: (DashboardTab) -> Unit
 ) {
     DashboardAnimatedBottomNavBar(
         selectedTab = selectedTab,
         showTools = showTools,
         bottomBarColorIndex = bottomBarColorIndex,
+        appLanguage = appLanguage,
         onTabSelected = onTabSelected
     )
 }
@@ -4776,8 +4861,9 @@ fun getFileName(context: Context, uri: Uri): String? {
 }
 
 @Composable
-fun StorageStatusCard(storageInfo: StorageInfo) {
+fun StorageStatusCard(storageInfo: StorageInfo, appLanguage: String = "ar") {
     if (storageInfo.totalGb <= 0f) return // Only show if storage statistics could be fetched
+    val strings = remember(appLanguage) { AppStringsProvider.get(appLanguage) }
     
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -4799,20 +4885,20 @@ fun StorageStatusCard(storageInfo: StorageInfo) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.Storage,
-                        contentDescription = "مساحة التخزين",
+                        contentDescription = strings.internalStorage,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "مساحة تخزين الهاتف",
+                        text = strings.internalStorage,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 Text(
-                    text = "${String.format(Locale.US, "%.1f", storageInfo.usedGb)} جيجابايت مستخدمة من ${String.format(Locale.US, "%.0f", storageInfo.totalGb)} جيجابايت",
+                    text = "${String.format(Locale.US, "%.1f GB / %.0f GB", storageInfo.usedGb, storageInfo.totalGb)}",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -4838,12 +4924,12 @@ fun StorageStatusCard(storageInfo: StorageInfo) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "مستعملة: ${storageInfo.usedPercentage}%",
+                    text = "${storageInfo.usedPercentage}%",
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "المساحة الحرة: ${String.format(Locale.US, "%.1f", storageInfo.availableGb)} جيجابايت",
+                    text = "${String.format(Locale.US, "%.1f GB", storageInfo.availableGb)}",
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
@@ -4867,8 +4953,10 @@ fun FileActionSheet(
     onRename: () -> Unit,
     onFileInfo: () -> Unit,
     onDelete: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    appLanguage: String = "ar"
 ) {
+    val strings = remember(appLanguage) { AppStringsProvider.get(appLanguage) }
     val pageCount = remember(file.filePath) { getPdfPageCount(file.filePath) }
     
     AppBottomSheet(
@@ -4892,7 +4980,7 @@ fun FileActionSheet(
                             overflow = TextOverflow.Ellipsis
                         )
                         Spacer(modifier = Modifier.height(4.dp))
-                        val pageText = if (pageCount > 0) "pages $pageCount • " else ""
+                        val pageText = if (pageCount > 0) "${strings.fileCountFormat(pageCount)} • " else ""
                         Text(
                             text = "$pageText${file.fileSize}",
                             fontSize = 12.sp,
@@ -4924,7 +5012,7 @@ fun FileActionSheet(
                 
                 // Section Title
                 Text(
-                    text = "Quick Actions",
+                    text = strings.quickActions,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.Gray,
@@ -4935,8 +5023,8 @@ fun FileActionSheet(
                 
                 // Action: Add to Favorites / Save to your favorites for quick access
                 ActionRowItem(
-                    title = if (isFavorite) "إزالة من المفضلة" else "إضافة إلى المفضلة",
-                    desc = if (isFavorite) "Remove from your favorite files" else "Save to your favorites for quick access",
+                    title = if (isFavorite) strings.removeFromFav else strings.addToFav,
+                    desc = if (isFavorite) strings.removeFromFavDesc else strings.addToFavDesc,
                     icon = Icons.Default.Star,
                     iconTint = Color(0xFFFFB300),
                     bgTint = Color(0xFFFFB300).copy(alpha = 0.1f),
@@ -4948,8 +5036,8 @@ fun FileActionSheet(
                 
                 // Action: Select (Enter multi-selection mode)
                 ActionRowItem(
-                    title = "تحديد الملف",
-                    desc = "Enter multi-selection mode for this file",
+                    title = strings.selectFile,
+                    desc = strings.selectFileDesc,
                     icon = Icons.Default.CheckCircle,
                     iconTint = Color(0xFF1E88E5),
                     bgTint = Color(0xFF1E88E5).copy(alpha = 0.1f),
@@ -4961,8 +5049,8 @@ fun FileActionSheet(
                 
                 // Action: Share
                 ActionRowItem(
-                    title = "مشاركة الملف",
-                    desc = "Send this PDF to other apps",
+                    title = strings.shareFile,
+                    desc = strings.shareFileDesc,
                     icon = Icons.Default.Share,
                     iconTint = Color(0xFF43A047),
                     bgTint = Color(0xFF43A047).copy(alpha = 0.1f),
@@ -4974,8 +5062,8 @@ fun FileActionSheet(
                 
                 // Action: Rename
                 ActionRowItem(
-                    title = "إعادة تسمية",
-                    desc = "Change the file name",
+                    title = strings.renameFile,
+                    desc = strings.renameFileDesc,
                     icon = Icons.Default.Edit,
                     iconTint = Color(0xFF8E24AA),
                     bgTint = Color(0xFF8E24AA).copy(alpha = 0.1f),
@@ -4987,8 +5075,8 @@ fun FileActionSheet(
                 
                 // Action: File Info
                 ActionRowItem(
-                    title = "معلومات الملف",
-                    desc = "View file details and properties",
+                    title = strings.fileInfo,
+                    desc = strings.fileInfoDesc,
                     icon = Icons.Default.Info,
                     iconTint = Color(0xFF00ACC1),
                     bgTint = Color(0xFF00ACC1).copy(alpha = 0.1f),
@@ -5000,10 +5088,10 @@ fun FileActionSheet(
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                // Action: Delete (Dangerous Action styled beautifully as a red banner button just like the screenshot!)
+                // Action: Delete
                 DeleteActionBanner(
-                    title = "حذف الملف",
-                    desc = "Permanently remove this file",
+                    title = strings.deleteFile,
+                    desc = strings.deleteFileDesc,
                     icon = Icons.Default.Delete,
                     onClick = {
                         onDelete()
@@ -5164,8 +5252,10 @@ fun ToolFilePickerCard(
     selectedFilePath: String,
     allPdfFiles: List<LocalPdfFile>,
     onFileSelected: (filePath: String, fileName: String) -> Unit,
-    onOpenSafPicker: () -> Unit
+    onOpenSafPicker: () -> Unit,
+    appLanguage: String = "ar"
 ) {
+    val strings = remember(appLanguage) { AppStringsProvider.get(appLanguage) }
     var showLibraryPicker by remember { mutableStateOf(false) }
     val selectedFile = allPdfFiles.find { it.filePath == selectedFilePath }
     val displayName = if (selectedFile != null) selectedFile.fileName else if (selectedFilePath.isNotEmpty()) File(selectedFilePath).name else null
@@ -5213,7 +5303,7 @@ fun ToolFilePickerCard(
                                 )
                             } else {
                                 Text(
-                                    text = "ملف من النظام (SAF)",
+                                    text = strings.selectFile,
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -5224,7 +5314,7 @@ fun ToolFilePickerCard(
                 Spacer(modifier = Modifier.height(10.dp))
             } else {
                 Text(
-                    text = "لم يتم اختيار ملف بعد. اختر ملفاً عبر منتقي ملفات النظام (SAF) أو من المكتبة.",
+                    text = strings.noPdfSelected,
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -5247,7 +5337,7 @@ fun ToolFilePickerCard(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("منتقي ملفات النظام (SAF)", fontSize = 11.sp, maxLines = 1)
+                    Text(strings.selectFile, fontSize = 11.sp, maxLines = 1)
                 }
 
                 OutlinedButton(
@@ -5261,7 +5351,7 @@ fun ToolFilePickerCard(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("من المكتبة (${allPdfFiles.size})", fontSize = 11.sp, maxLines = 1)
+                    Text("${strings.selectFromLibrary} (${allPdfFiles.size})", fontSize = 11.sp, maxLines = 1)
                 }
             }
 
@@ -5269,11 +5359,11 @@ fun ToolFilePickerCard(
                 Spacer(modifier = Modifier.height(12.dp))
                 Divider(color = Color.Gray.copy(alpha = 0.2f))
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("اختر ملفاً من مكتبة التطبيق:", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color.Gray)
+                Text(strings.selectFromLibrary, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = Color.Gray)
                 Spacer(modifier = Modifier.height(6.dp))
                 
                 if (allPdfFiles.isEmpty()) {
-                    Text("لا توجد ملفات PDF متوفرة حالياً في المكتبة.", fontSize = 12.sp, color = Color.Gray)
+                    Text(strings.noPdfFound, fontSize = 12.sp, color = Color.Gray)
                 } else {
                     Column(
                         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -5355,8 +5445,10 @@ fun ToolResultDialog(
     filePath: String,
     onDismiss: () -> Unit,
     onView: (filePath: String, fileName: String) -> Unit,
-    onShare: (filePath: String) -> Unit
+    onShare: (filePath: String) -> Unit,
+    appLanguage: String = "ar"
 ) {
+    val strings = remember(appLanguage) { AppStringsProvider.get(appLanguage) }
     val file = remember(filePath) { File(filePath) }
     val fileName = file.name
     val fileSizeStr = remember(file) {
@@ -5426,7 +5518,7 @@ fun ToolResultDialog(
                 Spacer(modifier = Modifier.height(14.dp))
 
                 Text(
-                    text = "تم إنجاز العملية بنجاح!",
+                    text = strings.processSuccess,
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp
@@ -5438,7 +5530,7 @@ fun ToolResultDialog(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "تم حفظ الملف في مجلد FinalPDF بنجاح",
+                    text = strings.fileSavedInFinalPDF,
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
@@ -5520,7 +5612,7 @@ fun ToolResultDialog(
                             Spacer(modifier = Modifier.height(4.dp))
 
                             Text(
-                                text = "$fileSizeStr • $pageCount صفحة",
+                                text = "$fileSizeStr • $pageCount ${strings.pagesTab}",
                                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -5548,7 +5640,7 @@ fun ToolResultDialog(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("عرض", fontWeight = FontWeight.Bold)
+                        Text(strings.openDocument, fontWeight = FontWeight.Bold)
                     }
 
                     OutlinedButton(
@@ -5565,7 +5657,7 @@ fun ToolResultDialog(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            "مشاركة",
+                            strings.share,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -5578,7 +5670,7 @@ fun ToolResultDialog(
                     onClick = onDismiss,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("إغلاق", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(strings.closeButton, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -5723,9 +5815,11 @@ fun PdfDetailOverlaySheet(
     file: LocalPdfFile,
     onDismiss: () -> Unit,
     onOpenPdf: (LocalPdfFile) -> Unit,
-    onSharePdf: (LocalPdfFile) -> Unit
+    onSharePdf: (LocalPdfFile) -> Unit,
+    appLanguage: String = "ar"
 ) {
     val context = LocalContext.current
+    val strings = remember(appLanguage) { AppStringsProvider.get(appLanguage) }
     var metadata by remember { mutableStateOf<PdfMetadata?>(null) }
     var thumbnailBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var isLoading by remember { mutableStateOf(true) }
@@ -5792,7 +5886,7 @@ fun PdfDetailOverlaySheet(
                         if (thumbnailBitmap != null) {
                             Image(
                                 bitmap = thumbnailBitmap!!.asImageBitmap(),
-                                contentDescription = "معاينة المستند",
+                                contentDescription = null,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
                             )
@@ -5823,7 +5917,7 @@ fun PdfDetailOverlaySheet(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            val pagesText = metadata?.let { if (it.pageCount > 0) "${it.pageCount} صفحة" else "PDF" } ?: "جاري..."
+                            val pagesText = metadata?.let { if (it.pageCount > 0) strings.fileCountFormat(it.pageCount) else "PDF" } ?: "..."
                             DetailBadge(text = pagesText, icon = Icons.Default.MenuBook, color = MaterialTheme.colorScheme.primary)
                             metadata?.let {
                                 DetailBadge(text = it.fileSize, icon = Icons.Default.Storage, color = Color(0xFF00B0FF))
@@ -5843,7 +5937,7 @@ fun PdfDetailOverlaySheet(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                         Spacer(modifier = Modifier.height(12.dp))
-                        Text("جاري استخراج بيانات المستند والميتاداتا...", fontSize = 13.sp, color = Color.Gray)
+                        Text(strings.extractingMetadata, fontSize = 13.sp, color = Color.Gray)
                     }
                 }
             } else {
@@ -5855,14 +5949,14 @@ fun PdfDetailOverlaySheet(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     SpecChip(
-                        title = "الإصدار",
+                        title = strings.pdfVersion,
                         value = meta.pdfVersion,
                         icon = Icons.Outlined.Badge,
                         modifier = Modifier.weight(1f)
                     )
                     SpecChip(
-                        title = "التشفير",
-                        value = if (meta.isEncrypted) "محمي بكلمة مرور" else "غير محمي",
+                        title = strings.encryption,
+                        value = if (meta.isEncrypted) strings.encrypted else strings.notEncrypted,
                         icon = if (meta.isEncrypted) Icons.Outlined.Lock else Icons.Outlined.LockOpen,
                         color = if (meta.isEncrypted) Color(0xFFE53935) else Color(0xFF43A047),
                         modifier = Modifier.weight(1f)
@@ -5870,40 +5964,40 @@ fun PdfDetailOverlaySheet(
                 }
 
                 // Metadata Cards
-                DetailCardSection(title = "تفاصيل المؤلف والمستند", icon = Icons.Outlined.Person) {
-                    DetailMetaRow(label = "المؤلف / الكاتب", value = meta.author, icon = Icons.Outlined.Person)
+                DetailCardSection(title = strings.authorSection, icon = Icons.Outlined.Person) {
+                    DetailMetaRow(label = strings.authorLabel, value = meta.author, icon = Icons.Outlined.Person)
                     if (!meta.title.isNullOrBlank()) {
-                        DetailMetaRow(label = "عنوان المستند", value = meta.title, icon = Icons.Outlined.Title)
+                        DetailMetaRow(label = strings.documentTitleLabel, value = meta.title, icon = Icons.Outlined.Title)
                     }
                     if (!meta.subject.isNullOrBlank()) {
-                        DetailMetaRow(label = "الموضوع", value = meta.subject, icon = Icons.Outlined.Subject)
+                        DetailMetaRow(label = strings.subjectLabel, value = meta.subject, icon = Icons.Outlined.Subject)
                     }
                     if (!meta.keywords.isNullOrBlank()) {
-                        DetailMetaRow(label = "الكلمات المفتاحية", value = meta.keywords, icon = Icons.Outlined.Tag)
+                        DetailMetaRow(label = strings.keywordsLabel, value = meta.keywords, icon = Icons.Outlined.Tag)
                     }
                 }
 
-                DetailCardSection(title = "التواريخ والوقت", icon = Icons.Outlined.CalendarToday) {
-                    DetailMetaRow(label = "تاريخ الإنشاء", value = meta.creationDate, icon = Icons.Outlined.CalendarMonth)
-                    DetailMetaRow(label = "تاريخ آخر تعديل", value = meta.modificationDate, icon = Icons.Outlined.Update)
+                DetailCardSection(title = strings.datesSection, icon = Icons.Outlined.CalendarToday) {
+                    DetailMetaRow(label = strings.creationDate, value = meta.creationDate, icon = Icons.Outlined.CalendarMonth)
+                    DetailMetaRow(label = strings.modificationDate, value = meta.modificationDate, icon = Icons.Outlined.Update)
                 }
 
                 if (!meta.creator.isNullOrBlank() && meta.creator != "غير محدد" || !meta.producer.isNullOrBlank() && meta.producer != "غير محدد") {
-                    DetailCardSection(title = "البرنامج المنشئ والمحرك", icon = Icons.Outlined.Devices) {
+                    DetailCardSection(title = strings.creatorAppSection, icon = Icons.Outlined.Devices) {
                         if (!meta.creator.isNullOrBlank() && meta.creator != "غير محدد") {
-                            DetailMetaRow(label = "البرنامج المنشئ", value = meta.creator!!, icon = Icons.Outlined.Laptop)
+                            DetailMetaRow(label = strings.creatorLabel, value = meta.creator!!, icon = Icons.Outlined.Laptop)
                         }
                         if (!meta.producer.isNullOrBlank() && meta.producer != "غير محدد") {
-                            DetailMetaRow(label = "محرك التصدير", value = meta.producer!!, icon = Icons.Outlined.Build)
+                            DetailMetaRow(label = strings.producerLabel, value = meta.producer!!, icon = Icons.Outlined.Build)
                         }
                     }
                 }
 
-                DetailCardSection(title = "موقع الملف والتخزين", icon = Icons.Outlined.Folder) {
-                    DetailMetaRow(label = "اسم المجلد", value = meta.folderName, icon = Icons.Outlined.FolderOpen)
+                DetailCardSection(title = strings.storageLocationSection, icon = Icons.Outlined.Folder) {
+                    DetailMetaRow(label = strings.folderName, value = meta.folderName, icon = Icons.Outlined.FolderOpen)
 
                     Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                        Text("المسار الكامل:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                        Text(strings.fullPath, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
                         Spacer(modifier = Modifier.height(2.dp))
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -5926,11 +6020,11 @@ fun PdfDetailOverlaySheet(
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                                     val clip = android.content.ClipData.newPlainText("PDF Path", meta.filePath)
                                     clipboard.setPrimaryClip(clip)
-                                    Toast.makeText(context, "تم نسخ مسار الملف", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, strings.pathCopied, Toast.LENGTH_SHORT).show()
                                 },
                                 modifier = Modifier.size(32.dp)
                             ) {
-                                Icon(Icons.Outlined.ContentCopy, contentDescription = "نسخ", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Outlined.ContentCopy, contentDescription = strings.copyPath, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                             }
                         }
                     }
@@ -5954,7 +6048,7 @@ fun PdfDetailOverlaySheet(
                     ) {
                         Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("فتح المستند", fontWeight = FontWeight.Bold)
+                        Text(strings.openDocument, fontWeight = FontWeight.Bold)
                     }
 
                     OutlinedButton(
@@ -5966,7 +6060,7 @@ fun PdfDetailOverlaySheet(
                     ) {
                         Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("مشاركة")
+                        Text(strings.share)
                     }
                 }
             }
