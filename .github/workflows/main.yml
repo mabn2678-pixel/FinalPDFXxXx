@@ -49,14 +49,18 @@ jobs:
     - name: Clean previous build
       run: ./gradlew clean
 
-    # تم تعديل هذه الخطوة لعمل Release وقراءة كلمات السر
+    # هذه هي الخطوة السحرية: ستنشئ مفتاح التوقيع تلقائياً وقت البناء
+    - name: Generate Release Keystore
+      run: keytool -genkey -v -keystore my-upload-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload -storepass android -keypass android -dname "CN=Release"
+
+    # هنا نمرر كلمات السر بشكل مباشر دون الحاجة لإعدادات GitHub
     - name: Build Release APK
       env:
-        STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
-        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        STORE_PASSWORD: "android"
+        KEY_PASSWORD: "android"
+        KEYSTORE_PATH: "my-upload-key.jks"
       run: ./gradlew assembleRelease
 
-    # تم تعديل مسار رفع التطبيق النهائي
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
