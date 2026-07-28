@@ -29,6 +29,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -186,6 +187,19 @@ fun ViewerScreen(
             isPageIndicatorVisible = true
             delay(2000)
             isPageIndicatorVisible = false
+        }
+    }
+
+    var isZoomBadgeVisible by remember { mutableStateOf(false) }
+    var lastZoomScale by remember { mutableFloatStateOf(state.currentScale) }
+
+    // Show floating gesture zoom indicator badge when zoom scale changes
+    LaunchedEffect(state.currentScale) {
+        if (kotlin.math.abs(state.currentScale - lastZoomScale) > 0.005f) {
+            lastZoomScale = state.currentScale
+            isZoomBadgeVisible = true
+            delay(1500)
+            isZoomBadgeVisible = false
         }
     }
 
@@ -556,6 +570,70 @@ fun ViewerScreen(
                             state = state,
                             onDismiss = { viewModel.closeAddStickyNoteDialog() }
                         )
+                    }
+
+                    // FLOATING GESTURE ZOOM INDICATOR BADGE OVERLAY
+                    AnimatedVisibility(
+                        visible = isZoomBadgeVisible,
+                        enter = fadeIn() + scaleIn(),
+                        exit = fadeOut() + scaleOut(),
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 80.dp)
+                            .zIndex(10f)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.95f),
+                            shadowElevation = 8.dp,
+                            tonalElevation = 4.dp,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ZoomIn,
+                                    contentDescription = "مقياس الزووم",
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "${(state.currentScale * 100).roundToInt()}%",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
+
+                    // FLOATING PAGE NUMBER INDICATOR OVERLAY
+                    AnimatedVisibility(
+                        visible = isPageIndicatorVisible,
+                        enter = fadeIn() + slideInVertically(initialOffsetY = { -it / 2 }),
+                        exit = fadeOut() + slideOutVertically(targetOffsetY = { -it / 2 }),
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 32.dp)
+                            .zIndex(9f)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
+                            shadowElevation = 4.dp,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                        ) {
+                            Text(
+                                text = "صفحة ${state.currentPage} من ${state.totalPages}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                            )
+                        }
                     }
                 }
             } else {
@@ -2245,7 +2323,7 @@ fun PdfWebView(
 
                                             window.doubleTapZoomFactor = ${state.doubleTapZoomFactor};
                                             window.defaultScale = null;
-                                            window.setScale = function(scale) {
+                                            window.setScale = function(scale, anchorX, anchorY) {
                                                 try {
                                                     if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
                                                         var pdfViewer = PDFViewerApplication.pdfViewer;
@@ -2256,21 +2334,42 @@ fun PdfWebView(
                                                         var maxScale = 5.0;
                                                         if (scale < minScale) scale = minScale;
                                                         if (scale > maxScale) scale = maxScale;
+
+                                                        var container = document.getElementById('viewerContainer');
+                                                        var oldScale = pdfViewer.currentScale || 1.0;
+                                                        if (Math.abs(oldScale - scale) < 0.001) return;
+
+                                                        var oldScrollTop = container ? container.scrollTop : 0;
+                                                        var oldScrollLeft = container ? container.scrollLeft : 0;
+
+                                                        var cx = (anchorX !== undefined && anchorX !== null) ? anchorX : (container ? container.clientWidth / 2 : 0);
+                                                        var cy = (anchorY !== undefined && anchorY !== null) ? anchorY : (container ? container.clientHeight / 2 : 0);
+
                                                         pdfViewer.currentScale = scale;
+
+                                                        if (container && oldScale > 0) {
+                                                            var ratio = scale / oldScale;
+                                                            container.scrollTop = (oldScrollTop + cy) * ratio - cy;
+                                                            container.scrollLeft = (oldScrollLeft + cx) * ratio - cx;
+                                                        }
                                                     }
                                                 } catch (e) {
                                                     console.error("Error in setScale JS: " + e);
                                                 }
                                             };
 
+                                            var lastWidth = window.innerWidth;
                                             var lastOrientation = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
                                             window.addEventListener('resize', function() {
+                                                var curWidth = window.innerWidth;
                                                 var curOrientation = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
                                                 if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
                                                     if (curOrientation !== lastOrientation) {
                                                         lastOrientation = curOrientation;
+                                                        lastWidth = curWidth;
                                                         PDFViewerApplication.pdfViewer.currentScaleValue = 'page-width';
-                                                    } else {
+                                                    } else if (Math.abs(curWidth - lastWidth) > 30) {
+                                                        lastWidth = curWidth;
                                                         PDFViewerApplication.pdfViewer.update();
                                                     }
                                                 }
@@ -2312,7 +2411,9 @@ fun PdfWebView(
                                                     }
                                                     newScale = Math.min(Math.max(newScale, minScale), 5.0);
                                                     lastPinchScale = newScale;
-                                                    window.setScale(newScale);
+                                                    var curCenterX = (t1.clientX + t2.clientX) / 2;
+                                                    var curCenterY = (t1.clientY + t2.clientY) / 2;
+                                                    window.setScale(newScale, curCenterX, curCenterY);
                                                     if (window.AndroidBridge && window.AndroidBridge.onScaleChanged) {
                                                         window.AndroidBridge.onScaleChanged(newScale);
                                                     }
