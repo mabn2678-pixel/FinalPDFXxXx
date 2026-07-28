@@ -1286,9 +1286,11 @@ fun PdfThumbnail(
     val cachedBitmap = remember(filePath) { ThumbnailMemoryCache.getBitmap(filePath) }
     var thumbnailBitmap by remember(filePath) { mutableStateOf<Bitmap?>(cachedBitmap) }
     
+    val thumbnailDispatcher = remember { Dispatchers.IO.limitedParallelism(2) }
+
     LaunchedEffect(filePath) {
         if (thumbnailBitmap == null) {
-            withContext(Dispatchers.IO) {
+            withContext(thumbnailDispatcher) {
                 val bitmap = getPdfThumbnailBitmap(context, filePath)
                 if (bitmap != null) {
                     withContext(Dispatchers.Main) {
@@ -1433,6 +1435,8 @@ fun formatReadingTime(totalSeconds: Long): String {
     }
 }
 
+private val dateFormat = SimpleDateFormat("yyyy/MM/dd", Locale.getDefault())
+
 fun formatLastOpened(timestamp: Long): String {
     val diff = System.currentTimeMillis() - timestamp
     val seconds = diff / 1000
@@ -1445,9 +1449,8 @@ fun formatLastOpened(timestamp: Long): String {
         minutes < 60 -> "منذ $minutes دقيقة"
         hours < 24 -> "منذ $hours ساعة"
         days < 7 -> "منذ $days يوم"
-        else -> {
-            val sdf = SimpleDateFormat("yyyy/MM/dd", Locale.getDefault())
-            sdf.format(Date(timestamp))
+        else -> synchronized(dateFormat) {
+            dateFormat.format(Date(timestamp))
         }
     }
 }
