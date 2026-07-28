@@ -2353,7 +2353,7 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                             pageBitmap.compress(Bitmap.CompressFormat.JPEG, 85, baos)
                             val base64Image = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
 
-                            val prompt = "أنت نظام OCR متقدم. استخرج جميع النصوص والكلمات من صفحة الكتاب هذه بالكامل (عربي/ألماني/إنجليزي/رموز). أرجع النتيجة فقط بتنسيق JSON بالشكل: {\"lines\": [{\"text\": \"النص\", \"box\": [ymin, xmin, ymax, xmax]}]} بدون كلام إضافي أو markdown. أعداد ymin, xmin, ymax, xmax بين 0 و 1000."
+                            val prompt = "أنت نظام OCR متقدم عالمي يدعم كل اللغات بلا استثناء (اللغة العربية الأساسية وكل لغات العالم الأخرى). استخرج جميع النصوص والكلمات من صفحة الكتاب هذه بالكامل بأي لغة كانت مع أقصى دقة للغة العربية. أرجع النتيجة فقط بتنسيق JSON بالشكل: {\"lines\": [{\"text\": \"النص\", \"box\": [ymin, xmin, ymax, xmax]}]} بدون كلام إضافي أو markdown. أعداد ymin, xmin, ymax, xmax بين 0 و 1000."
 
                             val jsonPayload = org.json.JSONObject().apply {
                                 put("contents", org.json.JSONArray().put(

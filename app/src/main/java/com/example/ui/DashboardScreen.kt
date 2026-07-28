@@ -3307,11 +3307,35 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                             Spacer(modifier = Modifier.height(14.dp))
                                             Text("لغة التعرف الضوئي (OCR):", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
                                             Spacer(modifier = Modifier.height(6.dp))
-                                            Row(
+                                            LazyRow(
                                                 modifier = Modifier.fillMaxWidth(),
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                                             ) {
-                                                listOf("ara" to "العربية", "eng" to "الإنجليزي", "deu" to "الألماني").forEach { (code, name) ->
+                                                val globalLangs = listOf(
+                                                    "ara" to "العربية (الرئيسية)",
+                                                    "auto" to "كشف تلقائي (كل اللغات)",
+                                                    "eng" to "English (إنجليزية)",
+                                                    "fra" to "Français (فرنسية)",
+                                                    "deu" to "Deutsch (ألمانية)",
+                                                    "spa" to "Español (إسبانية)",
+                                                    "ita" to "Italiano (إيطالية)",
+                                                    "tur" to "Türkçe (تركية)",
+                                                    "rus" to "Русский (روسية)",
+                                                    "zho" to "中文 (صينية)",
+                                                    "jpn" to "日本語 (يابانية)",
+                                                    "kor" to "한국어 (كورية)",
+                                                    "hin" to "हिन्दी (هندية)",
+                                                    "fas" to "فارسی (فارسية)",
+                                                    "urd" to "اردو (أوردية)",
+                                                    "por" to "Português (برتغالية)",
+                                                    "ind" to "Bahasa (إندونيسية)",
+                                                    "nld" to "Nederlands (هولندية)",
+                                                    "pol" to "Polski (بولندية)",
+                                                    "swe" to "Svenska (سويدية)",
+                                                    "ell" to "Ελληνικά (يونانية)",
+                                                    "heb" to "עברית (عبرية)"
+                                                )
+                                                items(globalLangs) { (code, name) ->
                                                     val isSelected = ocrLanguage == code
                                                     FilterChip(
                                                         selected = isSelected,
@@ -3319,8 +3343,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                                                         label = { Text(name, fontSize = 12.sp) },
                                                         leadingIcon = if (isSelected) {
                                                             { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                                                        } else null,
-                                                        modifier = Modifier.weight(1f)
+                                                        } else null
                                                     )
                                                 }
                                             }
