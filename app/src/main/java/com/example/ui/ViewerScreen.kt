@@ -353,10 +353,12 @@ fun ViewerScreen(
         }
     }
 
-    // Dynamic scale initialization on load
+    // Reset scale to 1f on load or file change
     LaunchedEffect(state.currentPdfPath) {
-        state.currentPdfPath?.let { path ->
-            viewModel.loadBookmarks(context, path)
+        if (state.currentPdfPath != null) {
+            viewModel.setScale(1.0f)
+            zoomAnimatable.snapTo(1.0f)
+            viewModel.loadBookmarks(context, state.currentPdfPath!!)
         }
     }
 
@@ -477,12 +479,11 @@ fun ViewerScreen(
 
     LaunchedEffect(state.currentScale) {
         if (kotlin.math.abs(zoomAnimatable.value - state.currentScale) > 0.005f) {
-            zoomAnimatable.animateTo(
-                targetValue = state.currentScale,
-                animationSpec = springZoomSpec
-            ) {
-                webViewRef?.evaluateJavascript("window.setScale(${this.value})", null)
-            }
+            zoomAnimatable.snapTo(state.currentScale)
+            webViewRef?.evaluateJavascript(
+                "window.isProgrammaticScale = true; window.setScale(${state.currentScale}); setTimeout(function() { window.isProgrammaticScale = false; }, 250);",
+                null
+            )
         }
     }
 
@@ -1357,6 +1358,28 @@ fun PdfWebView(
     }
 
     val filePathCallbackRef = remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
+    var createdWebViewRef by remember { mutableStateOf<WebView?>(null) }
+
+    DisposableEffect(pdfPath) {
+        onDispose {
+            if (state.currentPage > 0) {
+                viewModel.updatePage(state.currentPage, state.totalPages)
+            }
+            createdWebViewRef?.let { webView ->
+                try {
+                    webView.stopLoading()
+                    webView.loadUrl("about:blank")
+                    webView.clearHistory()
+                    webView.removeAllViews()
+                    webView.destroy()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            createdWebViewRef = null
+        }
+    }
+
     val fileChooserLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -1417,6 +1440,7 @@ fun PdfWebView(
                     return false
                 }
             }.apply {
+                createdWebViewRef = this
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
@@ -1434,6 +1458,7 @@ fun PdfWebView(
                     loadWithOverviewMode = true
                     builtInZoomControls = false
                     displayZoomControls = false
+                    setSupportZoom(false)
                     cacheMode = WebSettings.LOAD_NO_CACHE
                 }
 
@@ -2359,7 +2384,7 @@ fun PdfWebView(
                                                 var dist = Math.hypot(x - lastTapX, y - lastTapY);
 
                                                 if (timeDiff > 0 && timeDiff < 300 && dist < 35) {
-                                                    // Double tap detected: Toggle zoom between normal fit and 2x
+                                                    // Double tap detected: simple logic (if scale > 1, set to 1f, else set to 2.5f)
                                                     if (singleTapTimer) {
                                                         clearTimeout(singleTapTimer);
                                                         singleTapTimer = null;
@@ -2368,26 +2393,13 @@ fun PdfWebView(
 
                                                     if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
                                                         var pdfViewer = PDFViewerApplication.pdfViewer;
-                                                        if (!window.defaultScale && pdfViewer.currentScale) {
-                                                            window.defaultScale = pdfViewer.currentScale;
-                                                        }
-                                                        var baseScale = window.defaultScale || pdfViewer.currentScale || 1.0;
-                                                        var curScale = pdfViewer.currentScale || baseScale;
-                                                        var factor = window.doubleTapZoomFactor || ${state.doubleTapZoomFactor};
+                                                        var curScale = pdfViewer.currentScale || 1.0;
+                                                        var targetScale = (curScale > 1.05) ? 1.0 : 2.5;
 
-                                                        if (curScale > baseScale * 1.15) {
-                                                            if (window.AndroidBridge && window.AndroidBridge.animateZoomTo) {
-                                                                window.AndroidBridge.animateZoomTo(baseScale);
-                                                            } else {
-                                                                pdfViewer.currentScaleValue = 'page-width';
-                                                            }
+                                                        if (window.AndroidBridge && window.AndroidBridge.animateZoomTo) {
+                                                            window.AndroidBridge.animateZoomTo(targetScale);
                                                         } else {
-                                                            var targetScale = baseScale * factor;
-                                                            if (window.AndroidBridge && window.AndroidBridge.animateZoomTo) {
-                                                                window.AndroidBridge.animateZoomTo(targetScale);
-                                                            } else {
-                                                                window.setScale(targetScale);
-                                                            }
+                                                            window.setScale(targetScale);
                                                         }
                                                     }
 
