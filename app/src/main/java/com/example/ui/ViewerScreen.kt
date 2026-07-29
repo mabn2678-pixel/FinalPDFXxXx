@@ -1552,6 +1552,9 @@ fun PdfWebView(
                         onBrowsingStateChanged(isBrowsing)
                         if (isBrowsing) return
 
+                        val hideToolbarScript = "javascript:(function() { document.head.insertAdjacentHTML('beforeend', '<style>#toolbarContainer { display: none !important; } #viewerContainer { top: 0 !important; }</style>'); })();"
+                        view?.evaluateJavascript(hideToolbarScript, null)
+
                         // Script to establish bridge listeners, remove PDF.js toolbar, and sync state
                         val setupScript = """
                             (function() {
@@ -2394,7 +2397,22 @@ fun PdfWebView(
                                                     if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
                                                         var pdfViewer = PDFViewerApplication.pdfViewer;
                                                         var curScale = pdfViewer.currentScale || 1.0;
-                                                        var targetScale = (curScale > 1.05) ? 1.0 : 2.5;
+                                                        if (!window.baseFitScale && curScale) {
+                                                            window.baseFitScale = curScale;
+                                                        }
+                                                        var fitScale = window.baseFitScale || 1.0;
+                                                        var multiplier = window.doubleTapZoomFactor || ${state.doubleTapZoomFactor} || 2.0;
+
+                                                        var targetScale;
+                                                        if (curScale > fitScale * 1.15) {
+                                                            // Zoom Out back to Fit to Screen
+                                                            targetScale = fitScale;
+                                                        } else {
+                                                            // Zoom In relative to current scale: newScale = currentScale * multiplier
+                                                            targetScale = curScale * multiplier;
+                                                        }
+
+                                                        targetScale = Math.min(Math.max(targetScale, 0.25), 5.0);
 
                                                         if (window.AndroidBridge && window.AndroidBridge.animateZoomTo) {
                                                             window.AndroidBridge.animateZoomTo(targetScale);
@@ -2887,7 +2905,7 @@ fun PdfWebView(
                 // Encode file URL properly
                 val encodedFileUrl = Uri.encode("file://$pdfPath")
                 val currentPage = state.currentPage
-                val viewerUrl = "file:///android_asset/pdfjs/web/viewer.html?file=$encodedFileUrl#page=$currentPage&zoom=${state.defaultZoom}&scrollMode=${if (state.snapToPage) 3 else if (state.scrollMode == "horizontal") 1 else 0}"
+                val viewerUrl = "file:///android_asset/pdfjs/web/viewer.html?file=$encodedFileUrl#toolbar=0&page=$currentPage&zoom=${state.defaultZoom}&scrollMode=${if (state.snapToPage) 3 else if (state.scrollMode == "horizontal") 1 else 0}"
                 loadUrl(viewerUrl)
                 onWebViewCreated(this)
             }
