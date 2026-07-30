@@ -315,6 +315,7 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
     fun selectPdf(filePath: String, fileName: String) {
         viewModelScope.launch {
             // Find if already exists, then insert or update
+            val now = System.currentTimeMillis()
             val existing = recentPdfDao.getPdfByPath(filePath)
             val pdf = RecentPdf(
                 id = existing?.id ?: 0,
@@ -322,7 +323,7 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 fileName = fileName,
                 lastPage = existing?.lastPage ?: 1,
                 totalPages = existing?.totalPages ?: 0,
-                lastOpened = System.currentTimeMillis()
+                lastOpenedTime = now
             )
             recentPdfDao.insertOrUpdate(pdf)
 
@@ -366,11 +367,12 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
         }
         viewModelScope.launch {
             _uiState.value.currentPdfPath?.let { path ->
-                recentPdfDao.updateLastPage(path, page)
+                val now = System.currentTimeMillis()
+                recentPdfDao.updateLastPage(path, page, now)
                 // Also update the total pages in the database if it was 0
                 val existing = recentPdfDao.getPdfByPath(path)
                 if (existing != null && existing.totalPages != total) {
-                    recentPdfDao.insertOrUpdate(existing.copy(totalPages = total))
+                    recentPdfDao.insertOrUpdate(existing.copy(totalPages = total, lastOpenedTime = now))
                 }
             }
         }
@@ -1253,8 +1255,8 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                     MediaStore.Files.FileColumns.SIZE,
                     MediaStore.Files.FileColumns.DATE_MODIFIED
                 )
-                val selection = "${MediaStore.Files.FileColumns.MIME_TYPE} = ? OR ${MediaStore.Files.FileColumns.DATA} LIKE ?"
-                val selectionArgs = arrayOf("application/pdf", "%.pdf")
+                val selection = "(${MediaStore.Files.FileColumns.MIME_TYPE} = ? OR ${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE ? OR ${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE ? OR ${MediaStore.Files.FileColumns.DATA} LIKE ? OR ${MediaStore.Files.FileColumns.DATA} LIKE ?)"
+                val selectionArgs = arrayOf("application/pdf", "%.pdf", "%.PDF", "%.pdf", "%.PDF")
                 val sortOrder = "${MediaStore.Files.FileColumns.DATE_MODIFIED} DESC"
                 
                 try {
@@ -1318,7 +1320,12 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                     File("/sdcard/Download"),
                     File("/sdcard/Documents"),
                     File("/sdcard/WhatsApp/Media/WhatsApp Documents"),
-                    File("/sdcard/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Documents")
+                    File("/sdcard/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Documents"),
+                    File("/sdcard/WhatsApp Business/Media/WhatsApp Business Documents"),
+                    File("/sdcard/Android/media/com.whatsapp.w4b/WhatsApp Business/Media/WhatsApp Business Documents"),
+                    File("/sdcard/Android/media/com.whatsapp.w4b/WhatsApp Business/Media/WhatsApp Business Documents/Sent"),
+                    File("/sdcard/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Documents/Sent"),
+                    File("/sdcard/Telegram/Telegram Documents")
                 )
                 
                 for (dir in publicDirs) {
@@ -1407,7 +1414,7 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
 
     fun copyUriToCache(context: Context, uri: Uri, originalName: String): String? {
         return try {
-            val safeName = originalName.replace(Regex("[^a-zA-Z0-9._-]"), "_")
+            val safeName = originalName.replace(Regex("[\\\\/:*?\"<>|]"), "_")
             val tempFile = File(context.cacheDir, safeName)
             context.contentResolver.openInputStream(uri)?.use { input ->
                 tempFile.outputStream().use { output ->

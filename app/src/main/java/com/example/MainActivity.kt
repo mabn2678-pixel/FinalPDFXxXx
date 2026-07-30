@@ -10,6 +10,10 @@ import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -100,49 +104,82 @@ class MainActivity : ComponentActivity() {
       ?: if (intent.clipData != null && intent.clipData!!.itemCount > 0) intent.clipData!!.getItemAt(0).uri else null
 
     if (targetUri != null) {
-      try {
-        val contentResolver = contentResolver
-        var fileName = "opened_file"
-        
-        // Try to query display name
-        contentResolver.query(targetUri, null, null, null, null)?.use { cursor ->
-          val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-          if (nameIndex != -1 && cursor.moveToFirst()) {
-            val name = cursor.getString(nameIndex)
-            if (!name.isNullOrEmpty()) {
-              fileName = name
-            }
-          }
-        }
-        
-        if (fileName == "opened_file") {
-          targetUri.lastPathSegment?.let { segment ->
-            val clean = segment.substringAfterLast("/")
-            if (clean.isNotEmpty()) {
-              fileName = clean
-            }
-          }
-        }
-        
-        if (!fileName.endsWith(".pdf", ignoreCase = true)) {
-          fileName = "$fileName.pdf"
-        }
+      lifecycleScope.launch(Dispatchers.IO) {
+        try {
+          val contentResolver = contentResolver
+          var rawName = ""
 
-        val cleanBaseName = fileName.replace(".pdf", "", ignoreCase = true)
-        val safeFileName = "open_${System.currentTimeMillis()}_${fileName}"
-        val cacheFile = File(cacheDir, safeFileName)
-        contentResolver.openInputStream(targetUri)?.use { inputStream ->
-          FileOutputStream(cacheFile).use { outputStream ->
-            inputStream.copyTo(outputStream)
+          // Try to query display name
+          contentResolver.query(targetUri, null, null, null, null)?.use { cursor ->
+            val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+            if (nameIndex != -1 && cursor.moveToFirst()) {
+              val name = cursor.getString(nameIndex)
+              if (!name.isNullOrEmpty()) {
+                rawName = name
+              }
+            }
           }
+
+          if (rawName.isEmpty()) {
+            targetUri.lastPathSegment?.let { segment ->
+              val clean = segment.substringAfterLast("/")
+              if (clean.isNotEmpty()) {
+                rawName = clean
+              }
+            }
+          }
+
+          if (rawName.isEmpty()) {
+            rawName = "imported_document.pdf"
+          }
+
+          if (!rawName.endsWith(".pdf", ignoreCase = true)) {
+            rawName = "$rawName.pdf"
+          }
+
+          val cleanDisplayName = rawName.replace(".pdf", "", ignoreCase = true).replace("_", " ")
+
+          // 1. Check direct file URI scheme
+          if (targetUri.scheme == "file") {
+            val directPath = targetUri.path
+            if (directPath != null && File(directPath).exists()) {
+              withContext(Dispatchers.Main) {
+                viewModel.selectPdf(directPath, cleanDisplayName)
+              }
+              return@launch
+            }
+          }
+
+          // 2. Query Room DB to check if file was previously imported or scanned
+          val database = PdfDatabase.getDatabase(applicationContext)
+          val existingPdf = database.recentPdfDao().getPdfByName(cleanDisplayName)
+            ?: database.recentPdfDao().getPdfByName(rawName)
+
+          if (existingPdf != null && File(existingPdf.filePath).exists()) {
+            withContext(Dispatchers.Main) {
+              viewModel.selectPdf(existingPdf.filePath, existingPdf.fileName)
+            }
+            return@launch
+          }
+
+          // 3. Save to cache using clean filename without timestamp prefixes
+          val sanitizedFileName = rawName.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+          val cacheFile = File(cacheDir, sanitizedFileName)
+
+          contentResolver.openInputStream(targetUri)?.use { inputStream ->
+            FileOutputStream(cacheFile).use { outputStream ->
+              inputStream.copyTo(outputStream)
+            }
+          }
+
+          if (cacheFile.exists() && cacheFile.length() > 0) {
+            withContext(Dispatchers.Main) {
+              viewModel.selectPdf(cacheFile.absolutePath, cleanDisplayName)
+            }
+          }
+        } catch (e: Exception) {
+          e.printStackTrace()
         }
-        
-        if (cacheFile.exists() && cacheFile.length() > 0) {
-          val displayName = cleanBaseName.replace("_", " ")
-          viewModel.selectPdf(cacheFile.absolutePath, displayName)
-        }
-      } catch (e: Exception) {
-        e.printStackTrace()
       }
     }
   }

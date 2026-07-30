@@ -2,6 +2,7 @@ package com.example.data
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import androidx.room.Ignore
 
 @Entity(tableName = "recent_pdfs")
 data class RecentPdf(
@@ -10,5 +11,9 @@ data class RecentPdf(
     val fileName: String,
     val lastPage: Int = 1,
     val totalPages: Int = 0,
-    val lastOpened: Long = System.currentTimeMillis()
-)
+    val lastOpenedTime: Long = 0L
+) {
+    @get:Ignore
+    val lastOpened: Long
+        get() = lastOpenedTime
+}

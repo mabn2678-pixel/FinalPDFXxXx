@@ -450,8 +450,29 @@ fun HomeTabScreen(
             FileFilter.All -> list
             FileFilter.Favorites -> list.filter { it.isFavorite }
             FileFilter.Recent -> {
-                val recentPaths = recentPdfs.map { it.filePath }.toSet()
-                list.filter { recentPaths.contains(it.filePath) }
+                val recentMap = recentPdfs.associateBy { it.filePath }
+                val existingPaths = list.map { it.filePath }.toSet()
+                val additionalRecentFiles = recentPdfs.filter { 
+                    !existingPaths.contains(it.filePath) && File(it.filePath).exists() 
+                }.map { recent ->
+                    val file = File(recent.filePath)
+                    val rawSize = file.length()
+                    val sizeStr = when {
+                        rawSize > 1024 * 1024 -> String.format(Locale.US, "%.1f MB", rawSize / (1024f * 1024f))
+                        rawSize > 1024 -> "${rawSize / 1024} KB"
+                        else -> "$rawSize B"
+                    }
+                    LocalPdfFile(
+                        filePath = recent.filePath,
+                        fileName = recent.fileName,
+                        fileSize = sizeStr,
+                        folderName = file.parentFile?.name ?: "Documents",
+                        lastModified = file.lastModified(),
+                        isFavorite = uiState.starredPdfs.contains(recent.filePath)
+                    )
+                }
+                val combined = (list.filter { recentMap.containsKey(it.filePath) } + additionalRecentFiles)
+                combined.sortedByDescending { recentMap[it.filePath]?.lastOpenedTime ?: 0L }
             }
         }
 
