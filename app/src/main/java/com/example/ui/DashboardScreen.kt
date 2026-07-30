@@ -90,28 +90,25 @@ fun DashboardScreen(
     val uiState by viewModel.uiState.collectAsState()
     val recentPdfs by viewModel.recentPdfs.collectAsState(initial = emptyList())
 
-    var selectedFilePaths by remember { mutableStateOf(emptySet<String>()) }
+    val selectedFilePaths = uiState.selectedFiles
+    val isInSelectionMode = uiState.isSelectionMode
+    val onToggleSelectFile = { filePath: String -> viewModel.toggleSelection(filePath) }
+
     var showFileActionsSheet by remember { mutableStateOf<LocalPdfFile?>(null) }
     var fileToRename by remember { mutableStateOf<LocalPdfFile?>(null) }
     var fileToDelete by remember { mutableStateOf<LocalPdfFile?>(null) }
     var fileToViewInfo by remember { mutableStateOf<LocalPdfFile?>(null) }
     var showMultiDeleteConfirm by remember { mutableStateOf(false) }
-
-    val onToggleSelectFile = { filePath: String ->
-        if (selectedFilePaths.contains(filePath)) {
-            selectedFilePaths = selectedFilePaths - filePath
-        } else {
-            selectedFilePaths = selectedFilePaths + filePath
-        }
-    }
+    var showMergeDialog by remember { mutableStateOf(false) }
+    var mergeTargetName by remember { mutableStateOf("دمج_المستندات") }
+    var isMergingPdfs by remember { mutableStateOf(false) }
 
     var showExitConfirmSheet by remember { mutableStateOf(false) }
 
     // Back handler to return to the Home/Main tab, clear selection, or show exit confirmation sheet
-    val isInSelectionMode = selectedFilePaths.isNotEmpty()
     BackHandler(enabled = true) {
         if (isInSelectionMode) {
-            selectedFilePaths = emptySet()
+            viewModel.clearSelection()
         } else if (uiState.selectedTab != DashboardTab.Home) {
             viewModel.setTab(DashboardTab.Home)
         } else {
@@ -173,12 +170,31 @@ fun DashboardScreen(
                 enter = slideInVertically(initialOffsetY = { it }, animationSpec = tween(280)) + fadeIn(animationSpec = tween(200)),
                 exit = slideOutVertically(targetOffsetY = { it }, animationSpec = tween(280)) + fadeOut(animationSpec = tween(200))
             ) {
-                CustomBottomBar(
-                    selectedTab = uiState.selectedTab,
-                    showTools = uiState.showToolsTab,
-                    bottomBarColorIndex = uiState.bottomBarColorIndex,
-                    onTabSelected = { viewModel.setTab(it) }
-                )
+                if (isInSelectionMode) {
+                    ContextualSelectionBottomBar(
+                        selectedCount = selectedFilePaths.size,
+                        totalFilesCount = uiState.allPdfFiles.size,
+                        onClearSelection = { viewModel.clearSelection() },
+                        onSelectAll = {
+                            val allPaths = uiState.allPdfFiles.map { it.filePath }
+                            if (selectedFilePaths.size == allPaths.size && allPaths.isNotEmpty()) {
+                                viewModel.clearSelection()
+                            } else {
+                                viewModel.selectAll(allPaths)
+                            }
+                        },
+                        onDelete = { showMultiDeleteConfirm = true },
+                        onShare = { shareMultiplePdfs(context, selectedFilePaths.toList()) },
+                        onMerge = { showMergeDialog = true }
+                    )
+                } else {
+                    CustomBottomBar(
+                        selectedTab = uiState.selectedTab,
+                        showTools = uiState.showToolsTab,
+                        bottomBarColorIndex = uiState.bottomBarColorIndex,
+                        onTabSelected = { viewModel.setTab(it) }
+                    )
+                }
             }
         },
         floatingActionButton = {
@@ -225,7 +241,7 @@ fun DashboardScreen(
                     onToggleSelectFile = onToggleSelectFile,
                     onShowFileActions = { showFileActionsSheet = it },
                     onShowFileDetails = { fileToViewInfo = it },
-                    onClearSelection = { selectedFilePaths = emptySet() },
+                    onClearSelection = { viewModel.clearSelection() },
                     onShareMultiple = { shareMultiplePdfs(context, selectedFilePaths.toList()) },
                     onDeleteMultiple = { showMultiDeleteConfirm = true }
                 )
@@ -255,7 +271,7 @@ fun DashboardScreen(
             file = file,
             isFavorite = file.isFavorite,
             onToggleFav = { viewModel.toggleFavorite(context, file.filePath) },
-            onSelect = { selectedFilePaths = selectedFilePaths + file.filePath },
+            onSelect = { viewModel.toggleSelection(file.filePath) },
             onShare = { sharePdf(context, file.filePath, file.fileName) },
             onRename = { fileToRename = file },
             onFileInfo = { fileToViewInfo = file },
@@ -365,7 +381,7 @@ fun DashboardScreen(
                             filePaths = selectedFilePaths.toList(),
                             onSuccess = {
                                 Toast.makeText(context, "تم حذف الملفات بنجاح", Toast.LENGTH_SHORT).show()
-                                selectedFilePaths = emptySet()
+                                viewModel.clearSelection()
                                 showMultiDeleteConfirm = false
                             },
                             onError = { error ->
@@ -379,6 +395,70 @@ fun DashboardScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showMultiDeleteConfirm = false }) {
+                    Text("إلغاء")
+                }
+            }
+        )
+    }
+
+    // Multi-File Merge Dialog
+    if (showMergeDialog && selectedFilePaths.size >= 2) {
+        AlertDialog(
+            onDismissRequest = { if (!isMergingPdfs) showMergeDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.MergeType, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("دمج ${selectedFilePaths.size} ملفات PDF", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("أدخل اسم المستند المدمج الجديد:")
+                    OutlinedTextField(
+                        value = mergeTargetName,
+                        onValueChange = { mergeTargetName = it },
+                        label = { Text("اسم الملف") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    enabled = mergeTargetName.trim().isNotEmpty() && !isMergingPdfs,
+                    onClick = {
+                        isMergingPdfs = true
+                        viewModel.mergePdfs(
+                            context = context,
+                            filePaths = selectedFilePaths.toList(),
+                            targetName = mergeTargetName.trim(),
+                            onSuccess = { newPath ->
+                                isMergingPdfs = false
+                                showMergeDialog = false
+                                viewModel.clearSelection()
+                                viewModel.scanFiles(context)
+                                Toast.makeText(context, "تم دمج الملفات بنجاح!", Toast.LENGTH_SHORT).show()
+                            },
+                            onError = { error ->
+                                isMergingPdfs = false
+                                Toast.makeText(context, "خطأ أثناء الدمج: $error", Toast.LENGTH_LONG).show()
+                            }
+                        )
+                    }
+                ) {
+                    if (isMergingPdfs) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                    } else {
+                        Text("دمج الآن")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !isMergingPdfs,
+                    onClick = { showMergeDialog = false }
+                ) {
                     Text("إلغاء")
                 }
             }
@@ -440,6 +520,15 @@ fun HomeTabScreen(
     val filteredFiles = remember(uiState.allPdfFiles, uiState.dashboardSearchQuery, uiState.selectedFilter, uiState.sortOption, recentPdfs) {
         var list = uiState.allPdfFiles
         
+        val recentPathMap = recentPdfs.associateBy { it.filePath }
+        val recentNameMap = recentPdfs.associateBy { it.fileName }
+
+        fun getLastOpenedTime(file: LocalPdfFile): Long {
+            return recentPathMap[file.filePath]?.lastOpenedTime
+                ?: recentNameMap[file.fileName]?.lastOpenedTime
+                ?: 0L
+        }
+
         // Apply search query
         if (uiState.dashboardSearchQuery.isNotEmpty()) {
             list = list.filter { it.fileName.contains(uiState.dashboardSearchQuery, ignoreCase = true) }
@@ -450,7 +539,6 @@ fun HomeTabScreen(
             FileFilter.All -> list
             FileFilter.Favorites -> list.filter { it.isFavorite }
             FileFilter.Recent -> {
-                val recentMap = recentPdfs.associateBy { it.filePath }
                 val existingPaths = list.map { it.filePath }.toSet()
                 val additionalRecentFiles = recentPdfs.filter { 
                     !existingPaths.contains(it.filePath) && File(it.filePath).exists() 
@@ -471,8 +559,9 @@ fun HomeTabScreen(
                         isFavorite = uiState.starredPdfs.contains(recent.filePath)
                     )
                 }
-                val combined = (list.filter { recentMap.containsKey(it.filePath) } + additionalRecentFiles)
-                combined.sortedByDescending { recentMap[it.filePath]?.lastOpenedTime ?: 0L }
+                val combined = (list.filter { recentPathMap.containsKey(it.filePath) || recentNameMap.containsKey(it.fileName) } + additionalRecentFiles)
+                    .distinctBy { "${it.fileName}_${it.fileSize}" }
+                combined.sortedByDescending { getLastOpenedTime(it) }
             }
         }
 
@@ -490,12 +579,20 @@ fun HomeTabScreen(
 
         // Apply sorting
         when (uiState.sortOption) {
-            SortOption.ALPHA_ASC -> list.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.fileName })
+            SortOption.ALPHA_ASC -> {
+                if (uiState.selectedFilter == FileFilter.Recent) {
+                    list.sortedByDescending { getLastOpenedTime(it) }
+                } else {
+                    list.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.fileName })
+                }
+            }
             SortOption.ALPHA_DESC -> list.sortedWith(compareByDescending(String.CASE_INSENSITIVE_ORDER) { it.fileName })
             SortOption.SIZE_ASC -> list.sortedBy { getSizeBytes(it.fileSize) }
             SortOption.SIZE_DESC -> list.sortedByDescending { getSizeBytes(it.fileSize) }
             SortOption.DATE_ASC -> list.sortedBy { it.lastModified }
             SortOption.DATE_DESC -> list.sortedByDescending { it.lastModified }
+            SortOption.OPEN_DATE_DESC -> list.sortedByDescending { getLastOpenedTime(it) }
+            SortOption.OPEN_DATE_ASC -> list.sortedBy { getLastOpenedTime(it) }
         }
     }
 
@@ -787,11 +884,7 @@ fun HomeTabScreen(
                                 }
                             },
                             onLongClick = {
-                                if (isInSelectionMode) {
-                                    onToggleSelectFile(file.filePath)
-                                } else {
-                                    onShowFileDetails(file)
-                                }
+                                onToggleSelectFile(file.filePath)
                             },
                             onMenuClick = {
                                 onShowFileActions(file)
@@ -833,11 +926,7 @@ fun HomeTabScreen(
                                 }
                             },
                             onLongClick = {
-                                if (isInSelectionMode) {
-                                    onToggleSelectFile(file.filePath)
-                                } else {
-                                    onShowFileDetails(file)
-                                }
+                                onToggleSelectFile(file.filePath)
                             },
                             onMenuClick = {
                                 onShowFileActions(file)
@@ -1589,6 +1678,34 @@ fun SortFilesSheet(
                     modifier = Modifier.weight(1f)
                 )
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Category 4: Last Opened Date
+            Text(
+                text = "تاريخ الفتح",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                SortChip(
+                    label = "الأحدث فتحاً  ↓",
+                    selected = sortOption == SortOption.OPEN_DATE_DESC,
+                    onClick = { onSortSelected(SortOption.OPEN_DATE_DESC); onDismiss() },
+                    modifier = Modifier.weight(1f)
+                )
+                SortChip(
+                    label = "الأقدم فتحاً  ↑",
+                    selected = sortOption == SortOption.OPEN_DATE_ASC,
+                    onClick = { onSortSelected(SortOption.OPEN_DATE_ASC); onDismiss() },
+                    modifier = Modifier.weight(1f)
+                )
+            }
     }
 }
 
@@ -2136,11 +2253,7 @@ fun FoldersTabScreen(
                                     }
                                 },
                                 onLongClick = {
-                                    if (isInSelectionMode) {
-                                        onToggleSelectFile(file.filePath)
-                                    } else {
-                                        onShowFileDetails(file)
-                                    }
+                                    onToggleSelectFile(file.filePath)
                                 },
                                 onMenuClick = {
                                     onShowFileActions(file)
@@ -2178,11 +2291,7 @@ fun FoldersTabScreen(
                                     }
                                 },
                                 onLongClick = {
-                                    if (isInSelectionMode) {
-                                        onToggleSelectFile(file.filePath)
-                                    } else {
-                                        onShowFileDetails(file)
-                                    }
+                                    onToggleSelectFile(file.filePath)
                                 },
                                 onMenuClick = {
                                     onShowFileActions(file)
@@ -4692,6 +4801,161 @@ fun HomeSmileIcon(
                 cap = StrokeCap.Round
             )
         )
+    }
+}
+
+@Composable
+fun ContextualSelectionBottomBar(
+    selectedCount: Int,
+    totalFilesCount: Int,
+    onClearSelection: () -> Unit,
+    onSelectAll: () -> Unit,
+    onDelete: () -> Unit,
+    onShare: () -> Unit,
+    onMerge: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        color = MaterialTheme.colorScheme.surfaceColorAtElevation(6.dp),
+        tonalElevation = 8.dp,
+        shadowElevation = 8.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            // Top Row: Selected Count + Cancel X + Select All button
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    IconButton(
+                        onClick = onClearSelection,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .testTag("clear_selection_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "إلغاء التحديد",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Text(
+                        text = "تم تحديد $selectedCount",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                TextButton(
+                    onClick = onSelectAll,
+                    modifier = Modifier.testTag("select_all_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SelectAll,
+                        contentDescription = "تحديد الكل",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (selectedCount == totalFilesCount && totalFilesCount > 0) "إلغاء الكل" else "تحديد الكل",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Action Buttons Row: Share | Merge | Delete
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Share Action
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clickable(enabled = selectedCount > 0, onClick = onShare)
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .testTag("action_share_selected")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = "مشاركة",
+                        tint = if (selectedCount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "مشاركة",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (selectedCount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    )
+                }
+
+                // Merge Action (Enabled when selectedCount >= 2)
+                val canMerge = selectedCount >= 2
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clickable(enabled = canMerge, onClick = onMerge)
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .testTag("action_merge_selected")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MergeType,
+                        contentDescription = "دمج",
+                        tint = if (canMerge) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "دمج",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (canMerge) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    )
+                }
+
+                // Delete Action
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .clickable(enabled = selectedCount > 0, onClick = onDelete)
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .testTag("action_delete_selected")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "حذف",
+                        tint = if (selectedCount > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "حذف",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (selectedCount > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    )
+                }
+            }
+        }
     }
 }
 

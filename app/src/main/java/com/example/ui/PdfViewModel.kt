@@ -74,7 +74,9 @@ enum class SortOption {
     SIZE_ASC, // Smallest -> Largest
     SIZE_DESC, // Largest -> Smallest
     DATE_ASC, // Oldest -> Newest
-    DATE_DESC // Newest -> Oldest
+    DATE_DESC, // Newest -> Oldest
+    OPEN_DATE_DESC, // Recently opened -> Least recently
+    OPEN_DATE_ASC // Least recently -> Recently opened
 }
 
 data class LocalPdfFile(
@@ -126,6 +128,8 @@ data class PdfUiState(
     val sortOption: SortOption = SortOption.ALPHA_ASC,
     val totalReadingTimeSeconds: Long = 0L,
     val starredPdfs: Set<String> = emptySet(),
+    val selectedFiles: Set<String> = emptySet(),
+    val isSelectionMode: Boolean = false,
     val allPdfFiles: List<LocalPdfFile> = emptyList(),
     val showToolsTab: Boolean = true,
     val storageInfo: StorageInfo = StorageInfo(),
@@ -185,6 +189,36 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
         val prefs = context.getSharedPreferences("pdf_reader_prefs", Context.MODE_PRIVATE)
         prefs.edit().putString("sort_option", option.name).apply()
         _uiState.update { it.copy(sortOption = option) }
+    }
+
+    fun toggleSelection(filePath: String) {
+        _uiState.update { state ->
+            val current = state.selectedFiles
+            val updated = if (current.contains(filePath)) current - filePath else current + filePath
+            val inMode = updated.isNotEmpty()
+            state.copy(
+                selectedFiles = updated,
+                isSelectionMode = inMode
+            )
+        }
+    }
+
+    fun clearSelection() {
+        _uiState.update { state ->
+            state.copy(
+                selectedFiles = emptySet(),
+                isSelectionMode = false
+            )
+        }
+    }
+
+    fun selectAll(paths: List<String>) {
+        _uiState.update { state ->
+            state.copy(
+                selectedFiles = paths.toSet(),
+                isSelectionMode = paths.isNotEmpty()
+            )
+        }
     }
 
     fun loadReadingTime(context: Context) {
@@ -1398,7 +1432,7 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 val isAssetsFolder = (lowerFolder == "assets" || lowerFolder == "ملفات تجريبية") && !file.filePath.contains("14")
                 
                 !isSampleOrTest && !isAssetsFolder
-            }.distinctBy { it.filePath }
+            }.distinctBy { "${it.fileName}_${it.fileSize}" }
             
             _uiState.update { 
                 it.copy(
