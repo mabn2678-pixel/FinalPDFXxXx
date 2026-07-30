@@ -1232,6 +1232,20 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
 
     fun scanFiles(context: Context) {
         viewModelScope.launch {
+            // One-time data wipe on version upgrade to clear duplicates and stale cache
+            val prefs = context.getSharedPreferences("pdf_reader_prefs", Context.MODE_PRIVATE)
+            if (!prefs.getBoolean("v3_data_wiped_v2", false)) {
+                try {
+                    recentPdfDao.clearHistory()
+                    context.cacheDir.listFiles { _, name -> name.endsWith(".pdf", ignoreCase = true) }?.forEach {
+                        try { it.delete() } catch (_: Exception) {}
+                    }
+                    prefs.edit().putBoolean("v3_data_wiped_v2", true).apply()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
             val storage = getStorageInfo()
             val filesList = mutableListOf<LocalPdfFile>()
             
@@ -1267,39 +1281,43 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                         val dateIndex = cursor.getColumnIndex(MediaStore.Files.FileColumns.DATE_MODIFIED)
                         
                         while (cursor.moveToNext()) {
-                            if (dataIndex != -1) {
-                                val path = cursor.getString(dataIndex)
-                                if (path != null) {
-                                    val file = File(path)
-                                    if (file.exists()) {
-                                        val name = if (nameIndex != -1) cursor.getString(nameIndex) else file.name
-                                        val rawSize = if (sizeIndex != -1) cursor.getLong(sizeIndex) else file.length()
-                                        val lastMod = if (dateIndex != -1) cursor.getLong(dateIndex) * 1000 else file.lastModified()
-                                        
-                                        val sizeStr = when {
-                                            rawSize > 1024 * 1024 -> String.format(Locale.US, "%.1f MB", rawSize / (1024f * 1024f))
-                                            rawSize > 1024 -> "${rawSize / 1024} KB"
-                                            else -> "$rawSize B"
-                                        }
-                                        
-                                        val parentName = file.parentFile?.name ?: "Documents"
-                                        val isFav = _uiState.value.starredPdfs.contains(path)
-                                        
-                                        val isAlreadyAdded = filesList.any { it.filePath == path }
-                                        if (!isAlreadyAdded) {
-                                            filesList.add(
-                                                LocalPdfFile(
-                                                    filePath = path,
-                                                    fileName = name.replace(".pdf", "", ignoreCase = true).replace("_", " "),
-                                                    fileSize = sizeStr,
-                                                    folderName = parentName,
-                                                    lastModified = lastMod,
-                                                    isFavorite = isFav
+                            try {
+                                if (dataIndex != -1) {
+                                    val path = cursor.getString(dataIndex)
+                                    if (path != null) {
+                                        val file = File(path)
+                                        if (file.exists()) {
+                                            val name = if (nameIndex != -1) cursor.getString(nameIndex) else file.name
+                                            val rawSize = if (sizeIndex != -1) cursor.getLong(sizeIndex) else file.length()
+                                            val lastMod = if (dateIndex != -1) cursor.getLong(dateIndex) * 1000 else file.lastModified()
+                                            
+                                            val sizeStr = when {
+                                                rawSize > 1024 * 1024 -> String.format(Locale.US, "%.1f MB", rawSize / (1024f * 1024f))
+                                                rawSize > 1024 -> "${rawSize / 1024} KB"
+                                                else -> "$rawSize B"
+                                            }
+                                            
+                                            val parentName = file.parentFile?.name ?: "Documents"
+                                            val isFav = _uiState.value.starredPdfs.contains(path)
+                                            
+                                            val isAlreadyAdded = filesList.any { it.filePath == path }
+                                            if (!isAlreadyAdded) {
+                                                filesList.add(
+                                                    LocalPdfFile(
+                                                        filePath = path,
+                                                        fileName = name.replace(".pdf", "", ignoreCase = true).replace("_", " "),
+                                                        fileSize = sizeStr,
+                                                        folderName = parentName,
+                                                        lastModified = lastMod,
+                                                        isFavorite = isFav
+                                                    )
                                                 )
-                                            )
+                                            }
                                         }
                                     }
                                 }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
                             }
                         }
                     }
@@ -1353,22 +1371,6 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                             else -> "$size B"
                         }
                         
-                        val isPrebuilt = file.name in listOf(
-                            "Hören_&_Sprechen_A2.pdf",
-                            "Netzwerk_Neu_A2_Übungsbuch.pdf",
-                            "NWn_A2_Glossar_Arabisch.pdf",
-                            "B1_Wortschatz.pdf",
-                            "CamScanner_2025-11-09.pdf"
-                        )
-                        if (isPrebuilt) {
-                            try {
-                                file.delete()
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
-                            return@forEach
-                        }
-                        
                         filesList.add(
                             LocalPdfFile(
                                 filePath = file.absolutePath,
@@ -1394,13 +1396,8 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 val isSampleOrTest = (lowerName.contains("sample") || lowerName.contains("test") ||
                         lowerName.contains("تجريبي") || lowerName.contains("تجريبية")) && !file.filePath.contains("14")
                 val isAssetsFolder = (lowerFolder == "assets" || lowerFolder == "ملفات تجريبية") && !file.filePath.contains("14")
-                val isPrebuilt = file.filePath.contains("Hören_&_Sprechen_A2") ||
-                        file.filePath.contains("Netzwerk_Neu_A2") ||
-                        file.filePath.contains("NWn_A2_Glossar") ||
-                        file.filePath.contains("B1_Wortschatz") ||
-                        file.filePath.contains("CamScanner_2025")
                 
-                !isSampleOrTest && !isAssetsFolder && !isPrebuilt
+                !isSampleOrTest && !isAssetsFolder
             }.distinctBy { it.filePath }
             
             _uiState.update { 
