@@ -29,6 +29,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -75,6 +76,7 @@ import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -761,14 +763,13 @@ fun ViewerScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp)
                     .widthIn(max = 480.dp)
             ) {
-                Box(
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 54.dp, max = 72.dp)
-                        .clip(RoundedCornerShape(percent = 50))
-                        .background(Color(0xF2ECE6F8))
-                        .border(BorderStroke(1.dp, Color(0x407C5CFF)), RoundedCornerShape(percent = 50)),
-                    contentAlignment = Alignment.Center
+                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(24.dp)),
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f)
                 ) {
                     Box(
                         modifier = Modifier
@@ -842,7 +843,7 @@ fun ViewerScreen(
                                     modifier = Modifier
                                         .weight(1f)
                                         .padding(horizontal = 8.dp),
-                                    color = Color(0xFF1C182B),
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     textAlign = TextAlign.Center
                                 )
 
@@ -899,14 +900,14 @@ fun ViewerScreen(
                         .fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                        // Sleek circular-dock style Bottom bar with 6 beautifully labeled items
-                        Box(
+                        // Sleek floating pill style Bottom bar with 6 beautifully labeled items
+                        Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("native_bottom_bar")
-                                .clip(RoundedCornerShape(28.dp))
-                                .background(Color(0xF2ECE6F8))
-                                .border(BorderStroke(1.dp, Color(0x407C5CFF)), RoundedCornerShape(28.dp))
+                                .shadow(elevation = 8.dp, shape = RoundedCornerShape(24.dp)),
+                            shape = RoundedCornerShape(24.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.95f)
                         ) {
                             Row(
                                 modifier = Modifier
@@ -963,6 +964,25 @@ fun ViewerScreen(
                         }
                 }
             }
+
+            // FLOATING AUTO SCROLL OVERLAY PIP
+            AutoScrollOverlay(
+                isVisible = state.isAutoScrolling,
+                isPaused = false,
+                currentSpeed = state.autoScrollSpeed,
+                onTogglePause = {
+                    if (state.isAutoScrolling) {
+                        viewModel.stopAutoScroll()
+                    } else {
+                        viewModel.startAutoScroll(state.autoScrollSpeed)
+                    }
+                },
+                onStop = { viewModel.stopAutoScroll() },
+                onSpeedChange = { viewModel.startAutoScroll(it) },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+            )
 
             // ADAPTIVE SHEETS MANAGER (SIDE SHEET FOR LANDSCAPE, BOTTOM SHEET FOR PORTRAIT)
             val configuration = LocalConfiguration.current
@@ -4114,158 +4134,247 @@ fun BookmarksSheet(
 }
 
 @Composable
+fun AutoScrollOverlay(
+    isVisible: Boolean,
+    isPaused: Boolean,
+    currentSpeed: Int,
+    onTogglePause: () -> Unit,
+    onStop: () -> Unit,
+    onSpeedChange: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    AnimatedVisibility(
+        visible = isVisible,
+        enter = slideInVertically(
+            initialOffsetY = { it },
+            animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+        ) + fadeIn(),
+        exit = slideOutVertically(
+            targetOffsetY = { it },
+            animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
+        ) + fadeOut(),
+        modifier = modifier
+    ) {
+        Surface(
+            modifier = Modifier.padding(bottom = 32.dp),
+            shape = CircleShape,
+            color = Color(0xE61E1E2E), // خلفية داكنة شفافة أنيقة
+            shadowElevation = 8.dp
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // إبطاء
+                IconButton(
+                    onClick = { onSpeedChange((currentSpeed - 10).coerceAtLeast(10)) },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(Icons.Rounded.Remove, contentDescription = "أبطأ", tint = Color.White)
+                }
+
+                // إيقاف مؤقت / تشغيل
+                IconButton(
+                    onClick = onTogglePause,
+                    modifier = Modifier.size(42.dp).background(MaterialTheme.colorScheme.primary, CircleShape)
+                ) {
+                    Icon(
+                        imageVector = if (isPaused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
+                        contentDescription = if (isPaused) "استئناف" else "إيقاف مؤقت",
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+
+                // تسريع
+                IconButton(
+                    onClick = { onSpeedChange((currentSpeed + 10).coerceAtMost(200)) },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(Icons.Rounded.Add, contentDescription = "أسرع", tint = Color.White)
+                }
+
+                // إيقاف نهائي
+                IconButton(
+                    onClick = onStop,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(Icons.Rounded.Close, contentDescription = "إيقاف", tint = Color(0xFFFF5252))
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 fun AutoScrollSheet(
     viewModel: PdfViewModel,
     state: PdfUiState,
     onDismiss: () -> Unit
 ) {
-    var speedState by remember { mutableFloatStateOf(state.autoScrollSpeed.toFloat()) }
+    var selectedSpeed by remember { mutableFloatStateOf(state.autoScrollSpeed.toFloat()) }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(bottom = 24.dp)
             .padding(horizontal = 24.dp)
+            .padding(bottom = 24.dp)
     ) {
-        Text(
-            text = "التمرير التلقائي الذكي",
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(bottom = 12.dp),
-            textAlign = TextAlign.Start
-        )
-        
-        Text(
-            text = "قراءة هادئة خالية من اليدين بمعدل سرعة مريح لتمرير الصفحات تلقائياً.",
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 20.dp)
-        )
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.PlayArrow,
+                    contentDescription = null,
+                    modifier = Modifier.padding(6.dp).size(20.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column {
+                Text(
+                    text = "التمرير التلقائي",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "وضع القراءة الحرة (بدون يدين)",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
+        }
 
-        // Presets speed selection
+        // Speed presets
         Text(
-            text = "تحديد سرعة مسبقة",
-            fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurface,
+            text = "سرعات مسبقة",
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
             modifier = Modifier.padding(bottom = 8.dp)
         )
 
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 20.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             val presets = listOf(
-                Pair("بطيء", 12f),
-                Pair("متوسط", 25f),
-                Pair("سريع", 55f),
-                Pair("سريع جداً", 90f)
+                Pair("بطيء", 30f), Pair("متوسط", 60f), Pair("سريع", 100f), Pair("سريع جداً", 150f)
             )
-
             presets.forEach { (label, speed) ->
-                val isSelected = speedState == speed
-                Surface(
-                    onClick = {
-                        speedState = speed
-                        if (state.isAutoScrolling) {
-                            viewModel.startAutoScroll(speed.roundToInt())
-                        }
+                val isSelected = selectedSpeed == speed
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { 
+                        selectedSpeed = speed 
+                        if (state.isAutoScrolling) viewModel.startAutoScroll(speed.toInt())
                     },
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                    border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+                    label = { Text(text = label, style = MaterialTheme.typography.labelSmall) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                    ),
                     modifier = Modifier.weight(1f)
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .padding(vertical = 10.dp)
-                            .fillMaxWidth()
-                    ) {
-                        Text(
-                            text = label,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
+                )
             }
         }
 
         // Custom speed slider
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Rounded.Speed,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "سرعة مخصصة",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Text(
-                text = "ضبط دقيق للسرعة",
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = "${speedState.roundToInt()} بكسل/ث",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
+                text = "${selectedSpeed.toInt()} px/s",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.primary
             )
         }
 
-        AppSlider(
-            value = speedState,
-            onValueChange = {
-                speedState = it
-                if (state.isAutoScrolling) {
-                    viewModel.startAutoScroll(it.roundToInt())
-                }
+        Slider(
+            value = selectedSpeed,
+            onValueChange = { 
+                selectedSpeed = it
+                if (state.isAutoScrolling) viewModel.startAutoScroll(it.toInt())
             },
-            valueRange = 5f..150f,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 20.dp)
+            valueRange = 10f..200f,
+            steps = 18,
+            colors = SliderDefaults.colors(
+                thumbColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.primary,
+                inactiveTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                activeTickColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.4f),
+                inactiveTickColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+            ),
+            modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("أبطأ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("أسرع", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
 
-        // Large Start/Stop toggle button
+        // Start button
         Button(
             onClick = {
                 if (state.isAutoScrolling) {
                     viewModel.stopAutoScroll()
                 } else {
-                    viewModel.startAutoScroll(speedState.roundToInt())
+                    viewModel.startAutoScroll(selectedSpeed.toInt())
+                    onDismiss()
                 }
             },
+            modifier = Modifier.fillMaxWidth().height(48.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = if (state.isAutoScrolling) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
             ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp),
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(12.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Icon(
-                    imageVector = if (state.isAutoScrolling) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (state.isAutoScrolling) "إيقاف" else "بدء"
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (state.isAutoScrolling) "إيقاف التمرير التلقائي" else "بدء التمرير التلقائي",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            Icon(
+                imageVector = if (state.isAutoScrolling) Icons.Rounded.Close else Icons.Rounded.PlayArrow,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = if (state.isAutoScrolling) "إيقاف التمرير التلقائي" else "بدء التمرير التلقائي",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold)
+            )
         }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Text(
+            text = "اضغط على الشاشة للإيقاف المؤقت/الاستئناف. استخدم الشريط العائم للإيقاف النهائي.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 
