@@ -34,6 +34,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -366,6 +367,20 @@ fun ViewerScreen(
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+            try {
+                var currentContext = context
+                var act: Activity? = null
+                while (currentContext is android.content.ContextWrapper) {
+                    if (currentContext is Activity) {
+                        act = currentContext
+                        break
+                    }
+                    currentContext = currentContext.baseContext
+                }
+                act?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
             viewModel.incrementReadingTime(context, 0L)
         }
     }
@@ -407,6 +422,7 @@ fun ViewerScreen(
         } else if (webView != null && webView.canGoBack()) {
             webView.goBack()
         } else {
+            viewModel.setScreenOrientation(context, ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
             viewModel.goBackToDashboard()
         }
     }
@@ -5180,34 +5196,45 @@ fun MiniPlayerOverlay(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val displayText = wordName.ifEmpty { "كلمة غير معروفة" }.trim()
+    val textLength = displayText.length
+
+    val fontSize = when {
+        textLength > 35 -> 10.sp
+        textLength > 25 -> 11.sp
+        textLength > 18 -> 12.sp
+        textLength > 12 -> 14.sp
+        else -> 16.sp
+    }
+
     Surface(
         modifier = modifier
             .padding(horizontal = 16.dp)
-            .widthIn(max = 420.dp)
+            .widthIn(max = 400.dp)
             .fillMaxWidth()
             .testTag("audio_mini_player"),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         color = Color(0xF012111A),
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
-        shadowElevation = 12.dp
+        shadowElevation = 10.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 // Left side: Close button & Replay button
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     // Close button (X)
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(30.dp)
                             .clip(CircleShape)
                             .background(Color(0xFF232030))
                             .clickable(onClick = onDismiss),
@@ -5217,14 +5244,14 @@ fun MiniPlayerOverlay(
                             imageVector = Icons.Default.Close,
                             contentDescription = "إغلاق المشغل",
                             tint = Color.White.copy(alpha = 0.9f),
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(15.dp)
                         )
                     }
 
                     // Replay button (Circular Arrow)
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(30.dp)
                             .clip(CircleShape)
                             .background(Color(0xFF232030))
                             .clickable(enabled = !isLoading, onClick = onReplay),
@@ -5233,49 +5260,47 @@ fun MiniPlayerOverlay(
                         if (isLoading) {
                             CircularProgressIndicator(
                                 color = Color.White,
-                                strokeWidth = 2.dp,
-                                modifier = Modifier.size(16.dp)
+                                strokeWidth = 1.8.dp,
+                                modifier = Modifier.size(14.dp)
                             )
                         } else {
                             Icon(
                                 imageVector = Icons.Default.Replay,
                                 contentDescription = "إعادة النطق",
                                 tint = Color.White.copy(alpha = 0.9f),
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(15.dp)
                             )
                         }
                     }
                 }
 
-                // Center: Word Name Title & Phonetic / Subtext
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                // Center: Spoken word text (Auto font size + Marquee scrolling for long text/sentences)
+                Box(
+                    contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .weight(1f)
-                        .padding(horizontal = 10.dp)
+                        .padding(horizontal = 8.dp)
                 ) {
                     Text(
-                        text = wordName.ifEmpty { "كلمة غير معروفة" },
-                        fontSize = 18.sp,
+                        text = displayText,
+                        fontSize = fontSize,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = "· / ·",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Normal,
-                        color = Color.White.copy(alpha = 0.5f),
-                        textAlign = TextAlign.Center
+                        softWrap = false,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.basicMarquee(
+                            iterations = Int.MAX_VALUE,
+                            repeatDelayMillis = 800,
+                            velocity = 35.dp
+                        )
                     )
                 }
 
-                // Right side: Play / Pause Big Button
+                // Right side: Play / Pause Button (Smaller compact size)
                 Box(
                     modifier = Modifier
-                        .size(42.dp)
+                        .size(34.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary)
                         .clickable(enabled = !isLoading, onClick = onTogglePlayPause),
@@ -5285,7 +5310,7 @@ fun MiniPlayerOverlay(
                         imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                         contentDescription = if (isPlaying) "إيقاف مؤقت" else "تشغيل",
                         tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
@@ -5295,7 +5320,7 @@ fun MiniPlayerOverlay(
                 LinearProgressIndicator(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(3.dp),
+                        .height(2.5.dp),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = Color.Transparent
                 )
@@ -5303,7 +5328,7 @@ fun MiniPlayerOverlay(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(3.dp)
+                        .height(2.5.dp)
                         .background(
                             if (isPlaying) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.2f)
                         )
