@@ -20,6 +20,9 @@ import android.print.PrintAttributes
 import android.os.CancellationSignal
 import android.os.ParcelFileDescriptor
 import android.widget.Toast
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -5200,107 +5203,109 @@ fun MiniPlayerOverlay(
     val textLength = displayText.length
 
     val fontSize = when {
-        textLength > 35 -> 10.sp
-        textLength > 25 -> 11.sp
-        textLength > 18 -> 12.sp
-        textLength > 12 -> 14.sp
-        else -> 16.sp
+        textLength > 35 -> 13.sp
+        textLength > 25 -> 14.sp
+        textLength > 18 -> 16.sp
+        textLength > 12 -> 18.sp
+        else -> 20.sp
     }
 
     Surface(
         modifier = modifier
             .padding(horizontal = 16.dp)
-            .widthIn(max = 400.dp)
+            .widthIn(max = 440.dp)
             .fillMaxWidth()
             .testTag("audio_mini_player"),
-        shape = RoundedCornerShape(20.dp),
-        color = Color(0xF012111A),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
-        shadowElevation = 10.dp
+        shape = RoundedCornerShape(24.dp),
+        color = Color(0xF212111A),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+        shadowElevation = 12.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 // Left side: Close button & Replay button
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     // Close button (X)
                     Box(
                         modifier = Modifier
-                            .size(30.dp)
+                            .size(38.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF232030))
+                            .background(Color(0xFF282536))
                             .clickable(onClick = onDismiss),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "إغلاق المشغل",
-                            tint = Color.White.copy(alpha = 0.9f),
-                            modifier = Modifier.size(15.dp)
+                            tint = Color.White.copy(alpha = 0.95f),
+                            modifier = Modifier.size(20.dp)
                         )
                     }
 
                     // Replay button (Circular Arrow)
                     Box(
                         modifier = Modifier
-                            .size(30.dp)
+                            .size(38.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF232030))
+                            .background(Color(0xFF282536))
                             .clickable(enabled = !isLoading, onClick = onReplay),
                         contentAlignment = Alignment.Center
                     ) {
                         if (isLoading) {
                             CircularProgressIndicator(
                                 color = Color.White,
-                                strokeWidth = 1.8.dp,
-                                modifier = Modifier.size(14.dp)
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(18.dp)
                             )
                         } else {
                             Icon(
                                 imageVector = Icons.Default.Replay,
                                 contentDescription = "إعادة النطق",
-                                tint = Color.White.copy(alpha = 0.9f),
-                                modifier = Modifier.size(15.dp)
+                                tint = Color.White.copy(alpha = 0.95f),
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
                 }
 
-                // Center: Spoken word text (Auto font size + Marquee scrolling for long text/sentences)
+                // Center: Spoken word text (Enforced LTR direction for Right-to-Left marquee scrolling)
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .weight(1f)
-                        .padding(horizontal = 8.dp)
+                        .padding(horizontal = 10.dp)
                 ) {
-                    Text(
-                        text = displayText,
-                        fontSize = fontSize,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        maxLines = 1,
-                        softWrap = false,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.basicMarquee(
-                            iterations = Int.MAX_VALUE,
-                            repeatDelayMillis = 800,
-                            velocity = 35.dp
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                        Text(
+                            text = displayText,
+                            fontSize = fontSize,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            maxLines = 1,
+                            softWrap = false,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.basicMarquee(
+                                iterations = Int.MAX_VALUE,
+                                repeatDelayMillis = 600,
+                                velocity = 40.dp
+                            )
                         )
-                    )
+                    }
                 }
 
-                // Right side: Play / Pause Button (Smaller compact size)
+                // Right side: Play / Pause Big Button
                 Box(
                     modifier = Modifier
-                        .size(34.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.primary)
                         .clickable(enabled = !isLoading, onClick = onTogglePlayPause),
@@ -5310,7 +5315,7 @@ fun MiniPlayerOverlay(
                         imageVector = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                         contentDescription = if (isPlaying) "إيقاف مؤقت" else "تشغيل",
                         tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(26.dp)
                     )
                 }
             }
@@ -5320,7 +5325,7 @@ fun MiniPlayerOverlay(
                 LinearProgressIndicator(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(2.5.dp),
+                        .height(3.dp),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = Color.Transparent
                 )
@@ -5328,7 +5333,7 @@ fun MiniPlayerOverlay(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(2.5.dp)
+                        .height(3.dp)
                         .background(
                             if (isPlaying) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.2f)
                         )
