@@ -47,10 +47,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -84,23 +86,29 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -188,6 +196,7 @@ fun CameraOcrScreen(
 
     var createdPdfFile by remember { mutableStateOf<File?>(null) }
     var extractedTextResult by remember { mutableStateOf<String?>(null) }
+    var editableText by remember(extractedTextResult) { mutableStateOf(extractedTextResult ?: "") }
 
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
     var imageCapture: ImageCapture? by remember { mutableStateOf(null) }
@@ -261,6 +270,7 @@ fun CameraOcrScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .statusBarsPadding()
             .background(Color(0xFF0D0E15))
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -295,33 +305,6 @@ fun CameraOcrScreen(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    // Auto-Language Badge (Compact pill shape)
-                    Surface(
-                        color = Color(0xFF262B40),
-                        shape = RoundedCornerShape(50)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Language,
-                                contentDescription = null,
-                                tint = Color(0xFF00E5A3),
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Auto",
-                                color = Color(0xFF00E5A3),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
                 }
             }
 
@@ -614,7 +597,7 @@ fun CameraOcrScreen(
                                     }
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
+                                    modifier = Modifier.padding(vertical = 12.dp, horizontal = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.Center
                                 ) {
@@ -624,12 +607,15 @@ fun CameraOcrScreen(
                                         tint = Color.White,
                                         modifier = Modifier.size(18.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = "صورة جديدة",
                                         color = Color.White,
                                         fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium
+                                        fontWeight = FontWeight.Medium,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
@@ -651,7 +637,7 @@ fun CameraOcrScreen(
                                     }
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
+                                    modifier = Modifier.padding(vertical = 12.dp, horizontal = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.Center
                                 ) {
@@ -661,12 +647,15 @@ fun CameraOcrScreen(
                                         tint = Color(0xFF00E5A3),
                                         modifier = Modifier.size(18.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = "الصفحة كاملة",
                                         color = Color(0xFF00E5A3),
                                         fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
@@ -693,18 +682,15 @@ fun CameraOcrScreen(
                                                     br = cropPoints[2]
                                                 )
 
-                                                // B&W Contrast Enhancement for Tesseract
-                                                val enhancedBmp = toGrayscaleAndContrast(croppedBmp, 1.6f)
-
                                                 progressMessage = "جاري التعرف على النصوص Tesseract..."
                                                 val combinedLanguages = withContext(Dispatchers.IO) {
                                                     tesseractManager.getAvailableLanguagesCombined()
                                                 }
                                                 val ocrData = withContext(Dispatchers.IO) {
-                                                    tesseractManager.extractTextWithCoordinates(enhancedBmp, combinedLanguages)
+                                                    tesseractManager.extractTextWithCoordinates(croppedBmp, combinedLanguages)
                                                 }
                                                 val fullText = withContext(Dispatchers.IO) {
-                                                    tesseractManager.extractFullText(enhancedBmp, combinedLanguages)
+                                                    tesseractManager.extractFullText(croppedBmp, combinedLanguages)
                                                 }
                                                 extractedTextResult = fullText
 
@@ -744,12 +730,15 @@ fun CameraOcrScreen(
                                         tint = Color.Black,
                                         modifier = Modifier.size(18.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = "مسح ضوئي",
                                         color = Color.Black,
                                         fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
@@ -820,11 +809,14 @@ fun CameraOcrScreen(
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier
                                     .clickable {
-                                        extractedTextResult?.let { textToCopy ->
+                                        val textToCopy = editableText
+                                        if (textToCopy.isNotEmpty()) {
                                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                             val clip = ClipData.newPlainText("Extracted OCR Text", textToCopy)
                                             clipboard.setPrimaryClip(clip)
                                             Toast.makeText(context, "تم نسخ النص للحافظة بنجاح", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "لا يوجد نص لنسخه", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                             ) {
@@ -863,20 +855,22 @@ fun CameraOcrScreen(
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(16.dp)
+                                    .padding(14.dp)
                             ) {
-                                SelectionContainer(modifier = Modifier.fillMaxSize()) {
-                                    Text(
-                                        text = extractedTextResult.takeIf { !it.isNull_or_empty() }
-                                            ?: "لم يتم العثور على نص واضح في المستند",
+                                BasicTextField(
+                                    value = editableText,
+                                    onValueChange = { editableText = it },
+                                    textStyle = TextStyle(
                                         color = Color.White,
-                                        fontSize = 16.sp,
-                                        lineHeight = 24.sp,
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .verticalScroll(rememberScrollState())
-                                    )
-                                }
+                                        fontSize = 15.sp,
+                                        lineHeight = 22.sp,
+                                        textAlign = TextAlign.Start
+                                    ),
+                                    cursorBrush = SolidColor(Color(0xFF00E5A3)),
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState())
+                                )
                             }
                         }
 
@@ -1045,9 +1039,9 @@ data class CropPoints(
 }
 
 /**
- * Checkpoints 1, 2, 3: Interactive Perspective Crop Composable
- * Draws the bitmap, semi-transparent black overlay mask, orange boundary path (0xFFFF7A00),
- * and 4 orange touch node handles (radius 40f) responsive to touch drag gestures.
+ * Checkpoints 1, 2, 3: Interactive Perspective Crop Overlay Composable
+ * Applies pointerInput with detectDragGestures directly on Canvas.
+ * Uses 4 distinct Compose state variables and rememberUpdatedState for zero-latency smooth drag response.
  */
 @Composable
 fun ScannerCropOverlay(
@@ -1056,18 +1050,15 @@ fun ScannerCropOverlay(
     onPointsChanged: (List<Offset>) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
-    var activePointIndex by remember { mutableStateOf<Int?>(null) } // 0=TL, 1=TR, 2=BR, 3=BL
+    var activeNode by remember { mutableStateOf<Int?>(null) } // 0=TL, 1=TR, 2=BR, 3=BL
 
-    // 4 distinct Compose state variables for immediate recomposition during touch dragging
     var tl by remember(bitmap) { mutableStateOf(points.getOrElse(0) { Offset(0.08f, 0.08f) }) }
     var tr by remember(bitmap) { mutableStateOf(points.getOrElse(1) { Offset(0.92f, 0.08f) }) }
     var br by remember(bitmap) { mutableStateOf(points.getOrElse(2) { Offset(0.92f, 0.92f) }) }
     var bl by remember(bitmap) { mutableStateOf(points.getOrElse(3) { Offset(0.08f, 0.92f) }) }
 
-    // Keep states synced if external points change when not dragging
     LaunchedEffect(points) {
-        if (activePointIndex == null && points.size >= 4) {
+        if (activeNode == null && points.size >= 4) {
             tl = points[0]
             tr = points[1]
             br = points[2]
@@ -1078,151 +1069,225 @@ fun ScannerCropOverlay(
     val srcWidth = bitmap.width.toFloat()
     val srcHeight = bitmap.height.toFloat()
 
-    Box(
+    var canvasWidth by remember { mutableFloatStateOf(0f) }
+    var canvasHeight by remember { mutableFloatStateOf(0f) }
+
+    val scale = if (canvasWidth > 0f && canvasHeight > 0f && srcWidth > 0f && srcHeight > 0f) {
+        minOf(canvasWidth / srcWidth, canvasHeight / srcHeight)
+    } else 1f
+    val dispW = if (canvasWidth > 0f) srcWidth * scale else 1f
+    val dispH = if (canvasHeight > 0f) srcHeight * scale else 1f
+    val offsetX = (canvasWidth - dispW) / 2f
+    val offsetY = (canvasHeight - dispH) / 2f
+
+    val pxTL = Offset(offsetX + tl.x * dispW, offsetY + tl.y * dispH)
+    val pxTR = Offset(offsetX + tr.x * dispW, offsetY + tr.y * dispH)
+    val pxBR = Offset(offsetX + br.x * dispW, offsetY + br.y * dispH)
+    val pxBL = Offset(offsetX + bl.x * dispW, offsetY + bl.y * dispH)
+
+    val currentPxTL by rememberUpdatedState(pxTL)
+    val currentPxTR by rememberUpdatedState(pxTR)
+    val currentPxBR by rememberUpdatedState(pxBR)
+    val currentPxBL by rememberUpdatedState(pxBL)
+    val currentDispW by rememberUpdatedState(dispW)
+    val currentDispH by rememberUpdatedState(dispH)
+
+    val orangeColor = Color(0xFFFF7A00)
+
+    Canvas(
         modifier = modifier
             .fillMaxSize()
-            .onGloballyPositioned { canvasSize = it.size }
-    ) {
-        val cWidth = canvasSize.width.toFloat()
-        val cHeight = canvasSize.height.toFloat()
-
-        if (cWidth > 0 && cHeight > 0 && srcWidth > 0 && srcHeight > 0) {
-            val scale = minOf(cWidth / srcWidth, cHeight / srcHeight)
-            val dispW = srcWidth * scale
-            val dispH = srcHeight * scale
-            val offsetX = (cWidth - dispW) / 2f
-            val offsetY = (cHeight - dispH) / 2f
-
-            // Screen pixel coordinates calculated directly from state variables
-            val pxTL = Offset(offsetX + tl.x * dispW, offsetY + tl.y * dispH)
-            val pxTR = Offset(offsetX + tr.x * dispW, offsetY + tr.y * dispH)
-            val pxBR = Offset(offsetX + br.x * dispW, offsetY + br.y * dispH)
-            val pxBL = Offset(offsetX + bl.x * dispW, offsetY + bl.y * dispH)
-
-            val orangeColor = Color(0xFFFF7A00)
-
-            Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(bitmap, canvasSize) { // Key depends only on bitmap/canvasSize so drag coroutine is NOT cancelled during movement
-                        val touchThreshold = 150.dp.toPx() // Generous touch target threshold for easy finger capture
-
-                        detectDragGestures(
-                            onDragStart = { touchOffset ->
-                                val distTL = hypot((pxTL.x - touchOffset.x).toDouble(), (pxTL.y - touchOffset.y).toDouble()).toFloat()
-                                val distTR = hypot((pxTR.x - touchOffset.x).toDouble(), (pxTR.y - touchOffset.y).toDouble()).toFloat()
-                                val distBR = hypot((pxBR.x - touchOffset.x).toDouble(), (pxBR.y - touchOffset.y).toDouble()).toFloat()
-                                val distBL = hypot((pxBL.x - touchOffset.x).toDouble(), (pxBL.y - touchOffset.y).toDouble()).toFloat()
-
-                                val dists = listOf(distTL, distTR, distBR, distBL)
-                                val minIdx = dists.indices.minByOrNull { dists[it] }
-                                if (minIdx != null && dists[minIdx] <= touchThreshold) {
-                                    activePointIndex = minIdx
-                                } else {
-                                    activePointIndex = null
-                                }
-                            },
-                            onDrag = { change, dragAmount ->
-                                change.consume()
-                                activePointIndex?.let { idx ->
-                                    val currentPx = when (idx) {
-                                        0 -> pxTL
-                                        1 -> pxTR
-                                        2 -> pxBR
-                                        3 -> pxBL
-                                        else -> Offset.Zero
-                                    }
-                                    val newPx = currentPx + dragAmount
-                                    val newNormX = ((newPx.x - offsetX) / dispW).coerceIn(0f, 1f)
-                                    val newNormY = ((newPx.y - offsetY) / dispH).coerceIn(0f, 1f)
-                                    val newNorm = Offset(newNormX, newNormY)
-
-                                    when (idx) {
-                                        0 -> tl = newNorm
-                                        1 -> tr = newNorm
-                                        2 -> br = newNorm
-                                        3 -> bl = newNorm
-                                    }
-
-                                    onPointsChanged(listOf(tl, tr, br, bl))
-                                }
-                            },
-                            onDragEnd = { activePointIndex = null },
-                            onDragCancel = { activePointIndex = null }
-                        )
-                    }
-            ) {
-                // 1. Draw Bitmap background
-                val androidMatrix = Matrix().apply {
-                    postScale(scale, scale)
-                    postTranslate(offsetX, offsetY)
-                }
-                drawContext.canvas.nativeCanvas.drawBitmap(
-                    bitmap,
-                    androidMatrix,
-                    Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-                )
-
-                // 2. Crop Quadrilateral Path (TL -> TR -> BR -> BL -> Close)
-                val quadPath = androidx.compose.ui.graphics.Path().apply {
-                    moveTo(pxTL.x, pxTL.y)
-                    lineTo(pxTR.x, pxTR.y)
-                    lineTo(pxBR.x, pxBR.y)
-                    lineTo(pxBL.x, pxBL.y)
-                    close()
-                }
-
-                // 3. Draw Semi-transparent Black Overlay (0.6f alpha) outside crop quadrilateral
-                val fullScreenPath = androidx.compose.ui.graphics.Path().apply {
-                    addRect(androidx.compose.ui.geometry.Rect(0f, 0f, cWidth, cHeight))
-                }
-                val dimOutsidePath = androidx.compose.ui.graphics.Path.combine(
-                    androidx.compose.ui.graphics.PathOperation.Difference,
-                    fullScreenPath,
-                    quadPath
-                )
-                drawPath(
-                    path = dimOutsidePath,
-                    color = Color.Black.copy(alpha = 0.6f)
-                )
-
-                // 4. Draw Thick Orange Border Line (0xFFFF7A00)
-                drawPath(
-                    path = quadPath,
-                    color = orangeColor,
-                    style = Stroke(width = 3.5.dp.toPx())
-                )
-
-                // 5. Draw 4 Large Orange Circles (25.dp radius) with Inner White Circles at each node
-                val nodesPx = listOf(pxTL, pxTR, pxBR, pxBL)
-                val handleRadius = 25.dp.toPx()
-                val innerDotRadius = 8.dp.toPx()
-
-                nodesPx.forEachIndexed { idx, pxOffset ->
-                    val isActive = (idx == activePointIndex)
-                    val r = if (isActive) handleRadius * 1.25f else handleRadius
-
-                    // Outer shadow glow
-                    drawCircle(
-                        color = Color.Black.copy(alpha = 0.35f),
-                        radius = r + 4.dp.toPx(),
-                        center = pxOffset
-                    )
-                    // Solid Orange Handle Circle
-                    drawCircle(
-                        color = orangeColor,
-                        radius = r,
-                        center = pxOffset
-                    )
-                    // Inner Precision White Circle
-                    drawCircle(
-                        color = Color.White,
-                        radius = innerDotRadius,
-                        center = pxOffset
-                    )
-                }
+            .onGloballyPositioned { layoutCoordinates ->
+                canvasWidth = layoutCoordinates.size.width.toFloat()
+                canvasHeight = layoutCoordinates.size.height.toFloat()
             }
+            .pointerInput(bitmap) {
+                val touchRadius = 150.dp.toPx() // Generous touch target threshold for easy finger capture
+
+                detectDragGestures(
+                    onDragStart = { touchPos ->
+                        val distTl = (touchPos - currentPxTL).getDistance()
+                        val distTr = (touchPos - currentPxTR).getDistance()
+                        val distBr = (touchPos - currentPxBR).getDistance()
+                        val distBl = (touchPos - currentPxBL).getDistance()
+
+                        val minDist = minOf(distTl, distTr, distBr, distBl)
+                        if (minDist <= touchRadius) {
+                            activeNode = when (minDist) {
+                                distTl -> 0
+                                distTr -> 1
+                                distBr -> 2
+                                else -> 3
+                            }
+                        } else {
+                            activeNode = null
+                        }
+                    },
+                    onDragEnd = { activeNode = null },
+                    onDragCancel = { activeNode = null },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        val dW = if (currentDispW > 0f) currentDispW else 1f
+                        val dH = if (currentDispH > 0f) currentDispH else 1f
+
+                        when (activeNode) {
+                            0 -> tl = Offset((tl.x + dragAmount.x / dW).coerceIn(0f, 1f), (tl.y + dragAmount.y / dH).coerceIn(0f, 1f))
+                            1 -> tr = Offset((tr.x + dragAmount.x / dW).coerceIn(0f, 1f), (tr.y + dragAmount.y / dH).coerceIn(0f, 1f))
+                            2 -> br = Offset((br.x + dragAmount.x / dW).coerceIn(0f, 1f), (br.y + dragAmount.y / dH).coerceIn(0f, 1f))
+                            3 -> bl = Offset((bl.x + dragAmount.x / dW).coerceIn(0f, 1f), (bl.y + dragAmount.y / dH).coerceIn(0f, 1f))
+                        }
+                        onPointsChanged(listOf(tl, tr, br, bl))
+                    }
+                )
+            }
+    ) {
+        // 1. Draw Bitmap background
+        val androidMatrix = Matrix().apply {
+            postScale(scale, scale)
+            postTranslate(offsetX, offsetY)
         }
+        drawContext.canvas.nativeCanvas.drawBitmap(
+            bitmap,
+            androidMatrix,
+            Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        )
+
+        // 2. Crop Quadrilateral Path (TL -> TR -> BR -> BL -> Close)
+        val path = androidx.compose.ui.graphics.Path().apply {
+            moveTo(pxTL.x, pxTL.y)
+            lineTo(pxTR.x, pxTR.y)
+            lineTo(pxBR.x, pxBR.y)
+            lineTo(pxBL.x, pxBL.y)
+            close()
+        }
+
+        // 3. Draw Semi-transparent Black Overlay (0.6f alpha) outside crop quadrilateral
+        clipPath(path, clipOp = androidx.compose.ui.graphics.ClipOp.Difference) {
+            drawRect(color = Color.Black.copy(alpha = 0.6f))
+        }
+
+        // 4. Draw Thick Orange Border Line (0xFFFF7A00)
+        drawPath(
+            path = path,
+            color = orangeColor,
+            style = Stroke(width = 4.dp.toPx())
+        )
+
+        // 5. Draw 4 Large Orange Circles (25.dp radius) with Inner White Circles
+        val nodesPx = listOf(pxTL, pxTR, pxBR, pxBL)
+        val handleRadius = 25.dp.toPx()
+        val innerDotRadius = 8.dp.toPx()
+
+        nodesPx.forEachIndexed { idx, pxOffset ->
+            val isActive = (idx == activeNode)
+            val r = if (isActive) handleRadius * 1.25f else handleRadius
+
+            // Outer shadow glow
+            drawCircle(
+                color = Color.Black.copy(alpha = 0.35f),
+                radius = r + 4.dp.toPx(),
+                center = pxOffset
+            )
+            // Solid Orange Handle Circle
+            drawCircle(
+                color = orangeColor,
+                radius = r,
+                center = pxOffset
+            )
+            // Inner Precision White Circle
+            drawCircle(
+                color = Color.White,
+                radius = innerDotRadius,
+                center = pxOffset
+            )
+        }
+    }
+}
+
+/**
+ * Overloaded ScannerCropOverlay taking bitmap dimensions and callback returning individual Offset points
+ */
+@Composable
+fun ScannerCropOverlay(
+    modifier: Modifier = Modifier,
+    bitmapWidth: Float,
+    bitmapHeight: Float,
+    onCropPointsChanged: (tl: Offset, tr: Offset, bl: Offset, br: Offset) -> Unit
+) {
+    var tl by remember { mutableStateOf(Offset(100f, 100f)) }
+    var tr by remember { mutableStateOf(Offset(bitmapWidth - 100f, 100f)) }
+    var bl by remember { mutableStateOf(Offset(100f, bitmapHeight - 100f)) }
+    var br by remember { mutableStateOf(Offset(bitmapWidth - 100f, bitmapHeight - 100f)) }
+
+    var activeNode by remember { mutableStateOf<Int?>(null) }
+    val touchRadius = 150f
+
+    val currentTL by rememberUpdatedState(tl)
+    val currentTR by rememberUpdatedState(tr)
+    val currentBL by rememberUpdatedState(bl)
+    val currentBR by rememberUpdatedState(br)
+
+    Canvas(
+        modifier = modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = { touchPos ->
+                        val distTl = (touchPos - currentTL).getDistance()
+                        val distTr = (touchPos - currentTR).getDistance()
+                        val distBl = (touchPos - currentBL).getDistance()
+                        val distBr = (touchPos - currentBR).getDistance()
+
+                        val minDist = minOf(distTl, distTr, distBl, distBr)
+                        if (minDist <= touchRadius) {
+                            activeNode = when (minDist) {
+                                distTl -> 0
+                                distTr -> 1
+                                distBl -> 2
+                                else -> 3
+                            }
+                        } else {
+                            activeNode = null
+                        }
+                    },
+                    onDragEnd = { activeNode = null },
+                    onDragCancel = { activeNode = null },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        when (activeNode) {
+                            0 -> tl += dragAmount
+                            1 -> tr += dragAmount
+                            2 -> bl += dragAmount
+                            3 -> br += dragAmount
+                        }
+                        onCropPointsChanged(tl, tr, bl, br)
+                    }
+                )
+            }
+    ) {
+        val path = androidx.compose.ui.graphics.Path().apply {
+            moveTo(tl.x, tl.y)
+            lineTo(tr.x, tr.y)
+            lineTo(br.x, br.y)
+            lineTo(bl.x, bl.y)
+            close()
+        }
+
+        clipPath(path, clipOp = androidx.compose.ui.graphics.ClipOp.Difference) {
+            drawRect(color = Color.Black.copy(alpha = 0.6f))
+        }
+
+        drawPath(
+            path = path,
+            color = Color(0xFFFF7A00),
+            style = Stroke(width = 8f)
+        )
+
+        val nodeRadius = 40f
+        drawCircle(color = Color(0xFFFF7A00), radius = nodeRadius, center = tl)
+        drawCircle(color = Color(0xFFFF7A00), radius = nodeRadius, center = tr)
+        drawCircle(color = Color(0xFFFF7A00), radius = nodeRadius, center = bl)
+        drawCircle(color = Color(0xFFFF7A00), radius = nodeRadius, center = br)
     }
 }
 

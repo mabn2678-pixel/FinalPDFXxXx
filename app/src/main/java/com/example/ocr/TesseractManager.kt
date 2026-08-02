@@ -2,6 +2,10 @@ package com.example.ocr
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Paint
 import android.graphics.Rect
 import android.util.Log
 import com.googlecode.tesseract.android.TessBaseAPI
@@ -25,7 +29,71 @@ class TesseractManager(private val context: Context) {
     private var isInitialized = false
     private val TAG = "TesseractManager"
 
-    suspend fun initTesseract(language: String = "ara+eng"): Boolean = withContext(Dispatchers.IO) {
+    fun preprocessImageForOcr(bitmap: Bitmap): Bitmap {
+        val width = bitmap.width
+        val height = bitmap.height
+        if (width <= 0 || height <= 0) return bitmap
+
+        // 1. Calculate average luminance using a scaled down sample to detect dark mode (dark background with light text)
+        val sampleW = 64
+        val sampleH = 64
+        val scaledSample = Bitmap.createScaledBitmap(bitmap, sampleW, sampleH, false)
+        val pixels = IntArray(sampleW * sampleH)
+        scaledSample.getPixels(pixels, 0, sampleW, 0, 0, sampleW, sampleH)
+        scaledSample.recycle()
+
+        var totalLuminance = 0.0
+        for (pixel in pixels) {
+            val r = (pixel shr 16) and 0xFF
+            val g = (pixel shr 8) and 0xFF
+            val b = pixel and 0xFF
+            val lum = 0.299 * r + 0.587 * g + 0.114 * b
+            totalLuminance += lum
+        }
+        val avgLuminance = totalLuminance / (sampleW * sampleH)
+        val isDark = avgLuminance < 128.0
+
+        // 2. Grayscale matrix
+        val cm = ColorMatrix()
+        cm.setSaturation(0f)
+
+        // 3. Invert colors if dark image (white background with black text for Tesseract)
+        if (isDark) {
+            val invertMatrix = ColorMatrix(
+                floatArrayOf(
+                    -1f,  0f,  0f, 0f, 255f,
+                     0f, -1f,  0f, 0f, 255f,
+                     0f,  0f, -1f, 0f, 255f,
+                     0f,  0f,  0f, 1f,   0f
+                )
+            )
+            cm.postConcat(invertMatrix)
+        }
+
+        // 4. Contrast enhancement
+        val contrast = 1.6f
+        val translate = (-0.5f * contrast + 0.5f) * 255f
+        val contrastMatrix = ColorMatrix(
+            floatArrayOf(
+                contrast, 0f, 0f, 0f, translate,
+                0f, contrast, 0f, 0f, translate,
+                0f, 0f, contrast, 0f, translate,
+                0f, 0f, 0f, 1f, 0f
+            )
+        )
+        cm.postConcat(contrastMatrix)
+
+        val processedBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(processedBitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+            colorFilter = ColorMatrixColorFilter(cm)
+        }
+        canvas.drawBitmap(bitmap, 0f, 0f, paint)
+
+        return processedBitmap
+    }
+
+    suspend fun initTesseract(language: String = getAvailableLanguagesCombined()): Boolean = withContext(Dispatchers.IO) {
         try {
             val tessDir = File(context.filesDir, "tessdata")
             if (!tessDir.exists()) {
@@ -45,17 +113,18 @@ class TesseractManager(private val context: Context) {
             }
 
             val dataPath = context.filesDir.absolutePath
+            val activeLang = if (language.isBlank()) getAvailableLanguagesCombined() else language
 
             val api = TessBaseAPI()
-            val success = api.init(dataPath, language)
+            val success = api.init(dataPath, activeLang)
             if (success) {
                 api.pageSegMode = TessBaseAPI.PageSegMode.PSM_AUTO
                 tessApi = api
                 isInitialized = true
-                Log.d(TAG, "Tesseract initialized successfully with language: $language")
+                Log.d(TAG, "Tesseract initialized successfully with language: $activeLang")
                 true
             } else {
-                Log.e(TAG, "TessBaseAPI init returned false for lang: $language")
+                Log.e(TAG, "TessBaseAPI init returned false for lang: $activeLang")
                 false
             }
         } catch (e: Exception) {
@@ -85,11 +154,12 @@ class TesseractManager(private val context: Context) {
 
     suspend fun extractTextWithCoordinates(
         bitmap: Bitmap,
-        language: String = "ara+eng"
+        language: String = getAvailableLanguagesCombined()
     ): List<TextBoundingBox> = withContext(Dispatchers.IO) {
+        val activeLang = if (language.isBlank()) getAvailableLanguagesCombined() else language
         var api = tessApi
         if (!isInitialized || api == null) {
-            val ok = initTesseract(language)
+            val ok = initTesseract(activeLang)
             api = tessApi
             if (!ok || api == null) {
                 Log.e(TAG, "Tesseract engine failed to initialize")
@@ -100,12 +170,14 @@ class TesseractManager(private val context: Context) {
         val results = mutableListOf<TextBoundingBox>()
 
         try {
-            val safeBitmap = if (bitmap.config != Bitmap.Config.ARGB_8888) {
-                bitmap.copy(Bitmap.Config.ARGB_8888, false)
+            val preprocessed = preprocessImageForOcr(bitmap)
+            val safeBitmap = if (preprocessed.config != Bitmap.Config.ARGB_8888) {
+                preprocessed.copy(Bitmap.Config.ARGB_8888, false)
             } else {
-                bitmap
+                preprocessed
             }
 
+            api.pageSegMode = TessBaseAPI.PageSegMode.PSM_AUTO
             api.setImage(safeBitmap)
             api.getHOCRText(0) // Triggers OCR evaluation
 
@@ -143,21 +215,24 @@ class TesseractManager(private val context: Context) {
 
     suspend fun extractFullText(
         bitmap: Bitmap,
-        language: String = "ara+eng"
+        language: String = getAvailableLanguagesCombined()
     ): String = withContext(Dispatchers.IO) {
+        val activeLang = if (language.isBlank()) getAvailableLanguagesCombined() else language
         var api = tessApi
         if (!isInitialized || api == null) {
-            val ok = initTesseract(language)
+            val ok = initTesseract(activeLang)
             api = tessApi
             if (!ok || api == null) return@withContext ""
         }
 
         return@withContext try {
-            val safeBitmap = if (bitmap.config != Bitmap.Config.ARGB_8888) {
-                bitmap.copy(Bitmap.Config.ARGB_8888, false)
+            val preprocessed = preprocessImageForOcr(bitmap)
+            val safeBitmap = if (preprocessed.config != Bitmap.Config.ARGB_8888) {
+                preprocessed.copy(Bitmap.Config.ARGB_8888, false)
             } else {
-                bitmap
+                preprocessed
             }
+            api.pageSegMode = TessBaseAPI.PageSegMode.PSM_AUTO
             api.setImage(safeBitmap)
             api.utF8Text ?: ""
         } catch (e: Exception) {
