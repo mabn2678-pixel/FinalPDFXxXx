@@ -24,6 +24,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -46,7 +47,9 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -74,6 +77,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.Executors
+import kotlin.math.hypot
 
 data class CameraOcrResult(
     val text: String,
@@ -112,6 +116,10 @@ fun CameraOcrSheet(
     var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var isScanning by remember { mutableStateOf(false) }
     var ocrResult by remember { mutableStateOf<CameraOcrResult?>(null) }
+    var cropLeft by remember { mutableFloatStateOf(0.05f) }
+    var cropTop by remember { mutableFloatStateOf(0.05f) }
+    var cropRight by remember { mutableFloatStateOf(0.95f) }
+    var cropBottom by remember { mutableFloatStateOf(0.95f) }
     var scanStatusMessage by remember { mutableStateOf("") }
     var flashEnabled by remember { mutableStateOf(false) }
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
@@ -228,29 +236,21 @@ fun CameraOcrSheet(
         uri?.let { imageUri ->
             coroutineScope.launch {
                 try {
-                    isScanning = true
-                    scanStatusMessage = if (preferOnlineAi) {
-                        "جاري الاتصال عبر السحابة لتمحيص وقراءة نصوص صورة المعرض..."
-                    } else {
-                        "جاري تحليل نصوص صورة المعرض بالمحرك المحلي..."
-                    }
                     val inputStream = context.contentResolver.openInputStream(imageUri)
                     val loadedBitmap = BitmapFactory.decodeStream(inputStream)
                     inputStream?.close()
                     if (loadedBitmap != null) {
                         capturedBitmap = loadedBitmap
-                        val res = processMultiLanguageCameraOcr(context, loadedBitmap, preferOnlineAi)
-                        ocrResult = res
-                        if (res.isApiKeyError) {
-                            showApiKeyDialog = true
-                        }
+                        cropLeft = 0.05f
+                        cropTop = 0.05f
+                        cropRight = 0.95f
+                        cropBottom = 0.95f
+                        ocrResult = null
                     } else {
-                        Toast.makeText(context, "تعذر فتح الصورة المحفوطة", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "تعذر فتح الصورة المحفوظة", Toast.LENGTH_SHORT).show()
                     }
                 } catch (e: Exception) {
                     Toast.makeText(context, "خطأ أثناء قراءة الصورة: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                } finally {
-                    isScanning = false
                 }
             }
         }
@@ -262,25 +262,21 @@ fun CameraOcrSheet(
         uri?.let { fileUri ->
             coroutineScope.launch {
                 try {
-                    isScanning = true
-                    scanStatusMessage = "جاري فتح وتمحيص المستند المستورد..."
                     val inputStream = context.contentResolver.openInputStream(fileUri)
                     val loadedBitmap = BitmapFactory.decodeStream(inputStream)
                     inputStream?.close()
                     if (loadedBitmap != null) {
                         capturedBitmap = loadedBitmap
-                        val res = processMultiLanguageCameraOcr(context, loadedBitmap, preferOnlineAi)
-                        ocrResult = res
-                        if (res.isApiKeyError) {
-                            showApiKeyDialog = true
-                        }
+                        cropLeft = 0.05f
+                        cropTop = 0.05f
+                        cropRight = 0.95f
+                        cropBottom = 0.95f
+                        ocrResult = null
                     } else {
                         Toast.makeText(context, "تم استيراد الملف: ${fileUri.lastPathSegment}", Toast.LENGTH_SHORT).show()
                     }
                 } catch (e: Exception) {
                     Toast.makeText(context, "خطأ أثناء فتح الملف: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                } finally {
-                    isScanning = false
                 }
             }
         }
@@ -387,12 +383,53 @@ fun CameraOcrSheet(
                             }
                         }
                     } else if (capturedBitmap != null) {
-                        Image(
-                            bitmap = capturedBitmap!!.asImageBitmap(),
-                            contentDescription = "الصورة المصورة",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            InteractiveCropOverlay(
+                                bitmap = capturedBitmap!!,
+                                cropLeft = cropLeft,
+                                cropTop = cropTop,
+                                cropRight = cropRight,
+                                cropBottom = cropBottom,
+                                isScanning = isScanning,
+                                onCropChanged = { l, t, r, b ->
+                                    cropLeft = l
+                                    cropTop = t
+                                    cropRight = r
+                                    cropBottom = b
+                                }
+                            )
+
+                            // Instruction hint banner at top of crop view
+                            if (ocrResult == null && !isScanning) {
+                                Surface(
+                                    color = Color.Black.copy(alpha = 0.75f),
+                                    shape = RoundedCornerShape(20.dp),
+                                    border = BorderStroke(1.dp, Color(0xFF00E5A3).copy(alpha = 0.6f)),
+                                    modifier = Modifier
+                                        .align(Alignment.TopCenter)
+                                        .padding(top = 16.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Crop,
+                                            contentDescription = null,
+                                            tint = Color(0xFF00E5A3),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "اسحب الزوايا الخضراء لتحديد منتصف الصفحة أو الجزء المراد قراءته",
+                                            color = Color.White,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     } else {
                         val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -408,62 +445,113 @@ fun CameraOcrSheet(
                             }
                         }
 
-                        androidx.compose.ui.viewinterop.AndroidView(
-                            factory = { ctx ->
-                                val previewView = PreviewView(ctx).apply {
-                                    scaleType = PreviewView.ScaleType.FILL_CENTER
-                                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-                                }
-                                previewViewRef = previewView
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            androidx.compose.ui.viewinterop.AndroidView(
+                                factory = { ctx ->
+                                    val previewView = PreviewView(ctx).apply {
+                                        scaleType = PreviewView.ScaleType.FILL_CENTER
+                                        implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                                    }
+                                    previewViewRef = previewView
 
-                                cameraProviderFuture.addListener({
-                                    try {
-                                        val cameraProvider = cameraProviderFuture.get()
-                                        val preview = Preview.Builder().build().also {
-                                            it.setSurfaceProvider(previewView.surfaceProvider)
+                                    cameraProviderFuture.addListener({
+                                        try {
+                                            val cameraProvider = cameraProviderFuture.get()
+                                            val preview = Preview.Builder().build().also {
+                                                it.setSurfaceProvider(previewView.surfaceProvider)
+                                            }
+
+                                            val capture = ImageCapture.Builder()
+                                                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                                                .build()
+                                            imageCapture = capture
+
+                                            val cameraSelector = CameraSelector.Builder()
+                                                .requireLensFacing(lensFacing)
+                                                .build()
+
+                                            cameraProvider.unbindAll()
+                                            camera = cameraProvider.bindToLifecycle(
+                                                lifecycleOwner,
+                                                cameraSelector,
+                                                preview,
+                                                capture
+                                            )
+                                        } catch (exc: Exception) {
+                                            Log.e("CameraOcr", "Use case binding failed", exc)
                                         }
+                                    }, ContextCompat.getMainExecutor(ctx))
 
-                                        val capture = ImageCapture.Builder()
-                                            .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                                            .build()
-                                        imageCapture = capture
-
-                                        val cameraSelector = CameraSelector.Builder()
-                                            .requireLensFacing(lensFacing)
-                                            .build()
-
-                                        cameraProvider.unbindAll()
-                                        camera = cameraProvider.bindToLifecycle(
-                                            lifecycleOwner,
-                                            cameraSelector,
-                                            preview,
-                                            capture
-                                        )
-                                    } catch (exc: Exception) {
-                                        Log.e("CameraOcr", "Use case binding failed", exc)
+                                    previewView
+                                },
+                                onRelease = {
+                                    try {
+                                        if (cameraProviderFuture.isDone) {
+                                            cameraProviderFuture.get().unbindAll()
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e("CameraOcr", "Error releasing camera in AndroidView", e)
                                     }
-                                }, ContextCompat.getMainExecutor(ctx))
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
 
-                                previewView
-                            },
-                            onRelease = {
-                                try {
-                                    if (cameraProviderFuture.isDone) {
-                                        cameraProviderFuture.get().unbindAll()
-                                    }
-                                } catch (e: Exception) {
-                                    Log.e("CameraOcr", "Error releasing camera in AndroidView", e)
+                            // Interactive Crop Overlay over Live Camera Preview
+                            InteractiveCropOverlay(
+                                bitmap = null,
+                                cropLeft = cropLeft,
+                                cropTop = cropTop,
+                                cropRight = cropRight,
+                                cropBottom = cropBottom,
+                                isScanning = isScanning,
+                                onCropChanged = { l, t, r, b ->
+                                    cropLeft = l
+                                    cropTop = t
+                                    cropRight = r
+                                    cropBottom = b
                                 }
-                            },
-                            modifier = Modifier.fillMaxSize()
-                        )
+                            )
+
+                            // Instruction hint banner at top of camera view
+                            if (ocrResult == null && !isScanning) {
+                                Surface(
+                                    color = Color.Black.copy(alpha = 0.75f),
+                                    shape = RoundedCornerShape(20.dp),
+                                    border = BorderStroke(1.dp, Color(0xFF00E5A3).copy(alpha = 0.6f)),
+                                    modifier = Modifier
+                                        .align(Alignment.TopCenter)
+                                        .padding(top = 16.dp)
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Crop,
+                                            contentDescription = null,
+                                            tint = Color(0xFF00E5A3),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "اسحب الزوايا الخضراء لتحديد الجزء المراد قراءته قبل التصوير",
+                                            color = Color.White,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
 
-                    // Framing guidelines
-                    DocumentFrameOverlay(isScanning = isScanning)
+                    // Framing guidelines (only for live camera stream)
+                    if (capturedBitmap == null) {
+                        DocumentFrameOverlay(isScanning = isScanning)
+                    }
 
                     // Single vs Batch Pill Selector overlay near bottom of camera preview
-                    if (hasCameraPermission && ocrResult == null) {
+                    if (hasCameraPermission && capturedBitmap == null && ocrResult == null) {
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
@@ -500,7 +588,7 @@ fun CameraOcrSheet(
                                     )
                                     Spacer(modifier = Modifier.height(16.dp))
                                     Text(
-                                        text = scanStatusMessage.ifEmpty { "جاري معالجة المستند والمحاذاة الذكية..." },
+                                        text = scanStatusMessage.ifEmpty { "جاري قراءة وتحليل النص في الجزء المحدد..." },
                                         color = Color.White,
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold,
@@ -518,107 +606,142 @@ fun CameraOcrSheet(
                     }
                 }
 
-                // Modes Scroll Bar
-                CamScannerModesBar(
-                    selectedMode = selectedScannerMode,
-                    onModeSelected = { selectedScannerMode = it }
-                )
-
-                // Bottom Control Bar
-                CamScannerBottomBar(
-                    onImportFiles = { filePickerLauncher.launch("*/*") },
-                    onImportImages = { galleryLauncher.launch("image/*") },
-                    onCapture = {
-                        isScanning = true
-                        scanStatusMessage = if (preferOnlineAi) {
-                            "جاري التقاط المستند واستخراج النصوص بالسحابة..."
-                        } else {
-                            "جاري تحليل الصورة بالمحرك المحلي..."
-                        }
-
-                        val capture = imageCapture
-                        if (capture != null) {
-                            val executor = Executors.newSingleThreadExecutor()
-                            capture.takePicture(
-                                executor,
-                                object : ImageCapture.OnImageCapturedCallback() {
-                                    override fun onCaptureSuccess(image: ImageProxy) {
-                                        val rotationDegrees = image.imageInfo.rotationDegrees
-                                        val buffer = image.planes[0].buffer
-                                        val bytes = ByteArray(buffer.capacity())
-                                        buffer.get(bytes)
-                                        val originalBmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                                        image.close()
-
-                                        val rotatedBmp = if (rotationDegrees != 0 && originalBmp != null) {
-                                            val matrix = Matrix()
-                                            matrix.postRotate(rotationDegrees.toFloat())
-                                            Bitmap.createBitmap(
-                                                originalBmp,
-                                                0,
-                                                0,
-                                                originalBmp.width,
-                                                originalBmp.height,
-                                                matrix,
-                                                true
-                                            )
-                                        } else {
-                                            originalBmp
-                                        }
-
-                                        coroutineScope.launch {
-                                            capturedBitmap = rotatedBmp
-                                            if (rotatedBmp != null) {
-                                                val res = processMultiLanguageCameraOcr(context, rotatedBmp, preferOnlineAi)
-                                                ocrResult = res
-                                                if (res.isApiKeyError) {
-                                                    showApiKeyDialog = true
-                                                }
-                                                isScanning = false
-                                            } else {
-                                                isScanning = false
-                                                Toast.makeText(context, "فشل التقاط الصورة", Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
-                                    }
-
-                                    override fun onError(exception: ImageCaptureException) {
-                                        Log.e("CameraOcr", "Capture failed: ${exception.message}", exception)
-                                        coroutineScope.launch {
-                                            val previewBmp = previewViewRef?.bitmap
-                                            if (previewBmp != null) {
-                                                capturedBitmap = previewBmp
-                                                val res = processMultiLanguageCameraOcr(context, previewBmp, preferOnlineAi)
-                                                ocrResult = res
-                                                if (res.isApiKeyError) {
-                                                    showApiKeyDialog = true
-                                                }
-                                                isScanning = false
-                                            } else {
-                                                isScanning = false
-                                                Toast.makeText(context, "خطأ في التقاط الصورة: ${exception.localizedMessage}", Toast.LENGTH_SHORT).show()
-                                            }
-                                        }
-                                    }
-                                }
-                            )
-                        } else {
-                            val bmp = previewViewRef?.bitmap
-                            if (bmp != null) {
-                                capturedBitmap = bmp
+                // Bottom Control Bars
+                if (capturedBitmap != null && ocrResult == null) {
+                    CropControlBottomBar(
+                        isScanning = isScanning,
+                        preferOnlineAi = preferOnlineAi,
+                        onScanCrop = {
+                            if (capturedBitmap != null) {
                                 coroutineScope.launch {
-                                    val res = processMultiLanguageCameraOcr(context, bmp, preferOnlineAi)
-                                    ocrResult = res
-                                    isScanning = false
+                                    try {
+                                        isScanning = true
+                                        scanStatusMessage = if (preferOnlineAi) {
+                                            "جاري قراءة نص المنطقة المحددة بالسحابة..."
+                                        } else {
+                                            "جاري قراءة نص المنطقة المحددة محليًا..."
+                                        }
+                                        val croppedBmp = cropBitmapNormalized(
+                                            capturedBitmap!!,
+                                            cropLeft,
+                                            cropTop,
+                                            cropRight,
+                                            cropBottom
+                                        )
+                                        val res = processMultiLanguageCameraOcr(context, croppedBmp, preferOnlineAi)
+                                        ocrResult = res
+                                        if (res.isApiKeyError) {
+                                            showApiKeyDialog = true
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "خطأ أثناء معالجة الجزء المحدد: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                    } finally {
+                                        isScanning = false
+                                    }
                                 }
-                            } else {
-                                isScanning = false
-                                Toast.makeText(context, "الكاميرا غير جاهزة بعد، يمكنك استيراد صور أو ملفات", Toast.LENGTH_SHORT).show()
                             }
+                        },
+                        onSelectFull = {
+                            cropLeft = 0f
+                            cropTop = 0f
+                            cropRight = 1f
+                            cropBottom = 1f
+                            Toast.makeText(context, "تم تحديد الصفحة كاملة", Toast.LENGTH_SHORT).show()
+                        },
+                        onRetake = {
+                            capturedBitmap = null
+                            ocrResult = null
                         }
-                    },
-                    onAllFeatures = { showApiKeyDialog = true }
-                )
+                    )
+                } else if (capturedBitmap == null) {
+                    CamScannerModesBar(
+                        selectedMode = selectedScannerMode,
+                        onModeSelected = { selectedScannerMode = it }
+                    )
+
+                    CamScannerBottomBar(
+                        onImportFiles = { filePickerLauncher.launch("*/*") },
+                        onImportImages = { galleryLauncher.launch("image/*") },
+                        onCapture = {
+                            val capture = imageCapture
+                            if (capture != null) {
+                                val executor = Executors.newSingleThreadExecutor()
+                                capture.takePicture(
+                                    executor,
+                                    object : ImageCapture.OnImageCapturedCallback() {
+                                        override fun onCaptureSuccess(image: ImageProxy) {
+                                            val rotationDegrees = image.imageInfo.rotationDegrees
+                                            val buffer = image.planes[0].buffer
+                                            val bytes = ByteArray(buffer.capacity())
+                                            buffer.get(bytes)
+                                            val originalBmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                                            image.close()
+
+                                            val rotatedBmp = if (rotationDegrees != 0 && originalBmp != null) {
+                                                val matrix = Matrix()
+                                                matrix.postRotate(rotationDegrees.toFloat())
+                                                Bitmap.createBitmap(
+                                                    originalBmp,
+                                                    0,
+                                                    0,
+                                                    originalBmp.width,
+                                                    originalBmp.height,
+                                                    matrix,
+                                                    true
+                                                )
+                                            } else {
+                                                originalBmp
+                                            }
+
+                                            coroutineScope.launch {
+                                                if (rotatedBmp != null) {
+                                                    capturedBitmap = rotatedBmp
+                                                    cropLeft = 0.05f
+                                                    cropTop = 0.05f
+                                                    cropRight = 0.95f
+                                                    cropBottom = 0.95f
+                                                    ocrResult = null
+                                                } else {
+                                                    Toast.makeText(context, "فشل التقاط الصورة", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                        }
+
+                                        override fun onError(exception: ImageCaptureException) {
+                                            Log.e("CameraOcr", "Capture failed: ${exception.message}", exception)
+                                            coroutineScope.launch {
+                                                val previewBmp = previewViewRef?.bitmap
+                                                if (previewBmp != null) {
+                                                    capturedBitmap = previewBmp
+                                                    cropLeft = 0.05f
+                                                    cropTop = 0.05f
+                                                    cropRight = 0.95f
+                                                    cropBottom = 0.95f
+                                                    ocrResult = null
+                                                } else {
+                                                    Toast.makeText(context, "خطأ في التقاط الصورة: ${exception.localizedMessage}", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                        }
+                                    }
+                                )
+                            } else {
+                                val bmp = previewViewRef?.bitmap
+                                if (bmp != null) {
+                                    capturedBitmap = bmp
+                                    cropLeft = 0.05f
+                                    cropTop = 0.05f
+                                    cropRight = 0.95f
+                                    cropBottom = 0.95f
+                                    ocrResult = null
+                                } else {
+                                    Toast.makeText(context, "الكاميرا غير جاهزة بعد، يمكنك استيراد صور أو ملفات", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        onAllFeatures = { showApiKeyDialog = true }
+                    )
+                }
             }
 
             // OCR Result Bottom Sheet overlay when text is recognized
@@ -1355,6 +1478,342 @@ fun CamScannerBottomBar(
                 color = Color.White,
                 fontWeight = FontWeight.Medium
             )
+        }
+    }
+}
+
+enum class CropHandle { NONE, TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT, CENTER }
+
+fun cropBitmapNormalized(
+    bmp: Bitmap,
+    leftRatio: Float,
+    topRatio: Float,
+    rightRatio: Float,
+    bottomRatio: Float
+): Bitmap {
+    val l = leftRatio.coerceIn(0f, 1f)
+    val t = topRatio.coerceIn(0f, 1f)
+    val r = rightRatio.coerceIn(l + 0.01f, 1f)
+    val b = bottomRatio.coerceIn(t + 0.01f, 1f)
+
+    val startX = (l * bmp.width).toInt().coerceIn(0, bmp.width - 1)
+    val startY = (t * bmp.height).toInt().coerceIn(0, bmp.height - 1)
+    val endX = (r * bmp.width).toInt().coerceIn(startX + 1, bmp.width)
+    val endY = (b * bmp.height).toInt().coerceIn(startY + 1, bmp.height)
+
+    val width = (endX - startX).coerceAtLeast(1)
+    val height = (endY - startY).coerceAtLeast(1)
+
+    return Bitmap.createBitmap(bmp, startX, startY, width, height)
+}
+
+@Composable
+fun CropControlBottomBar(
+    isScanning: Boolean,
+    preferOnlineAi: Boolean,
+    onScanCrop: () -> Unit,
+    onSelectFull: () -> Unit,
+    onRetake: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF14121E))
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Retake / Reselect Image Button
+            OutlinedButton(
+                onClick = onRetake,
+                enabled = !isScanning,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(imageVector = Icons.Default.CropRotate, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("صورة جديدة", fontSize = 12.sp)
+            }
+
+            // Select Full Page Button
+            OutlinedButton(
+                onClick = onSelectFull,
+                enabled = !isScanning,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF00E5A3)),
+                border = BorderStroke(1.dp, Color(0xFF00E5A3).copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(imageVector = Icons.Default.AspectRatio, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("الصفحة كاملة", fontSize = 12.sp)
+            }
+
+            // Primary Scan Button
+            Button(
+                onClick = onScanCrop,
+                enabled = !isScanning,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5A3), contentColor = Color.Black),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.weight(1.4f)
+            ) {
+                Icon(imageVector = Icons.Default.DocumentScanner, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color.Black)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "مسح الضوئي",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun InteractiveCropOverlay(
+    bitmap: Bitmap?,
+    cropLeft: Float,
+    cropTop: Float,
+    cropRight: Float,
+    cropBottom: Float,
+    isScanning: Boolean,
+    onCropChanged: (left: Float, top: Float, right: Float, bottom: Float) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var activeHandle by remember { mutableStateOf(CropHandle.NONE) }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "laser_scanner")
+    val laserPositionY by infiniteTransition.animateFloat(
+        initialValue = 0.05f,
+        targetValue = 0.95f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "laser_anim"
+    )
+
+    val density = LocalDensity.current
+
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxSize()
+            .then(if (bitmap != null) Modifier.background(Color.Black) else Modifier)
+    ) {
+        val containerWidth = with(density) { maxWidth.toPx() }
+        val containerHeight = with(density) { maxHeight.toPx() }
+
+        if (containerWidth > 0f && containerHeight > 0f) {
+            val displayedWidth: Float
+            val displayedHeight: Float
+            val imageX: Float
+            val imageY: Float
+
+            if (bitmap != null && bitmap.width > 0 && bitmap.height > 0) {
+                val bmpWidth = bitmap.width.toFloat()
+                val bmpHeight = bitmap.height.toFloat()
+                val bmpAspect = bmpWidth / bmpHeight
+                val containerAspect = containerWidth / containerHeight
+
+                if (bmpAspect > containerAspect) {
+                    displayedWidth = containerWidth
+                    displayedHeight = containerWidth / bmpAspect
+                    imageX = 0f
+                    imageY = (containerHeight - displayedHeight) / 2f
+                } else {
+                    displayedHeight = containerHeight
+                    displayedWidth = containerHeight * bmpAspect
+                    imageY = 0f
+                    imageX = (containerWidth - displayedWidth) / 2f
+                }
+
+                // Base Image Displayed Fit
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = "صورة المستند",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+            } else {
+                displayedWidth = containerWidth
+                displayedHeight = containerHeight
+                imageX = 0f
+                imageY = 0f
+            }
+
+            val rectLeft = imageX + cropLeft * displayedWidth
+            val rectTop = imageY + cropTop * displayedHeight
+            val rectRight = imageX + cropRight * displayedWidth
+            val rectBottom = imageY + cropBottom * displayedHeight
+
+            // Touch & Visual Crop Overlay Canvas
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(displayedWidth, displayedHeight, imageX, imageY) {
+                        detectDragGestures(
+                            onDragStart = { offset ->
+                                val touchX = offset.x
+                                val touchY = offset.y
+                                val touchRadius = 44.dp.toPx()
+
+                                val distTL = hypot((touchX - rectLeft).toDouble(), (touchY - rectTop).toDouble()).toFloat()
+                                val distTR = hypot((touchX - rectRight).toDouble(), (touchY - rectTop).toDouble()).toFloat()
+                                val distBL = hypot((touchX - rectLeft).toDouble(), (touchY - rectBottom).toDouble()).toFloat()
+                                val distBR = hypot((touchX - rectRight).toDouble(), (touchY - rectBottom).toDouble()).toFloat()
+
+                                activeHandle = when {
+                                    distTL < touchRadius -> CropHandle.TOP_LEFT
+                                    distTR < touchRadius -> CropHandle.TOP_RIGHT
+                                    distBL < touchRadius -> CropHandle.BOTTOM_LEFT
+                                    distBR < touchRadius -> CropHandle.BOTTOM_RIGHT
+                                    touchX in rectLeft..rectRight && touchY in rectTop..rectBottom -> CropHandle.CENTER
+                                    else -> CropHandle.NONE
+                                }
+                            },
+                            onDragEnd = { activeHandle = CropHandle.NONE },
+                            onDragCancel = { activeHandle = CropHandle.NONE },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                var nLeft = cropLeft
+                                var nTop = cropTop
+                                var nRight = cropRight
+                                var nBottom = cropBottom
+
+                                val deltaX = dragAmount.x / displayedWidth
+                                val deltaY = dragAmount.y / displayedHeight
+
+                                val minW = 28.dp.toPx() / displayedWidth
+                                val minH = 28.dp.toPx() / displayedHeight
+
+                                when (activeHandle) {
+                                    CropHandle.TOP_LEFT -> {
+                                        nLeft = (nLeft + deltaX).coerceIn(0f, nRight - minW)
+                                        nTop = (nTop + deltaY).coerceIn(0f, nBottom - minH)
+                                    }
+                                    CropHandle.TOP_RIGHT -> {
+                                        nRight = (nRight + deltaX).coerceIn(nLeft + minW, 1f)
+                                        nTop = (nTop + deltaY).coerceIn(0f, nBottom - minH)
+                                    }
+                                    CropHandle.BOTTOM_LEFT -> {
+                                        nLeft = (nLeft + deltaX).coerceIn(0f, nRight - minW)
+                                        nBottom = (nBottom + deltaY).coerceIn(nTop + minH, 1f)
+                                    }
+                                    CropHandle.BOTTOM_RIGHT -> {
+                                        nRight = (nRight + deltaX).coerceIn(nLeft + minW, 1f)
+                                        nBottom = (nBottom + deltaY).coerceIn(nTop + minH, 1f)
+                                    }
+                                    CropHandle.CENTER -> {
+                                        val curW = nRight - nLeft
+                                        val curH = nBottom - nTop
+                                        val newL = (nLeft + deltaX).coerceIn(0f, 1f - curW)
+                                        val newT = (nTop + deltaY).coerceIn(0f, 1f - curH)
+                                        nLeft = newL
+                                        nRight = newL + curW
+                                        nTop = newT
+                                        nBottom = newT + curH
+                                    }
+                                    CropHandle.NONE -> {}
+                                }
+                                onCropChanged(nLeft, nTop, nRight, nBottom)
+                            }
+                        )
+                    }
+            ) {
+                val canvasW = size.width
+                val canvasH = size.height
+
+                // Dimmed exterior background
+                val dimColor = Color.Black.copy(alpha = 0.55f)
+                drawRect(dimColor, topLeft = Offset(0f, 0f), size = Size(canvasW, rectTop.coerceAtLeast(0f)))
+                drawRect(dimColor, topLeft = Offset(0f, rectBottom), size = Size(canvasW, (canvasH - rectBottom).coerceAtLeast(0f)))
+                drawRect(dimColor, topLeft = Offset(0f, rectTop), size = Size(rectLeft.coerceAtLeast(0f), (rectBottom - rectTop).coerceAtLeast(0f)))
+                drawRect(dimColor, topLeft = Offset(rectRight, rectTop), size = Size((canvasW - rectRight).coerceAtLeast(0f), (rectBottom - rectTop).coerceAtLeast(0f)))
+
+                val cropW = rectRight - rectLeft
+                val cropH = rectBottom - rectTop
+
+                if (cropW > 0f && cropH > 0f) {
+                    // Dashed Guideline Border
+                    val strokeColor = if (isScanning) Color(0xFF00FFCC) else Color.White.copy(alpha = 0.9f)
+                    drawRoundRect(
+                        color = strokeColor,
+                        topLeft = Offset(rectLeft, rectTop),
+                        size = Size(cropW, cropH),
+                        cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx()),
+                        style = Stroke(
+                            width = 2.dp.toPx(),
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 12f), 0f)
+                        )
+                    )
+
+                    // Rule of Thirds Grid lines
+                    val gridColor = Color.White.copy(alpha = 0.25f)
+                    val strokeGrid = Stroke(width = 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f), 0f))
+                    drawLine(gridColor, Offset(rectLeft + cropW / 3f, rectTop), Offset(rectLeft + cropW / 3f, rectBottom), strokeGrid.width)
+                    drawLine(gridColor, Offset(rectLeft + 2 * cropW / 3f, rectTop), Offset(rectLeft + 2 * cropW / 3f, rectBottom), strokeGrid.width)
+                    drawLine(gridColor, Offset(rectLeft, rectTop + cropH / 3f), Offset(rectRight, rectTop + cropH / 3f), strokeGrid.width)
+                    drawLine(gridColor, Offset(rectLeft, rectTop + 2 * cropH / 3f), Offset(rectRight, rectTop + 2 * cropH / 3f), strokeGrid.width)
+
+                    // Corner Brackets & Glowing Touch Handles (Neon Cyan #00FFCC)
+                    val cornerLen = 28.dp.toPx()
+                    val cornerStroke = 4.5f.dp.toPx()
+                    val cornerColor = Color(0xFF00FFCC)
+
+                    // Top-Left Corner
+                    drawLine(cornerColor, Offset(rectLeft, rectTop), Offset(rectLeft + cornerLen, rectTop), cornerStroke)
+                    drawLine(cornerColor, Offset(rectLeft, rectTop), Offset(rectLeft, rectTop + cornerLen), cornerStroke)
+                    drawCircle(cornerColor, radius = 6.dp.toPx(), center = Offset(rectLeft, rectTop))
+
+                    // Top-Right Corner
+                    drawLine(cornerColor, Offset(rectRight, rectTop), Offset(rectRight - cornerLen, rectTop), cornerStroke)
+                    drawLine(cornerColor, Offset(rectRight, rectTop), Offset(rectRight, rectTop + cornerLen), cornerStroke)
+                    drawCircle(cornerColor, radius = 6.dp.toPx(), center = Offset(rectRight, rectTop))
+
+                    // Bottom-Left Corner
+                    drawLine(cornerColor, Offset(rectLeft, rectBottom), Offset(rectLeft + cornerLen, rectBottom), cornerStroke)
+                    drawLine(cornerColor, Offset(rectLeft, rectBottom), Offset(rectLeft, rectBottom - cornerLen), cornerStroke)
+                    drawCircle(cornerColor, radius = 6.dp.toPx(), center = Offset(rectLeft, rectBottom))
+
+                    // Bottom-Right Corner
+                    drawLine(cornerColor, Offset(rectRight, rectBottom), Offset(rectRight - cornerLen, rectBottom), cornerStroke)
+                    drawLine(cornerColor, Offset(rectRight, rectBottom), Offset(rectRight, rectBottom - cornerLen), cornerStroke)
+                    drawCircle(cornerColor, radius = 6.dp.toPx(), center = Offset(rectRight, rectBottom))
+
+                    // Laser Beam Scanner Effect if scanning
+                    if (isScanning) {
+                        val laserY = rectTop + cropH * laserPositionY
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color(0xFF00FFCC).copy(alpha = 0.35f),
+                                    Color(0xFF00FFCC).copy(alpha = 0.9f),
+                                    Color(0xFF00FFCC).copy(alpha = 0.35f),
+                                    Color.Transparent
+                                ),
+                                startY = laserY - 16.dp.toPx(),
+                                endY = laserY + 16.dp.toPx()
+                            ),
+                            topLeft = Offset(rectLeft + 2.dp.toPx(), laserY - 16.dp.toPx()),
+                            size = Size(cropW - 4.dp.toPx(), 32.dp.toPx())
+                        )
+                        drawLine(
+                            color = Color(0xFF00FFCC),
+                            start = Offset(rectLeft, laserY),
+                            end = Offset(rectRight, laserY),
+                            strokeWidth = 2.5.dp.toPx()
+                        )
+                    }
+                }
+            }
         }
     }
 }

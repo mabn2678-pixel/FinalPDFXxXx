@@ -2339,13 +2339,17 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                 com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(context.applicationContext)
                 val document = com.tom_roush.pdfbox.pdmodel.PDDocument.load(file)
 
-                val fontStream = try {
-                    context.assets.open("pdfjs/web/standard_fonts/LiberationSans-Regular.ttf")
-                } catch (e: Exception) { null }
-
-                val pdfFont: com.tom_roush.pdfbox.pdmodel.font.PDFont = if (fontStream != null) {
+                val fontBytes = try {
+                    context.assets.open("fonts/NotoSansArabic-Regular.ttf").readBytes()
+                } catch (e: Exception) {
                     try {
-                        com.tom_roush.pdfbox.pdmodel.font.PDType0Font.load(document, fontStream)
+                        context.assets.open("pdfjs/web/standard_fonts/LiberationSans-Regular.ttf").readBytes()
+                    } catch (ex: Exception) { null }
+                }
+
+                val pdfFont: com.tom_roush.pdfbox.pdmodel.font.PDFont = if (fontBytes != null) {
+                    try {
+                        com.tom_roush.pdfbox.pdmodel.font.PDType0Font.load(document, java.io.ByteArrayInputStream(fontBytes))
                     } catch (e: Exception) {
                         com.tom_roush.pdfbox.pdmodel.font.PDType1Font.HELVETICA
                     }
@@ -2540,14 +2544,26 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
                             contentStream.appendRawCommands("3 Tr\n")
                             contentStream.newLineAtOffset(pdfX, pdfY)
 
-                            val cleanStr = line.text.replace("\r", "").replace("\n", "").replace("\t", " ")
+                            val cleanStr = line.text.filter { c ->
+                                val code = c.code
+                                code in 32..126 || code in 0x0600..0x06FF || code in 0x0750..0x077F || code in 0x08A0..0x08FF || code in 0xFB50..0xFDFF || code in 0xFE70..0xFEFE || code in 160..255
+                            }.trim()
+
                             if (cleanStr.isNotBlank()) {
                                 try {
                                     contentStream.showText(cleanStr)
                                 } catch (e: Exception) {
+                                    val safeSb = StringBuilder()
                                     for (ch in cleanStr) {
                                         try {
-                                            contentStream.showText(ch.toString())
+                                            pdfFont.encode(ch.toString())
+                                            safeSb.append(ch)
+                                        } catch (ignored: Exception) {}
+                                    }
+                                    val safeStr = safeSb.toString()
+                                    if (safeStr.isNotBlank()) {
+                                        try {
+                                            contentStream.showText(safeStr)
                                         } catch (ignored: Exception) {}
                                     }
                                 }
