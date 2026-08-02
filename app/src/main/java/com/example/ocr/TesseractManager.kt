@@ -166,6 +166,38 @@ class TesseractManager(private val context: Context) {
         }
     }
 
+    fun getAvailableLanguagesCombined(): String {
+        try {
+            val tessDir = File(context.filesDir, "tessdata")
+            if (!tessDir.exists()) {
+                tessDir.mkdirs()
+            }
+
+            // Copy traineddata files from assets dynamically if not existing
+            try {
+                val tessAssets = context.assets.list("tessdata") ?: emptyArray()
+                for (fileName in tessAssets) {
+                    if (fileName.endsWith(".traineddata")) {
+                        copyAssetTessDataIfNotExists(tessDir, fileName)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not list assets in tessdata: ${e.message}")
+            }
+
+            val files = tessDir.listFiles { _, name -> name.endsWith(".traineddata") }
+            if (files != null && files.isNotEmpty()) {
+                val langs = files.map { it.name.removeSuffix(".traineddata") }.filter { it.isNotBlank() }
+                if (langs.isNotEmpty()) {
+                    return langs.joinToString("+")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error discovering available traineddata languages", e)
+        }
+        return "eng"
+    }
+
     fun release() {
         try {
             tessApi?.recycle()
