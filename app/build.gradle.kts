@@ -1,4 +1,6 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.io.File
+import java.net.URI
 
 plugins {
   alias(libs.plugins.android.application)
@@ -115,6 +117,7 @@ dependencies {
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
   implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+  implementation("cz.adaptech.tesseract4android:tesseract4android:4.7.0")
   implementation("com.google.mlkit:text-recognition:16.0.1")
   implementation(libs.logging.interceptor)
   implementation(libs.moshi.kotlin)
@@ -140,4 +143,66 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
+}
+
+tasks.register("downloadOcrAssets") {
+    val projectDir = layout.projectDirectory.asFile
+    doLast {
+        val tessDataDir = File(projectDir, "src/main/assets/tessdata")
+        if (!tessDataDir.exists()) {
+            tessDataDir.mkdirs()
+        }
+
+        val ocrFiles = listOf(
+            "ara.traineddata" to "https://github.com/tesseract-ocr/tessdata_fast/raw/main/ara.traineddata",
+            "eng.traineddata" to "https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata",
+            "deu.traineddata" to "https://github.com/tesseract-ocr/tessdata_fast/raw/main/deu.traineddata"
+        )
+
+        for ((fileName, urlStr) in ocrFiles) {
+            val destFile = File(tessDataDir, fileName)
+            if (!destFile.exists() || destFile.length() == 0L) {
+                println("Downloading OCR asset: $fileName...")
+                try {
+                    URI(urlStr).toURL().openStream().use { input ->
+                        destFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    println("Downloaded $fileName successfully.")
+                } catch (e: Exception) {
+                    println("Failed to download $fileName: ${e.message}")
+                }
+            } else {
+                println("OCR asset $fileName already exists. Skipping download.")
+            }
+        }
+
+        val fontsDir = File(projectDir, "src/main/assets/fonts")
+        if (!fontsDir.exists()) {
+            fontsDir.mkdirs()
+        }
+
+        val fontFile = File(fontsDir, "NotoSansArabic-Regular.ttf")
+        val fontUrl = "https://github.com/google/fonts/raw/main/ofl/notosansarabic/NotoSansArabic-Regular.ttf"
+        if (!fontFile.exists() || fontFile.length() == 0L) {
+            println("Downloading font asset: NotoSansArabic-Regular.ttf...")
+            try {
+                URI(fontUrl).toURL().openStream().use { input ->
+                    fontFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                println("Downloaded NotoSansArabic-Regular.ttf successfully.")
+            } catch (e: Exception) {
+                println("Failed to download font: ${e.message}")
+            }
+        } else {
+            println("Font asset NotoSansArabic-Regular.ttf already exists. Skipping download.")
+        }
+    }
+}
+
+tasks.named("preBuild") {
+    dependsOn("downloadOcrAssets")
 }

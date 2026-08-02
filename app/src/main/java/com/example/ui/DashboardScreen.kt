@@ -104,6 +104,7 @@ fun DashboardScreen(
     var isMergingPdfs by remember { mutableStateOf(false) }
 
     var showExitConfirmSheet by remember { mutableStateOf(false) }
+    var showCameraOcr by remember { mutableStateOf(false) }
 
     // Back handler to return to the Home/Main tab, clear selection, or show exit confirmation sheet
     BackHandler(enabled = true) {
@@ -243,7 +244,8 @@ fun DashboardScreen(
                     onShowFileDetails = { fileToViewInfo = it },
                     onClearSelection = { viewModel.clearSelection() },
                     onShareMultiple = { shareMultiplePdfs(context, selectedFilePaths.toList()) },
-                    onDeleteMultiple = { showMultiDeleteConfirm = true }
+                    onDeleteMultiple = { showMultiDeleteConfirm = true },
+                    onOpenCameraOcr = { showCameraOcr = true }
                 )
                 DashboardTab.Folders -> FoldersTabScreen(
                     viewModel = viewModel,
@@ -486,6 +488,17 @@ fun DashboardScreen(
             }
         )
     }
+
+    // Camera OCR Screen Overlay
+    if (showCameraOcr) {
+        com.example.ocr.CameraOcrScreen(
+            onBack = { showCameraOcr = false },
+            onOpenPdfViewer = { pdfFile ->
+                showCameraOcr = false
+                viewModel.selectPdf(pdfFile.absolutePath, pdfFile.name)
+            }
+        )
+    }
 }
 
 // ==========================================
@@ -504,7 +517,8 @@ fun HomeTabScreen(
     onShowFileDetails: (LocalPdfFile) -> Unit,
     onClearSelection: () -> Unit,
     onShareMultiple: () -> Unit,
-    onDeleteMultiple: () -> Unit
+    onDeleteMultiple: () -> Unit,
+    onOpenCameraOcr: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val currentHour = remember { Calendar.getInstance().get(Calendar.HOUR_OF_DAY) }
@@ -677,11 +691,28 @@ fun HomeTabScreen(
                 )
             }
 
-            // Two Premium Header Icons (Stats & Sort) - Separated Circular Buttons
+            // Header Action Buttons (Camera OCR, Stats & Sort)
             Row(
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Camera OCR Quick Action Button
+                if (onOpenCameraOcr != null) {
+                    IconButton(
+                        onClick = { onOpenCameraOcr() },
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DocumentScanner,
+                            contentDescription = "ماسح الكاميرا (OCR)",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
                 // Statistics Icon Button
                 IconButton(
                     onClick = { showStatsSheet = true },
@@ -2780,10 +2811,12 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                 modifier = Modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background
             ) {
-                CameraOcrSheet(
-                    viewModel = viewModel,
-                    state = uiState,
-                    onDismiss = { activeTool = ActiveTool.None }
+                com.example.ocr.CameraOcrScreen(
+                    onBack = { activeTool = ActiveTool.None },
+                    onOpenPdfViewer = { pdfFile ->
+                        activeTool = ActiveTool.None
+                        viewModel.selectPdf(pdfFile.absolutePath, pdfFile.name)
+                    }
                 )
             }
         } else {
