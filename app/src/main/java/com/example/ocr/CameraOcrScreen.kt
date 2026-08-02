@@ -15,6 +15,7 @@ import android.graphics.Paint
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -195,6 +196,13 @@ fun CameraOcrScreen(
 
     DisposableEffect(Unit) {
         onDispose {
+            try {
+                if (cameraProviderFuture.isDone) {
+                    cameraProviderFuture.get().unbindAll()
+                }
+            } catch (e: Exception) {
+                Log.e("CameraOcrScreen", "Error unbinding camera on dispose", e)
+            }
             tesseractManager.release()
         }
     }
@@ -228,6 +236,28 @@ fun CameraOcrScreen(
         }
     }
 
+    val handleBackPress: () -> Unit = {
+        when {
+            createdPdfFile != null || screenState == OcrScreenState.Success -> {
+                createdPdfFile = null
+                capturedBitmap = null
+                extractedTextResult = null
+                screenState = OcrScreenState.Camera
+            }
+            capturedBitmap != null || screenState == OcrScreenState.Crop -> {
+                capturedBitmap = null
+                screenState = OcrScreenState.Camera
+            }
+            else -> {
+                onBack()
+            }
+        }
+    }
+
+    BackHandler(enabled = true) {
+        handleBackPress()
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -246,7 +276,7 @@ fun CameraOcrScreen(
                         .padding(horizontal = 8.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = handleBackPress) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "رجوع",
@@ -334,6 +364,18 @@ fun CameraOcrScreen(
                                 }
                             }
                         } else {
+                            DisposableEffect(lifecycleOwner) {
+                                onDispose {
+                                    try {
+                                        if (cameraProviderFuture.isDone) {
+                                            cameraProviderFuture.get().unbindAll()
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e("CameraOcrScreen", "Camera unbind on state exit failed", e)
+                                    }
+                                }
+                            }
+
                             // CameraX Live Preview with 3x3 Grid Overlay
                             Box(modifier = Modifier.fillMaxSize()) {
                                 AndroidView(
@@ -642,13 +684,13 @@ fun CameraOcrScreen(
 
                                         coroutineScope.launch {
                                             try {
-                                                // Perspective Crop
-                                                val croppedBmp = cropPerspective(
-                                                    bmp,
-                                                    cropPoints[0],
-                                                    cropPoints[1],
-                                                    cropPoints[2],
-                                                    cropPoints[3]
+                                                // Perspective Crop & Warp using user-selected crop points
+                                                val croppedBmp = cropAndWarpBitmap(
+                                                    bitmap = bmp,
+                                                    tl = cropPoints[0],
+                                                    tr = cropPoints[1],
+                                                    bl = cropPoints[3],
+                                                    br = cropPoints[2]
                                                 )
 
                                                 // B&W Contrast Enhancement for Tesseract
@@ -1008,14 +1050,30 @@ data class CropPoints(
  * and 4 orange touch node handles (radius 40f) responsive to touch drag gestures.
  */
 @Composable
-fun InteractivePerspectiveCrop(
+fun ScannerCropOverlay(
     bitmap: Bitmap,
-    cropPoints: CropPoints,
-    onCropPointsChanged: (CropPoints) -> Unit,
+    points: List<Offset>, // 4 points [TL, TR, BR, BL] normalized 0..1
+    onPointsChanged: (List<Offset>) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
-    var activeNodeName by remember { mutableStateOf<String?>(null) } // "TL", "TR", "BL", "BR"
+    var activePointIndex by remember { mutableStateOf<Int?>(null) } // 0=TL, 1=TR, 2=BR, 3=BL
+
+    // 4 distinct Compose state variables for immediate recomposition during touch dragging
+    var tl by remember(bitmap) { mutableStateOf(points.getOrElse(0) { Offset(0.08f, 0.08f) }) }
+    var tr by remember(bitmap) { mutableStateOf(points.getOrElse(1) { Offset(0.92f, 0.08f) }) }
+    var br by remember(bitmap) { mutableStateOf(points.getOrElse(2) { Offset(0.92f, 0.92f) }) }
+    var bl by remember(bitmap) { mutableStateOf(points.getOrElse(3) { Offset(0.08f, 0.92f) }) }
+
+    // Keep states synced if external points change when not dragging
+    LaunchedEffect(points) {
+        if (activePointIndex == null && points.size >= 4) {
+            tl = points[0]
+            tr = points[1]
+            br = points[2]
+            bl = points[3]
+        }
+    }
 
     val srcWidth = bitmap.width.toFloat()
     val srcHeight = bitmap.height.toFloat()
@@ -1035,18 +1093,20 @@ fun InteractivePerspectiveCrop(
             val offsetX = (cWidth - dispW) / 2f
             val offsetY = (cHeight - dispH) / 2f
 
-            // Screen pixel coordinates for 4 nodes
-            val pxTL = Offset(offsetX + cropPoints.tl.x * dispW, offsetY + cropPoints.tl.y * dispH)
-            val pxTR = Offset(offsetX + cropPoints.tr.x * dispW, offsetY + cropPoints.tr.y * dispH)
-            val pxBR = Offset(offsetX + cropPoints.br.x * dispW, offsetY + cropPoints.br.y * dispH)
-            val pxBL = Offset(offsetX + cropPoints.bl.x * dispW, offsetY + cropPoints.bl.y * dispH)
+            // Screen pixel coordinates calculated directly from state variables
+            val pxTL = Offset(offsetX + tl.x * dispW, offsetY + tl.y * dispH)
+            val pxTR = Offset(offsetX + tr.x * dispW, offsetY + tr.y * dispH)
+            val pxBR = Offset(offsetX + br.x * dispW, offsetY + br.y * dispH)
+            val pxBL = Offset(offsetX + bl.x * dispW, offsetY + bl.y * dispH)
 
             val orangeColor = Color(0xFFFF7A00)
 
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(cropPoints, canvasSize) {
+                    .pointerInput(bitmap, canvasSize) { // Key depends only on bitmap/canvasSize so drag coroutine is NOT cancelled during movement
+                        val touchThreshold = 150.dp.toPx() // Generous touch target threshold for easy finger capture
+
                         detectDragGestures(
                             onDragStart = { touchOffset ->
                                 val distTL = hypot((pxTL.x - touchOffset.x).toDouble(), (pxTL.y - touchOffset.y).toDouble()).toFloat()
@@ -1054,51 +1114,45 @@ fun InteractivePerspectiveCrop(
                                 val distBR = hypot((pxBR.x - touchOffset.x).toDouble(), (pxBR.y - touchOffset.y).toDouble()).toFloat()
                                 val distBL = hypot((pxBL.x - touchOffset.x).toDouble(), (pxBL.y - touchOffset.y).toDouble()).toFloat()
 
-                                val nodeDists = listOf(
-                                    "TL" to distTL,
-                                    "TR" to distTR,
-                                    "BR" to distBR,
-                                    "BL" to distBL
-                                )
-                                val closest = nodeDists.minByOrNull { it.second }
-                                if (closest != null && closest.second <= 100f) {
-                                    activeNodeName = closest.first
+                                val dists = listOf(distTL, distTR, distBR, distBL)
+                                val minIdx = dists.indices.minByOrNull { dists[it] }
+                                if (minIdx != null && dists[minIdx] <= touchThreshold) {
+                                    activePointIndex = minIdx
                                 } else {
-                                    activeNodeName = null
+                                    activePointIndex = null
                                 }
                             },
                             onDrag = { change, dragAmount ->
                                 change.consume()
-                                activeNodeName?.let { node ->
-                                    val currentNorm = when (node) {
-                                        "TL" -> cropPoints.tl
-                                        "TR" -> cropPoints.tr
-                                        "BR" -> cropPoints.br
-                                        "BL" -> cropPoints.bl
+                                activePointIndex?.let { idx ->
+                                    val currentPx = when (idx) {
+                                        0 -> pxTL
+                                        1 -> pxTR
+                                        2 -> pxBR
+                                        3 -> pxBL
                                         else -> Offset.Zero
                                     }
-                                    val currentPx = Offset(offsetX + currentNorm.x * dispW, offsetY + currentNorm.y * dispH)
                                     val newPx = currentPx + dragAmount
                                     val newNormX = ((newPx.x - offsetX) / dispW).coerceIn(0f, 1f)
                                     val newNormY = ((newPx.y - offsetY) / dispH).coerceIn(0f, 1f)
-                                    val updatedNorm = Offset(newNormX, newNormY)
+                                    val newNorm = Offset(newNormX, newNormY)
 
-                                    val newCropPoints = when (node) {
-                                        "TL" -> cropPoints.copy(tl = updatedNorm)
-                                        "TR" -> cropPoints.copy(tr = updatedNorm)
-                                        "BR" -> cropPoints.copy(br = updatedNorm)
-                                        "BL" -> cropPoints.copy(bl = updatedNorm)
-                                        else -> cropPoints
+                                    when (idx) {
+                                        0 -> tl = newNorm
+                                        1 -> tr = newNorm
+                                        2 -> br = newNorm
+                                        3 -> bl = newNorm
                                     }
-                                    onCropPointsChanged(newCropPoints)
+
+                                    onPointsChanged(listOf(tl, tr, br, bl))
                                 }
                             },
-                            onDragEnd = { activeNodeName = null },
-                            onDragCancel = { activeNodeName = null }
+                            onDragEnd = { activePointIndex = null },
+                            onDragCancel = { activePointIndex = null }
                         )
                     }
             ) {
-                // 1. Draw Bitmap
+                // 1. Draw Bitmap background
                 val androidMatrix = Matrix().apply {
                     postScale(scale, scale)
                     postTranslate(offsetX, offsetY)
@@ -1118,7 +1172,7 @@ fun InteractivePerspectiveCrop(
                     close()
                 }
 
-                // 3. Draw Semi-transparent Black Overlay outside selection
+                // 3. Draw Semi-transparent Black Overlay (0.6f alpha) outside crop quadrilateral
                 val fullScreenPath = androidx.compose.ui.graphics.Path().apply {
                     addRect(androidx.compose.ui.geometry.Rect(0f, 0f, cWidth, cHeight))
                 }
@@ -1129,7 +1183,7 @@ fun InteractivePerspectiveCrop(
                 )
                 drawPath(
                     path = dimOutsidePath,
-                    color = Color.Black.copy(alpha = 0.55f)
+                    color = Color.Black.copy(alpha = 0.6f)
                 )
 
                 // 4. Draw Thick Orange Border Line (0xFFFF7A00)
@@ -1139,35 +1193,31 @@ fun InteractivePerspectiveCrop(
                     style = Stroke(width = 3.5.dp.toPx())
                 )
 
-                // 5. Draw 4 Orange Node Circles (radius 40f) for clear touch handle interaction
-                val nodesList = listOf(
-                    "TL" to pxTL,
-                    "TR" to pxTR,
-                    "BR" to pxBR,
-                    "BL" to pxBL
-                )
+                // 5. Draw 4 Large Orange Circles (25.dp radius) with Inner White Circles at each node
+                val nodesPx = listOf(pxTL, pxTR, pxBR, pxBL)
+                val handleRadius = 25.dp.toPx()
+                val innerDotRadius = 8.dp.toPx()
 
-                nodesList.forEach { (name, pxOffset) ->
-                    val isActive = (name == activeNodeName)
-                    val baseRadius = 40f
-                    val outerRadius = if (isActive) baseRadius + 12f else baseRadius
+                nodesPx.forEachIndexed { idx, pxOffset ->
+                    val isActive = (idx == activePointIndex)
+                    val r = if (isActive) handleRadius * 1.25f else handleRadius
 
-                    // Outer soft shadow
+                    // Outer shadow glow
                     drawCircle(
                         color = Color.Black.copy(alpha = 0.35f),
-                        radius = outerRadius + 4f,
+                        radius = r + 4.dp.toPx(),
                         center = pxOffset
                     )
-                    // Orange Circle (0xFFFF7A00)
+                    // Solid Orange Handle Circle
                     drawCircle(
                         color = orangeColor,
-                        radius = outerRadius,
+                        radius = r,
                         center = pxOffset
                     )
-                    // Inner White Precision Dot
+                    // Inner Precision White Circle
                     drawCircle(
                         color = Color.White,
-                        radius = 12f,
+                        radius = innerDotRadius,
                         center = pxOffset
                     )
                 }
@@ -1176,57 +1226,63 @@ fun InteractivePerspectiveCrop(
     }
 }
 
-@Composable
-fun ScannerCropOverlay(
-    bitmap: Bitmap,
-    points: List<Offset>, // 4 points [TL, TR, BR, BL] normalized 0..1
-    onPointsChanged: (List<Offset>) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val cropPoints = remember(points) {
-        if (points.size >= 4) {
-            CropPoints(tl = points[0], tr = points[1], br = points[2], bl = points[3])
-        } else {
-            CropPoints.default()
-        }
-    }
-
-    InteractivePerspectiveCrop(
-        bitmap = bitmap,
-        cropPoints = cropPoints,
-        onCropPointsChanged = { updated ->
-            onPointsChanged(listOf(updated.tl, updated.tr, updated.br, updated.bl))
-        },
-        modifier = modifier
-    )
-}
-
 /**
  * Checkpoint 4: Perspective Transform & Crop Helper
  * Crops image bounded by 4 points and applies perspective transform flattening the quadrilateral into a clean rectangle.
  */
-fun cropPerspective(
+/**
+ * Checkpoint 1: Perspective Transform & Crop Function
+ * Crops and warps the quadrilateral bounded by 4 points (tl, tr, bl, br) into a clean, flat rectangle Bitmap.
+ * Supports both normalized points (0..1) and view pixel coordinates.
+ */
+fun cropAndWarpBitmap(
     bitmap: Bitmap,
-    tlNorm: Offset,
-    trNorm: Offset,
-    brNorm: Offset,
-    blNorm: Offset
+    tl: Offset,
+    tr: Offset,
+    bl: Offset,
+    br: Offset,
+    viewWidth: Float = 0f,
+    viewHeight: Float = 0f
 ): Bitmap {
     val srcW = bitmap.width.toFloat()
     val srcH = bitmap.height.toFloat()
 
-    val pTL = Offset(tlNorm.x * srcW, tlNorm.y * srcH)
-    val pTR = Offset(trNorm.x * srcW, trNorm.y * srcH)
-    val pBR = Offset(brNorm.x * srcW, brNorm.y * srcH)
-    val pBL = Offset(blNorm.x * srcW, blNorm.y * srcH)
+    val pTL: Offset
+    val pTR: Offset
+    val pBL: Offset
+    val pBR: Offset
+
+    if (viewWidth > 0f && viewHeight > 0f && (tl.x > 1.0f || tl.y > 1.0f || tr.x > 1.0f || tr.y > 1.0f)) {
+        val scale = minOf(viewWidth / srcW, viewHeight / srcH)
+        val dispW = srcW * scale
+        val dispH = srcH * scale
+        val offsetX = (viewWidth - dispW) / 2f
+        val offsetY = (viewHeight - dispH) / 2f
+
+        fun mapToBitmap(pt: Offset): Offset {
+            val normX = ((pt.x - offsetX) / dispW).coerceIn(0f, 1f)
+            val normY = ((pt.y - offsetY) / dispH).coerceIn(0f, 1f)
+            return Offset(normX * srcW, normY * srcH)
+        }
+
+        pTL = mapToBitmap(tl)
+        pTR = mapToBitmap(tr)
+        pBL = mapToBitmap(bl)
+        pBR = mapToBitmap(br)
+    } else {
+        pTL = Offset(tl.x * srcW, tl.y * srcH)
+        pTR = Offset(tr.x * srcW, tr.y * srcH)
+        pBL = Offset(bl.x * srcW, bl.y * srcH)
+        pBR = Offset(br.x * srcW, br.y * srcH)
+    }
 
     val widthA = hypot((pBR.x - pBL.x).toDouble(), (pBR.y - pBL.y).toDouble()).toFloat()
     val widthB = hypot((pTR.x - pTL.x).toDouble(), (pTR.y - pTL.y).toDouble()).toFloat()
-    val targetWidth = maxOf(widthA, widthB).coerceAtLeast(100f)
+    val targetWidth = maxOf(widthA, widthB).coerceAtLeast(50f)
 
     val heightA = hypot((pTR.x - pBR.x).toDouble(), (pTR.y - pBR.y).toDouble()).toFloat()
     val heightB = hypot((pTL.x - pBL.x).toDouble(), (pTL.y - pBL.y).toDouble()).toFloat()
-    val targetHeight = maxOf(heightA, heightB).coerceAtLeast(100f)
+    val targetHeight = maxOf(heightA, heightB).coerceAtLeast(50f)
 
     val srcPoints = floatArrayOf(
         pTL.x, pTL.y,
@@ -1250,6 +1306,16 @@ fun cropPerspective(
     canvas.drawBitmap(bitmap, matrix, paint)
 
     return resultBmp
+}
+
+fun cropPerspective(
+    bitmap: Bitmap,
+    tlNorm: Offset,
+    trNorm: Offset,
+    brNorm: Offset,
+    blNorm: Offset
+): Bitmap {
+    return cropAndWarpBitmap(bitmap, tlNorm, trNorm, blNorm, brNorm)
 }
 
 fun cropPerspective(bitmap: Bitmap, cropPoints: CropPoints): Bitmap {
