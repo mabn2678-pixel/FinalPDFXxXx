@@ -29,6 +29,8 @@ class TesseractManager(private val context: Context) {
     private var isInitialized = false
     private val TAG = "TesseractManager"
 
+    private var currentLanguage: String? = null
+
     fun preprocessImageForOcr(bitmap: Bitmap): Bitmap {
         val width = bitmap.width
         val height = bitmap.height
@@ -51,7 +53,7 @@ class TesseractManager(private val context: Context) {
             totalLuminance += lum
         }
         val avgLuminance = totalLuminance / (sampleW * sampleH)
-        val isDark = avgLuminance < 128.0
+        val isDark = avgLuminance < 120.0
 
         // 2. Grayscale matrix
         val cm = ColorMatrix()
@@ -70,8 +72,8 @@ class TesseractManager(private val context: Context) {
             cm.postConcat(invertMatrix)
         }
 
-        // 4. Contrast enhancement
-        val contrast = 1.6f
+        // 4. Subtle contrast enhancement (1.2f to preserve thin font strokes and umlauts)
+        val contrast = 1.2f
         val translate = (-0.5f * contrast + 0.5f) * 255f
         val contrastMatrix = ColorMatrix(
             floatArrayOf(
@@ -115,12 +117,21 @@ class TesseractManager(private val context: Context) {
             val dataPath = context.filesDir.absolutePath
             val activeLang = if (language.isBlank()) getAvailableLanguagesCombined() else language
 
+            if (isInitialized && tessApi != null && currentLanguage == activeLang) {
+                return@withContext true
+            }
+
+            tessApi?.recycle()
+            tessApi = null
+
             val api = TessBaseAPI()
             val success = api.init(dataPath, activeLang)
             if (success) {
                 api.pageSegMode = TessBaseAPI.PageSegMode.PSM_AUTO
+                api.setVariable("preserve_interword_spaces", "1")
                 tessApi = api
                 isInitialized = true
+                currentLanguage = activeLang
                 Log.d(TAG, "Tesseract initialized successfully with language: $activeLang")
                 true
             } else {
@@ -264,7 +275,14 @@ class TesseractManager(private val context: Context) {
             if (files != null && files.isNotEmpty()) {
                 val langs = files.map { it.name.removeSuffix(".traineddata") }.filter { it.isNotBlank() }
                 if (langs.isNotEmpty()) {
-                    return langs.joinToString("+")
+                    // Sort languages so Latin/German script (LTR) comes before Arabic (RTL)
+                    val priorityMap = mapOf("deu" to 1, "eng" to 2, "ara" to 99)
+                    val sortedLangs = langs.sortedWith { a, b ->
+                        val pA = priorityMap[a] ?: 50
+                        val pB = priorityMap[b] ?: 50
+                        pA.compareTo(pB)
+                    }
+                    return sortedLangs.joinToString("+")
                 }
             }
         } catch (e: Exception) {

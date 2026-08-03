@@ -49,6 +49,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.magnifier
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -97,6 +98,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
@@ -112,6 +114,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -249,9 +252,8 @@ fun CameraOcrScreen(
         when {
             createdPdfFile != null || screenState == OcrScreenState.Success -> {
                 createdPdfFile = null
-                capturedBitmap = null
                 extractedTextResult = null
-                screenState = OcrScreenState.Camera
+                screenState = OcrScreenState.Crop
             }
             capturedBitmap != null || screenState == OcrScreenState.Crop -> {
                 capturedBitmap = null
@@ -1051,6 +1053,7 @@ fun ScannerCropOverlay(
     modifier: Modifier = Modifier
 ) {
     var activeNode by remember { mutableStateOf<Int?>(null) } // 0=TL, 1=TR, 2=BR, 3=BL
+    var magnifierSourceCenter by remember { mutableStateOf(Offset.Unspecified) }
 
     var tl by remember(bitmap) { mutableStateOf(points.getOrElse(0) { Offset(0.08f, 0.08f) }) }
     var tr by remember(bitmap) { mutableStateOf(points.getOrElse(1) { Offset(0.92f, 0.08f) }) }
@@ -1101,6 +1104,19 @@ fun ScannerCropOverlay(
                 canvasWidth = layoutCoordinates.size.width.toFloat()
                 canvasHeight = layoutCoordinates.size.height.toFloat()
             }
+            .magnifier(
+                sourceCenter = { magnifierSourceCenter },
+                magnifierCenter = {
+                    if (magnifierSourceCenter.isSpecified) {
+                        Offset(magnifierSourceCenter.x, magnifierSourceCenter.y - 250f)
+                    } else {
+                        Offset.Unspecified
+                    }
+                },
+                zoom = 2.0f,
+                size = DpSize(120.dp, 120.dp),
+                cornerRadius = 60.dp
+            )
             .pointerInput(bitmap) {
                 val touchRadius = 150.dp.toPx() // Generous touch target threshold for easy finger capture
 
@@ -1119,14 +1135,25 @@ fun ScannerCropOverlay(
                                 distBr -> 2
                                 else -> 3
                             }
+                            magnifierSourceCenter = touchPos
                         } else {
                             activeNode = null
+                            magnifierSourceCenter = Offset.Unspecified
                         }
                     },
-                    onDragEnd = { activeNode = null },
-                    onDragCancel = { activeNode = null },
+                    onDragEnd = {
+                        activeNode = null
+                        magnifierSourceCenter = Offset.Unspecified
+                    },
+                    onDragCancel = {
+                        activeNode = null
+                        magnifierSourceCenter = Offset.Unspecified
+                    },
                     onDrag = { change, dragAmount ->
                         change.consume()
+                        if (activeNode != null) {
+                            magnifierSourceCenter = change.position
+                        }
                         val dW = if (currentDispW > 0f) currentDispW else 1f
                         val dH = if (currentDispH > 0f) currentDispH else 1f
 
@@ -1220,6 +1247,7 @@ fun ScannerCropOverlay(
     var br by remember { mutableStateOf(Offset(bitmapWidth - 100f, bitmapHeight - 100f)) }
 
     var activeNode by remember { mutableStateOf<Int?>(null) }
+    var magnifierSourceCenter by remember { mutableStateOf(Offset.Unspecified) }
     val touchRadius = 150f
 
     val currentTL by rememberUpdatedState(tl)
@@ -1230,6 +1258,19 @@ fun ScannerCropOverlay(
     Canvas(
         modifier = modifier
             .fillMaxSize()
+            .magnifier(
+                sourceCenter = { magnifierSourceCenter },
+                magnifierCenter = {
+                    if (magnifierSourceCenter.isSpecified) {
+                        Offset(magnifierSourceCenter.x, magnifierSourceCenter.y - 250f)
+                    } else {
+                        Offset.Unspecified
+                    }
+                },
+                zoom = 2.0f,
+                size = DpSize(120.dp, 120.dp),
+                cornerRadius = 60.dp
+            )
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragStart = { touchPos ->
@@ -1246,14 +1287,25 @@ fun ScannerCropOverlay(
                                 distBl -> 2
                                 else -> 3
                             }
+                            magnifierSourceCenter = touchPos
                         } else {
                             activeNode = null
+                            magnifierSourceCenter = Offset.Unspecified
                         }
                     },
-                    onDragEnd = { activeNode = null },
-                    onDragCancel = { activeNode = null },
+                    onDragEnd = {
+                        activeNode = null
+                        magnifierSourceCenter = Offset.Unspecified
+                    },
+                    onDragCancel = {
+                        activeNode = null
+                        magnifierSourceCenter = Offset.Unspecified
+                    },
                     onDrag = { change, dragAmount ->
                         change.consume()
+                        if (activeNode != null) {
+                            magnifierSourceCenter = change.position
+                        }
                         when (activeNode) {
                             0 -> tl += dragAmount
                             1 -> tr += dragAmount
@@ -1312,10 +1364,10 @@ fun cropAndWarpBitmap(
     val srcW = bitmap.width.toFloat()
     val srcH = bitmap.height.toFloat()
 
-    val pTL: Offset
-    val pTR: Offset
-    val pBL: Offset
-    val pBR: Offset
+    val rawTL: Offset
+    val rawTR: Offset
+    val rawBL: Offset
+    val rawBR: Offset
 
     if (viewWidth > 0f && viewHeight > 0f && (tl.x > 1.0f || tl.y > 1.0f || tr.x > 1.0f || tr.y > 1.0f)) {
         val scale = minOf(viewWidth / srcW, viewHeight / srcH)
@@ -1330,16 +1382,25 @@ fun cropAndWarpBitmap(
             return Offset(normX * srcW, normY * srcH)
         }
 
-        pTL = mapToBitmap(tl)
-        pTR = mapToBitmap(tr)
-        pBL = mapToBitmap(bl)
-        pBR = mapToBitmap(br)
+        rawTL = mapToBitmap(tl)
+        rawTR = mapToBitmap(tr)
+        rawBL = mapToBitmap(bl)
+        rawBR = mapToBitmap(br)
     } else {
-        pTL = Offset(tl.x * srcW, tl.y * srcH)
-        pTR = Offset(tr.x * srcW, tr.y * srcH)
-        pBL = Offset(bl.x * srcW, bl.y * srcH)
-        pBR = Offset(br.x * srcW, br.y * srcH)
+        rawTL = Offset((tl.x * srcW).coerceIn(0f, srcW), (tl.y * srcH).coerceIn(0f, srcH))
+        rawTR = Offset((tr.x * srcW).coerceIn(0f, srcW), (tr.y * srcH).coerceIn(0f, srcH))
+        rawBL = Offset((bl.x * srcW).coerceIn(0f, srcW), (bl.y * srcH).coerceIn(0f, srcH))
+        rawBR = Offset((br.x * srcW).coerceIn(0f, srcW), (br.y * srcH).coerceIn(0f, srcH))
     }
+
+    // Expand points slightly outward (2% of image dimensions) to ensure white border around text
+    val padX = (srcW * 0.02f).coerceAtLeast(12f)
+    val padY = (srcH * 0.02f).coerceAtLeast(12f)
+
+    val pTL = Offset((rawTL.x - padX).coerceIn(0f, srcW), (rawTL.y - padY).coerceIn(0f, srcH))
+    val pTR = Offset((rawTR.x + padX).coerceIn(0f, srcW), (rawTR.y - padY).coerceIn(0f, srcH))
+    val pBL = Offset((rawBL.x - padX).coerceIn(0f, srcW), (rawBL.y + padY).coerceIn(0f, srcH))
+    val pBR = Offset((rawBR.x + padX).coerceIn(0f, srcW), (rawBR.y + padY).coerceIn(0f, srcH))
 
     val widthA = hypot((pBR.x - pBL.x).toDouble(), (pBR.y - pBL.y).toDouble()).toFloat()
     val widthB = hypot((pTR.x - pTL.x).toDouble(), (pTR.y - pTL.y).toDouble()).toFloat()
@@ -1380,7 +1441,7 @@ fun cropPerspective(
     brNorm: Offset,
     blNorm: Offset
 ): Bitmap {
-    return cropAndWarpBitmap(bitmap, tlNorm, trNorm, blNorm, brNorm)
+    return cropAndWarpBitmap(bitmap, tl = tlNorm, tr = trNorm, bl = blNorm, br = brNorm)
 }
 
 fun cropPerspective(bitmap: Bitmap, cropPoints: CropPoints): Bitmap {
