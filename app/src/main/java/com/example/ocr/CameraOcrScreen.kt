@@ -193,6 +193,7 @@ fun CameraOcrScreen(
 
     var flashEnabled by remember { mutableStateOf(false) }
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
+    var selectedLanguage by remember { mutableStateOf("auto") }
 
     var isProcessing by remember { mutableStateOf(false) }
     var progressMessage by remember { mutableStateOf("جاري إنشاء مستند PDF...") }
@@ -576,172 +577,211 @@ fun CameraOcrScreen(
                 }
 
                 OcrScreenState.Crop -> {
-                    // Checkpoint 2: Crop Bottom Bar with 3 Modern Cards
+                    // Crop Bottom Bar with Language Selector & Action Cards
                     Surface(
                         color = Color(0xFF141622),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                .padding(vertical = 8.dp)
                         ) {
-                            // Card 1: "صورة جديدة" (Dark Card)
-                            Surface(
-                                color = Color(0xFF262B40),
-                                shape = RoundedCornerShape(14.dp),
+                            // Language Chips Selector
+                            Row(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .clickable {
-                                        capturedBitmap = null
-                                        screenState = OcrScreenState.Camera
-                                    }
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(vertical = 12.dp, horizontal = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Refresh,
-                                        contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "صورة جديدة",
-                                        color = Color.White,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        textAlign = TextAlign.Center,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-
-                            // Card 2: "الصفحة كاملة" (Dark Card with Border)
-                            Surface(
-                                color = Color(0xFF262B40),
-                                shape = RoundedCornerShape(14.dp),
-                                border = BorderStroke(1.dp, Color(0xFF00E5A3).copy(alpha = 0.5f)),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable {
-                                        cropPoints = listOf(
-                                            Offset(0.0f, 0.0f),
-                                            Offset(1.0f, 0.0f),
-                                            Offset(1.0f, 1.0f),
-                                            Offset(0.0f, 1.0f)
+                                val languages = listOf(
+                                    "auto" to "✨ تلقائي",
+                                    "ara" to "🇸🇦 العربية",
+                                    "deu" to "🇩🇪 الألمانية",
+                                    "eng" to "🇬🇧 الإنجليزية"
+                                )
+                                languages.forEach { (code, label) ->
+                                    val isSelected = selectedLanguage == code
+                                    Surface(
+                                        color = if (isSelected) Color(0xFF00E5A3) else Color(0xFF262B40),
+                                        shape = RoundedCornerShape(20.dp),
+                                        modifier = Modifier
+                                            .padding(horizontal = 3.dp)
+                                            .clickable { selectedLanguage = code }
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            color = if (isSelected) Color(0xFF0D0E15) else Color.White,
+                                            fontSize = 11.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
                                         )
                                     }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(vertical = 12.dp, horizontal = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Fullscreen,
-                                        contentDescription = null,
-                                        tint = Color(0xFF00E5A3),
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "الصفحة كاملة",
-                                        color = Color(0xFF00E5A3),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        textAlign = TextAlign.Center,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
                                 }
                             }
 
-                            // Card 3: "مسح ضوئي" (Highlighted Card 0xFF00E5A3)
-                            Surface(
-                                color = Color(0xFF00E5A3),
-                                shape = RoundedCornerShape(14.dp),
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Row(
                                 modifier = Modifier
-                                    .weight(1.2f)
-                                    .clickable {
-                                        val bmp = capturedBitmap ?: return@clickable
-                                        screenState = OcrScreenState.Processing
-                                        progressMessage = "جاري تنفيذ القص والتعرف الضوئي..."
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                // Card 1: "صورة جديدة" (Dark Card)
+                                Surface(
+                                    color = Color(0xFF262B40),
+                                    shape = RoundedCornerShape(14.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable {
+                                            capturedBitmap = null
+                                            screenState = OcrScreenState.Camera
+                                        }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(vertical = 12.dp, horizontal = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Refresh,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "صورة جديدة",
+                                            color = Color.White,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            textAlign = TextAlign.Center,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
 
-                                        coroutineScope.launch {
-                                            try {
-                                                // Perspective Crop & Warp using user-selected crop points
-                                                val croppedBmp = cropAndWarpBitmap(
-                                                    bitmap = bmp,
-                                                    tl = cropPoints[0],
-                                                    tr = cropPoints[1],
-                                                    bl = cropPoints[3],
-                                                    br = cropPoints[2]
-                                                )
+                                // Card 2: "الصفحة كاملة" (Dark Card with Border)
+                                Surface(
+                                    color = Color(0xFF262B40),
+                                    shape = RoundedCornerShape(14.dp),
+                                    border = BorderStroke(1.dp, Color(0xFF00E5A3).copy(alpha = 0.5f)),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable {
+                                            cropPoints = listOf(
+                                                Offset(0.0f, 0.0f),
+                                                Offset(1.0f, 0.0f),
+                                                Offset(1.0f, 1.0f),
+                                                Offset(0.0f, 1.0f)
+                                            )
+                                        }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(vertical = 12.dp, horizontal = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Fullscreen,
+                                            contentDescription = null,
+                                            tint = Color(0xFF00E5A3),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "الصفحة كاملة",
+                                            color = Color(0xFF00E5A3),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            textAlign = TextAlign.Center,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
 
-                                                progressMessage = "جاري التعرف على النصوص Tesseract..."
-                                                val combinedLanguages = withContext(Dispatchers.IO) {
-                                                    tesseractManager.getAvailableLanguagesCombined()
-                                                }
-                                                val ocrData = withContext(Dispatchers.IO) {
-                                                    tesseractManager.extractTextWithCoordinates(croppedBmp, combinedLanguages)
-                                                }
-                                                val fullText = withContext(Dispatchers.IO) {
-                                                    tesseractManager.extractFullText(croppedBmp, combinedLanguages)
-                                                }
-                                                extractedTextResult = fullText
+                                // Card 3: "مسح ضوئي" (Highlighted Card 0xFF00E5A3)
+                                Surface(
+                                    color = Color(0xFF00E5A3),
+                                    shape = RoundedCornerShape(14.dp),
+                                    modifier = Modifier
+                                        .weight(1.2f)
+                                        .clickable {
+                                            val bmp = capturedBitmap ?: return@clickable
+                                            screenState = OcrScreenState.Processing
+                                            progressMessage = "جاري تنفيذ القص والتعرف الضوئي..."
 
-                                                progressMessage = "جاري إنشاء مستند PDF..."
-                                                val pdfDir = File(context.filesDir, "documents").apply { if (!exists()) mkdirs() }
-                                                val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-                                                val fileName = "Scanner_OCR_$timestamp.pdf"
-                                                val outputFile = File(pdfDir, fileName)
-
-                                                val createdFile = withContext(Dispatchers.IO) {
-                                                    PdfBoxGenerator.createSearchablePdf(
-                                                        context = context,
-                                                        image = croppedBmp,
-                                                        ocrData = ocrData,
-                                                        outputPath = outputFile.absolutePath
+                                            coroutineScope.launch {
+                                                try {
+                                                    // Perspective Crop & Warp using user-selected crop points
+                                                    val croppedBmp = cropAndWarpBitmap(
+                                                        bitmap = bmp,
+                                                        tl = cropPoints[0],
+                                                        tr = cropPoints[1],
+                                                        bl = cropPoints[3],
+                                                        br = cropPoints[2]
                                                     )
-                                                }
 
-                                                createdPdfFile = createdFile
-                                                screenState = OcrScreenState.Success
-                                            } catch (e: Exception) {
-                                                Log.e("CameraOcrScreen", "Error during scan processing", e)
-                                                Toast.makeText(context, "حدث خطأ أثناء المعالجة: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
-                                                screenState = OcrScreenState.Crop
+                                                    progressMessage = "جاري التعرف على النصوص Tesseract..."
+                                                    val ocrData = withContext(Dispatchers.IO) {
+                                                        tesseractManager.extractTextWithCoordinates(croppedBmp, selectedLanguage)
+                                                    }
+                                                    val fullText = withContext(Dispatchers.IO) {
+                                                        tesseractManager.extractFullText(croppedBmp, selectedLanguage)
+                                                    }
+                                                    extractedTextResult = fullText
+
+                                                    progressMessage = "جاري إنشاء مستند PDF..."
+                                                    val pdfDir = File(context.filesDir, "documents").apply { if (!exists()) mkdirs() }
+                                                    val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+                                                    val fileName = "Scanner_OCR_$timestamp.pdf"
+                                                    val outputFile = File(pdfDir, fileName)
+
+                                                    val createdFile = withContext(Dispatchers.IO) {
+                                                        PdfBoxGenerator.createSearchablePdf(
+                                                            context = context,
+                                                            image = croppedBmp,
+                                                            ocrData = ocrData,
+                                                            outputPath = outputFile.absolutePath
+                                                        )
+                                                    }
+
+                                                    createdPdfFile = createdFile
+                                                    screenState = OcrScreenState.Success
+                                                } catch (e: Exception) {
+                                                    Log.e("CameraOcrScreen", "Error during scan processing", e)
+                                                    Toast.makeText(context, "حدث خطأ أثناء المعالجة: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                                                    screenState = OcrScreenState.Crop
+                                                }
                                             }
                                         }
-                                    }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.AutoAwesome,
-                                        contentDescription = null,
-                                        tint = Color.Black,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "مسح ضوئي",
-                                        color = Color.Black,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        textAlign = TextAlign.Center,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                    Row(
+                                        modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.AutoAwesome,
+                                            contentDescription = null,
+                                            tint = Color.Black,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "مسح ضوئي",
+                                            color = Color.Black,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            textAlign = TextAlign.Center,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1393,9 +1433,9 @@ fun cropAndWarpBitmap(
         rawBR = Offset((br.x * srcW).coerceIn(0f, srcW), (br.y * srcH).coerceIn(0f, srcH))
     }
 
-    // Expand points slightly outward (2% of image dimensions) to ensure white border around text
-    val padX = (srcW * 0.02f).coerceAtLeast(12f)
-    val padY = (srcH * 0.02f).coerceAtLeast(12f)
+    // Expand points slightly outward (3.5% of image dimensions) to ensure white border around text
+    val padX = (srcW * 0.035f).coerceAtLeast(18f)
+    val padY = (srcH * 0.035f).coerceAtLeast(18f)
 
     val pTL = Offset((rawTL.x - padX).coerceIn(0f, srcW), (rawTL.y - padY).coerceIn(0f, srcH))
     val pTR = Offset((rawTR.x + padX).coerceIn(0f, srcW), (rawTR.y - padY).coerceIn(0f, srcH))
