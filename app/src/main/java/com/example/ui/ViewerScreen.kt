@@ -593,6 +593,47 @@ fun ViewerScreen(
                             onDismiss = { viewModel.closeAddStickyNoteDialog() }
                         )
                     }
+
+                    // Text Selection Floating Toolbar (Highlight Menu)
+                    if (state.showTextSelectionToolbar && !state.selectedPdfText.isNullOrBlank()) {
+                        Surface(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 80.dp, start = 16.dp, end = 16.dp)
+                                .fillMaxWidth(0.9f),
+                            shape = RoundedCornerShape(24.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shadowElevation = 8.dp
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Close / Clear selection button
+                                IconButton(onClick = { viewModel.clearTextSelection() }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "إلغاء التحديد"
+                                    )
+                                }
+
+                                // Color circles
+                                val highlightColors = listOf("#FFEB3B", "#8BC34A", "#03A9F4", "#E91E63", "#9C27B0")
+                                highlightColors.forEach { colorHex ->
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(android.graphics.Color.parseColor(colorHex)))
+                                            .clickable {
+                                                viewModel.highlightSelectedText(context, colorHex)
+                                            }
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             } else {
                 Box(
@@ -2724,14 +2765,27 @@ fun PdfWebView(
                                         }
 
                                         var addedAny = false;
+                                        var rectList = [];
                                         if (rects && rects.length > 0) {
                                             for (var i = 0; i < rects.length; i++) {
                                                 var rect = rects[i];
                                                 if (rect.width > 0.5 && rect.height > 0.5) {
-                                                    var leftPct = ((rect.left - pageRect.left) / pageRect.width) * 100;
-                                                    var topPct = ((rect.top - pageRect.top) / pageRect.height) * 100;
-                                                    var widthPct = (rect.width / pageRect.width) * 100;
-                                                    var heightPct = (rect.height / pageRect.height) * 100;
+                                                    var leftRel = (rect.left - pageRect.left) / pageRect.width;
+                                                    var topRel = (rect.top - pageRect.top) / pageRect.height;
+                                                    var widthRel = rect.width / pageRect.width;
+                                                    var heightRel = rect.height / pageRect.height;
+
+                                                    rectList.push({
+                                                        left: leftRel,
+                                                        top: topRel,
+                                                        width: widthRel,
+                                                        height: heightRel
+                                                    });
+
+                                                    var leftPct = leftRel * 100;
+                                                    var topPct = topRel * 100;
+                                                    var widthPct = widthRel * 100;
+                                                    var heightPct = heightRel * 100;
 
                                                     var highlightSpan = document.createElement('div');
                                                     highlightSpan.className = 'custom-highlight-rect';
@@ -2759,6 +2813,19 @@ fun PdfWebView(
                                                     addedAny = true;
                                                 }
                                             }
+                                        }
+
+                                        var targetPageNum = 1;
+                                        try {
+                                            if (pageElem && pageElem.getAttribute('data-page-number')) {
+                                                targetPageNum = parseInt(pageElem.getAttribute('data-page-number')) || 1;
+                                            } else if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) {
+                                                targetPageNum = PDFViewerApplication.pdfViewer.currentPageNumber || 1;
+                                            }
+                                        } catch(e) {}
+
+                                        if (rectList.length > 0 && typeof AndroidBridge !== 'undefined' && AndroidBridge.onHighlightCoordinatesRequested) {
+                                            AndroidBridge.onHighlightCoordinatesRequested(targetPageNum, colorHex, JSON.stringify(rectList));
                                         }
 
                                         if (!addedAny && window.lastSelectionText) {
@@ -2957,6 +3024,13 @@ fun PdfWebView(
                     fun onTextSelected(text: String, pageNumber: Int) {
                         coroutineScope.launch {
                             viewModel.onTextSelected(text, pageNumber)
+                        }
+                    }
+
+                    @android.webkit.JavascriptInterface
+                    fun onHighlightCoordinatesRequested(page: Int, colorHex: String, rectsJson: String) {
+                        coroutineScope.launch {
+                            viewModel.savePermanentHighlight(context, page, colorHex, rectsJson)
                         }
                     }
                 }, "AndroidBridge")
