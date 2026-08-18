@@ -491,7 +491,7 @@ fun DashboardScreen(
 
     // Camera OCR Screen Overlay
     if (showCameraOcr) {
-        com.example.ocr.CameraOcrScreen(
+        com.example.ocr.UnifiedCameraOcrScreen(
             onBack = { showCameraOcr = false },
             onOpenPdfViewer = { pdfFile ->
                 showCameraOcr = false
@@ -2875,7 +2875,7 @@ fun ToolsTabScreen(viewModel: PdfViewModel) {
                 modifier = Modifier.fillMaxSize(),
                 color = MaterialTheme.colorScheme.background
             ) {
-                com.example.ocr.CameraOcrScreen(
+                com.example.ocr.UnifiedCameraOcrScreen(
                     onBack = { activeTool = ActiveTool.None },
                     onOpenPdfViewer = { pdfFile ->
                         activeTool = ActiveTool.None

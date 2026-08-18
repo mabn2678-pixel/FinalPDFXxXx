@@ -41,9 +41,6 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.Locale
-import org.json.JSONArray
-import android.util.Log
-import android.widget.Toast
 
 enum class Screen {
     Welcome,
@@ -648,101 +645,6 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
         android.widget.Toast.makeText(context, "تم تظليل النص بنجاح", android.widget.Toast.LENGTH_SHORT).show()
     }
 
-    fun savePermanentHighlight(context: Context, pageNumber: Int, colorHex: String, rectsJson: String) {
-        val pdfPath = _uiState.value.currentPdfPath ?: return
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                com.tom_roush.pdfbox.android.PDFBoxResourceLoader.init(context.applicationContext)
-                val file = File(pdfPath)
-                if (!file.exists()) return@launch
-
-                val document = com.tom_roush.pdfbox.pdmodel.PDDocument.load(file)
-                val totalPages = document.numberOfPages
-                val targetPageIndex = (pageNumber - 1).coerceIn(0, totalPages - 1)
-                val page = document.getPage(targetPageIndex)
-
-                val mediaBox = page.mediaBox ?: com.tom_roush.pdfbox.pdmodel.common.PDRectangle(0f, 0f, 612f, 792f)
-                val pageWidth = mediaBox.width
-                val pageHeight = mediaBox.height
-
-                val jsonArray = JSONArray(rectsJson)
-                if (jsonArray.length() == 0) {
-                    document.close()
-                    return@launch
-                }
-
-                val rgb = parseHexToRGB(colorHex)
-                val pdColor = com.tom_roush.pdfbox.pdmodel.graphics.color.PDColor(
-                    rgb,
-                    com.tom_roush.pdfbox.pdmodel.graphics.color.PDDeviceRGB.INSTANCE
-                )
-
-                val annotations = page.annotations
-
-                for (i in 0 until jsonArray.length()) {
-                    val obj = jsonArray.getJSONObject(i)
-                    val leftRel = obj.optDouble("left", 0.0).toFloat()
-                    val topRel = obj.optDouble("top", 0.0).toFloat()
-                    val widthRel = obj.optDouble("width", 0.0).toFloat()
-                    val heightRel = obj.optDouble("height", 0.0).toFloat()
-
-                    if (widthRel <= 0f || heightRel <= 0f) continue
-
-                    // Convert relative 0..1 coordinates to PDF coordinate space (PDF origin is bottom-left)
-                    val pdfLeft = (leftRel * pageWidth).coerceIn(0f, pageWidth)
-                    val pdfRight = ((leftRel + widthRel) * pageWidth).coerceIn(0f, pageWidth)
-                    val pdfTop = ((1f - topRel) * pageHeight).coerceIn(0f, pageHeight)
-                    val pdfBottom = ((1f - (topRel + heightRel)) * pageHeight).coerceIn(0f, pageHeight)
-
-                    val rect = com.tom_roush.pdfbox.pdmodel.common.PDRectangle()
-                    rect.lowerLeftX = pdfLeft
-                    rect.lowerLeftY = pdfBottom
-                    rect.upperRightX = pdfRight
-                    rect.upperRightY = pdfTop
-
-                    val highlight = com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup(
-                        com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationTextMarkup.SUB_TYPE_HIGHLIGHT
-                    )
-                    highlight.rectangle = rect
-                    highlight.color = pdColor
-
-                    val quadPoints = floatArrayOf(
-                        pdfLeft, pdfTop,
-                        pdfRight, pdfTop,
-                        pdfLeft, pdfBottom,
-                        pdfRight, pdfBottom
-                    )
-                    highlight.quadPoints = quadPoints
-
-                    annotations.add(highlight)
-                }
-
-                document.save(file)
-                document.close()
-
-                withContext(Dispatchers.Main) {
-                    _uiState.update { it.copy(hasUnsavedChanges = false) }
-                    Toast.makeText(context, "تم حفظ التظليل دائماً في ملف الـ PDF", Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {
-                Log.e("PdfViewModel", "Error saving permanent highlight", e)
-            }
-        }
-    }
-
-    private fun parseHexToRGB(colorHex: String): FloatArray {
-        val clean = colorHex.replace("#", "")
-        val colorInt = try {
-            android.graphics.Color.parseColor("#$clean")
-        } catch (e: Exception) {
-            android.graphics.Color.YELLOW
-        }
-        val r = android.graphics.Color.red(colorInt) / 255f
-        val g = android.graphics.Color.green(colorInt) / 255f
-        val b = android.graphics.Color.blue(colorInt) / 255f
-        return floatArrayOf(r, g, b)
-    }
-
     fun openAddStickyNoteDialog() {
         _uiState.update { it.copy(showAddStickyNoteDialog = true) }
     }
@@ -893,11 +795,11 @@ class PdfViewModel(private val recentPdfDao: RecentPdfDao) : ViewModel() {
     }
 
     fun triggerFitWidth() {
-        sendJsCommand("(function() { try { if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) { PDFViewerApplication.pdfViewer.currentScaleValue = 'page-width'; setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 100); } } catch(e) {} })()")
+        sendJsCommand("(function() { try { if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) { PDFViewerApplication.pdfViewer.currentScaleValue = 'page-width'; window.baseFitScale = PDFViewerApplication.pdfViewer.currentScale; setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 100); } } catch(e) {} })()")
     }
 
     fun triggerFitPage() {
-        sendJsCommand("(function() { try { if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) { PDFViewerApplication.pdfViewer.currentScaleValue = 'page-fit'; setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 100); } } catch(e) {} })()")
+        sendJsCommand("(function() { try { if (typeof PDFViewerApplication !== 'undefined' && PDFViewerApplication.pdfViewer) { PDFViewerApplication.pdfViewer.currentScaleValue = 'page-fit'; window.baseFitScale = PDFViewerApplication.pdfViewer.currentScale; setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 100); } } catch(e) {} })()")
     }
 
     // PDF Navigation commands
